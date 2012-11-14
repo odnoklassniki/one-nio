@@ -21,14 +21,16 @@ public class SocketPool extends Pool<Socket> {
 
     @Override
     public Socket createObject() throws PoolException {
+        Socket socket = null;
         try {
-            Socket socket = Socket.create();
+            socket = Socket.create();
             socket.setKeepAlive(true);
             socket.setNoDelay(true);
             socket.setTimeout(timeout);
             socket.connect(address, port);
             return socket;
         } catch (IOException e) {
+            if (socket != null) { socket.close(); }
             throw new PoolException(e);
         }
     }

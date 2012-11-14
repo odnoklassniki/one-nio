@@ -2,6 +2,8 @@ package one.nio.serial.gen;
 
 import one.nio.util.JavaInternals;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -23,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DelegateGenerator extends ClassLoader implements Opcodes {
     private static final DelegateGenerator INSTANCE = new DelegateGenerator();
+    private static final Log log = LogFactory.getLog(DelegateGenerator.class);
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final ObjectInputStream nullObjectInputStream;
     private static final ObjectOutputStream nullObjectOutputStream;
@@ -125,7 +128,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             } else {
                 mv.visitVarInsn(ALOAD, 1);
                 generateFieldAccess(mv, GETFIELD, f);
-                generateTypeCast(mv, f.getType(), fi.sourceClass);
+                generateTypeCast(mv, f.getType(), fi.sourceClass, f);
             }
 
             mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectOutput", srcType.writeMethod(), srcType.writeSignature());
@@ -168,13 +171,13 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 mv.visitLdcInsn(unsafe.objectFieldOffset(f));
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
-                generateTypeCast(mv, fi.sourceClass, f.getType());
+                generateTypeCast(mv, fi.sourceClass, f.getType(), f);
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
             } else {
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
-                generateTypeCast(mv, fi.sourceClass, f.getType());
+                generateTypeCast(mv, fi.sourceClass, f.getType(), f);
                 generateFieldAccess(mv, PUTFIELD, f);
             }
         }
@@ -219,11 +222,13 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         mv.visitEnd();
     }
 
-    private static void generateTypeCast(MethodVisitor mv, Class<?> src, Class<?> dst) {
+    private static void generateTypeCast(MethodVisitor mv, Class<?> src, Class<?> dst, Field f) {
         // Trivial case
         if (src == dst || dst.isAssignableFrom(src)) {
             return;
         }
+
+        log.warn("Migrating type of " + f + ": " + src.getName() + " -> " + dst.getName());
 
         // Primitive -> Primitive
         if (src.isPrimitive() && dst.isPrimitive()) {
@@ -279,6 +284,12 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 generateMethodInvoke(mv, m.getDeclaringClass().isInterface() ? INVOKEINTERFACE : INVOKEVIRTUAL, m);
                 return;
             }
+        }
+
+        // Type widening
+        if (src.isAssignableFrom(dst)) {
+            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
+            return;
         }
 
         throw new ClassCastException("Cannot convert " + src.getName() + " to " + dst.getName());
