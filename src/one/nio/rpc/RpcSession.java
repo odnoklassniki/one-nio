@@ -65,7 +65,7 @@ public class RpcSession extends Session {
     }
 
     @SuppressWarnings("unchecked")
-    private void processRequest(byte[] buffer) throws Exception {
+    protected void processRequest(byte[] buffer) throws Exception {
         Object response;
         try {
             Object request = new DeserializeStream(buffer).readObject();

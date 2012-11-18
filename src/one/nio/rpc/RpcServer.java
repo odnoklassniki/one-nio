@@ -8,10 +8,11 @@ import one.nio.server.Server;
 import java.io.IOException;
 
 public class RpcServer extends Server {
-    private final RpcService service;
+    protected final RpcService service;
 
-    public RpcServer(ConnectionString conn) throws IOException {
-        this(conn, new DefaultRpcService());
+    protected RpcServer(ConnectionString conn) throws IOException {
+        super(conn);
+        this.service = (RpcService) this;
     }
 
     public RpcServer(ConnectionString conn, RpcService service) throws IOException {

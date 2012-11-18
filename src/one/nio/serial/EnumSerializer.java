@@ -55,7 +55,7 @@ class EnumSerializer extends Serializer<Enum> {
 
     private long oldVersionUid() {
         DigestStream ds = new DigestStream("MD5");
-        ds.writeUTF(getClass().getName());
+        ds.writeUTF("one.rmi.serial.EnumSerializer");
         ds.writeUTF(cls.getName());
         ds.writeLong(0);
         return ds.digest();
