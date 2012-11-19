@@ -108,7 +108,7 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
     }
 
     private void sendRequest(Socket socket, byte[] buffer) throws IOException {
-        socket.write(buffer, 0, buffer.length);
+        socket.writeFully(buffer, 0, buffer.length);
         socket.readFully(buffer, 0, 4);
     }
 
