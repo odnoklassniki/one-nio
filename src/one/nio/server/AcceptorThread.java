@@ -20,6 +20,8 @@ final class AcceptorThread extends Thread {
     final Socket serverSocket;
     final Random random;
 
+    long acceptedSessions;
+
     AcceptorThread(Server server, InetAddress address, int port, int backlog, int buffers) throws IOException {
         super("NIO Acceptor");
         setUncaughtExceptionHandler(server);
@@ -54,6 +56,7 @@ final class AcceptorThread extends Thread {
                 socket.setBlocking(false);
                 Session session = server.createSession(socket);
                 getSmallestSelector().register(session);
+                acceptedSessions++;
             } catch (Exception e) {
                 if (server.isRunning()) {
                     log.error("Cannot accept incoming connection", e);

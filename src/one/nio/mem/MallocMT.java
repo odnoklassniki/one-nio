@@ -1,5 +1,7 @@
 package one.nio.mem;
 
+import one.nio.util.Management;
+
 /**
  * MT-friendly version of Malloc.
  * Divides the whole memory space into 8 thread-local areas.
@@ -23,7 +25,7 @@ public class MallocMT extends Malloc {
     }
 
     @Override
-    public long freeMemory() {
+    public long getFreeMemory() {
         long result = 0;
         for (Malloc segment : segments) {
             result += segment.freeMemory;
@@ -66,6 +68,8 @@ public class MallocMT extends Malloc {
 
     @Override
     void init() {
+        Management.registerMXBean(this, "type=MallocMT,base=" + Long.toHexString(base));
+
         long segmentSize = (capacity / SEGMENT_COUNT) & ~7;
         segments = new Malloc[SEGMENT_COUNT];
 

@@ -41,6 +41,17 @@ public class Session implements Closeable {
         }
     }
 
+    public synchronized void getQueueStats(long[] stats) {
+        int length = 0;
+        long bytes = 0;
+        for (WriteQueue head = writeQueue; head != null; head = head.next) {
+            length++;
+            bytes += head.count;
+        }
+        stats[0] = length;
+        stats[1] = bytes;
+    }
+
     public synchronized void write(byte[] data, int offset, int count, boolean close) throws IOException {
         if (writeQueue != null) {
             WriteQueue tail = writeQueue;

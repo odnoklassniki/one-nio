@@ -2,11 +2,21 @@ package one.nio.serial;
 
 import one.nio.util.DigestStream;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class EnumSerializer extends Serializer<Enum> {
+    private static final Log log = LogFactory.getLog(GeneratedSerializer.class);
+
+    static final AtomicInteger enumOldSerializers = new AtomicInteger();
+    static final AtomicInteger enumCountMismatches = new AtomicInteger();
+    static final AtomicInteger enumMissedConstants = new AtomicInteger();
+
     private Enum[] values;
 
     EnumSerializer(Class cls) {
@@ -28,12 +38,21 @@ class EnumSerializer extends Serializer<Enum> {
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         super.readExternal(in);
         Enum[] ownValues = (Enum[]) cls.getEnumConstants();
+
         if (uid == oldVersionUid()) {
             this.values = ownValues;
+            log.warn("Old EnumSerializer [" + uid() + "] for " + cls.getName());
+            enumOldSerializers.incrementAndGet();
         } else {
             this.values = new Enum[in.readUnsignedShort()];
             for (int i = 0; i < values.length; i++) {
                 values[i] = find(ownValues, in.readUTF(), i);
+            }
+
+            if (ownValues.length != values.length) {
+                log.warn("Enum count mismatch [" + uid() + "] for " + cls.getName() + ": " +
+                        ownValues.length + " local vs. " + values.length + " stream constants");
+                enumCountMismatches.incrementAndGet();
             }
         }
     }
@@ -61,12 +80,15 @@ class EnumSerializer extends Serializer<Enum> {
         return ds.digest();
     }
 
-    private static Enum find(Enum[] values, String name, int defaultIndex) {
+    private Enum find(Enum[] values, String name, int defaultIndex) {
         for (Enum v : values) {
             if (name.equals(v.name())) {
                 return v;
             }
         }
+
+        log.warn("Missed local enum constant " + cls.getName() + "." + name);
+        enumMissedConstants.incrementAndGet();
         return defaultIndex < values.length ? values[defaultIndex] : null;
     }
 }

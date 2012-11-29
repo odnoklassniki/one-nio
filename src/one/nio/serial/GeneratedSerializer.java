@@ -15,10 +15,15 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class GeneratedSerializer extends Serializer {
     private static final Log log = LogFactory.getLog(GeneratedSerializer.class);
     private static final ClassSerializer classSerializer = (ClassSerializer) Repository.get(Class.class);
+
+    static final AtomicInteger missedLocalFields = new AtomicInteger();
+    static final AtomicInteger missedStreamFields = new AtomicInteger();
+    static final AtomicInteger migratedFields = new AtomicInteger();
 
     private Delegate delegate;
 
@@ -63,6 +68,7 @@ class GeneratedSerializer extends Serializer {
         for (Field f : ownFields) {
             if (f != null) {
                 logFieldMismatch("Local field is missed in stream", f.getType(), f.getDeclaringClass(), f.getName());
+                missedLocalFields.incrementAndGet();
             }
         }
 
@@ -115,17 +121,19 @@ class GeneratedSerializer extends Serializer {
             Field f = itr.next();
             if (f != null && f.getName().equals(name)) {
                 logFieldMismatch("Field type migrated from " + type.getName(), f.getType(), f.getDeclaringClass(), f.getName());
+                migratedFields.incrementAndGet();
                 itr.set(null);
                 return f;
             }
         }
 
         logFieldMismatch("Stream field is missed locally", type, cls, name);
+        missedStreamFields.incrementAndGet();
         return null;
     }
 
     private void logFieldMismatch(String msg, Class type, Class holder, String name) {
-        log.warn("[" + Long.toHexString(uid) + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
+        log.warn("[" + uid() + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
     }
 
     private List<Field> getSerializableFields() {

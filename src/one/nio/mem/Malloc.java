@@ -1,6 +1,7 @@
 package one.nio.mem;
 
 import one.nio.util.JavaInternals;
+import one.nio.util.Management;
 
 import sun.misc.Unsafe;
 
@@ -8,7 +9,7 @@ import sun.misc.Unsafe;
  * The simplified implementation of Doug Lea's Memory Allocator.
  * See http://g.oswego.edu/dl/html/malloc.html
  */
-public class Malloc {
+public class Malloc implements MallocMXBean {
     static final Unsafe unsafe = JavaInternals.getUnsafe();
 
     static final int BASE_OFFSET     = 0;
@@ -58,16 +59,20 @@ public class Malloc {
         init();
     }
 
-    public long totalMemory() {
+    public long base() {
+        return base;
+    }
+
+    public long getTotalMemory() {
         return capacity;
     }
 
-    public long freeMemory() {
+    public long getFreeMemory() {
         return freeMemory;
     }
 
-    public long usedMemory() {
-        return totalMemory() - freeMemory();
+    public long getUsedMemory() {
+        return getTotalMemory() - getFreeMemory();
     }
 
     public long calloc(int size) {
@@ -162,6 +167,8 @@ public class Malloc {
 
     // Initial setup of the empty heap
     void init() {
+        Management.registerMXBean(this, "type=Malloc,base=" + Long.toHexString(base));
+
         long oldBase = unsafe.getLong(base + BASE_OFFSET);
         long oldCapacity = unsafe.getLong(base + CAPACITY_OFFSET);
         unsafe.putLong(base + BASE_OFFSET, base);

@@ -6,24 +6,36 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class Serializer<T> implements Externalizable {
     Class cls;
     long uid;
+
+    static final AtomicInteger serializersSent = new AtomicInteger();
+    static final AtomicInteger serializersReceived = new AtomicInteger();
 
     Serializer(Class cls) {
         this.cls = cls;
         this.uid = generateLongUid();
     }
 
+    public String uid() {
+        return Long.toHexString(uid);
+    }
+
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
+        serializersSent.incrementAndGet();
+
         out.writeUTF(cls.getName());
         out.writeLong(uid);
     }
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        serializersReceived.incrementAndGet();
+
         this.cls = Class.forName(in.readUTF());
         this.uid = in.readLong();
     }
@@ -33,7 +45,7 @@ public abstract class Serializer<T> implements Externalizable {
         StringBuilder builder = new StringBuilder(100);
         builder.append("---\n");
         builder.append("Class: ").append(cls.getName()).append('\n');
-        builder.append("UID: ").append(Long.toHexString(uid)).append('\n');
+        builder.append("UID: ").append(uid()).append('\n');
         return builder.toString();
     }
 

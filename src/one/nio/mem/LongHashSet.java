@@ -6,22 +6,34 @@ import sun.misc.Unsafe;
 
 public class LongHashSet {
     protected static final Unsafe unsafe = JavaInternals.getUnsafe();
-    protected static final long countOffset = JavaInternals.fieldOffset(LongHashSet.class, "count");
+    protected static final long sizeOffset = JavaInternals.fieldOffset(LongHashSet.class, "size");
 
     public static final long EMPTY = 0;
     public static final long REMOVED = 0x8000000000000000L;
 
-    protected volatile int count;
-    protected final int capacity;
-    protected final long keys;
+    protected volatile int size;
+    protected int capacity;
+    protected int maxSteps;
+    protected long keys;
 
     public LongHashSet(int capacity) {
         this.capacity = roundUp(capacity);
+        this.maxSteps = (int) Math.sqrt(capacity);
         this.keys = DirectMemory.allocateAndFill((long) this.capacity * 8, this, (byte) 0);
     }
 
-    public final int count() {
-        return count;
+    public LongHashSet(int capacity, long keys) {
+        if (capacity != roundUp(capacity)) {
+            throw new IllegalArgumentException("Capacity must be power of 2");
+        }
+        this.capacity = capacity;
+        this.maxSteps = (int) Math.sqrt(capacity);
+        this.keys = keys;
+        this.size = calculateSize();
+    }
+
+    public final int size() {
+        return size;
     }
 
     public final int capacity() {
@@ -29,37 +41,54 @@ public class LongHashSet {
     }
 
     public final int getKey(long key) {
-        final int mask = this.capacity - 1;
-        for (int i = hash(key) & mask; ; i = (i + 1) & mask) {
-            long cur = keyAt(i);
+        final int mask = capacity - 1;
+        int step = 0;
+        int index = hash(key) & mask;
+
+        do {
+            long cur = keyAt(index);
             if (cur == key) {
-                return i;
+                return index;
             } else if (cur == EMPTY) {
                 return -1;
             }
-        }
+
+            index = (index + ++step) & mask;
+        } while (step < maxSteps);
+
+        return -1;
     }
 
     public final int putKey(long key) {
-        final int mask = this.capacity - 1;
-        for (int i = hash(key) & mask; ; i = (i + 1) & mask) {
-            long cur = keyAt(i);
-            if (cur == EMPTY || cur == REMOVED) {
-                if (unsafe.compareAndSwapLong(null, keys + (long) i * 8, cur, key)) {
-                    increment();
-                    return i;
+        final int mask = capacity - 1;
+        int step = 0;
+        int index = hash(key) & mask;
+
+        do {
+            long cur = keyAt(index);
+            if (cur == EMPTY) {
+                if (!unsafe.compareAndSwapLong(null, keys + (long) index * 8, cur, key)) {
+                    continue;
                 }
-                cur = keyAt(i);
+                incrementSize();
+                return index;
+            } else if (cur == key) {
+                return index;
             }
-            if (cur == key) {
-                return i;
-            }
-        }
+
+            index = (index + ++step) & mask;
+        } while (step < maxSteps);
+
+        throw new OutOfMemoryException("No room for a new key");
     }
 
-    public final boolean remove(long key) {
+    public final int removeKey(long key) {
         int index = getKey(key);
-        return index >= 0 && unsafe.compareAndSwapLong(null, keys + (long) index * 8, key, REMOVED);
+        if (index >= 0 && unsafe.compareAndSwapLong(null, keys + (long) index * 8, key, REMOVED)) {
+            decrementSize();
+            return index;
+        }
+        return -1;
     }
 
     public final long keyAt(int index) {
@@ -70,17 +99,37 @@ public class LongHashSet {
         unsafe.putLong(keys + (long) index * 8, value);
     }
 
-    private void increment() {
+    protected void incrementSize() {
         for (;;) {
-            int current = count;
-            if (unsafe.compareAndSwapInt(this, countOffset, current, current + 1)) {
+            int current = size;
+            if (unsafe.compareAndSwapInt(this, sizeOffset, current, current + 1)) {
                 return;
             }
         }
     }
 
+    protected void decrementSize() {
+        for (;;) {
+            int current = size;
+            if (unsafe.compareAndSwapInt(this, sizeOffset, current, current - 1)) {
+                return;
+            }
+        }
+    }
+
+    private int calculateSize() {
+        int result = 0;
+        for (int i = 0; i < capacity; i++) {
+            long cur = keyAt(i);
+            if (cur != EMPTY && cur != REMOVED) {
+                result++;
+            }
+        }
+        return result;
+    }
+
     protected static int hash(long key) {
-        return (int) key ^ (int) (key >>> 32);
+        return (int) key ^ (int) (key >>> 21) ^ (int) (key >>> 42);
     }
 
     protected static int roundUp(int n) {

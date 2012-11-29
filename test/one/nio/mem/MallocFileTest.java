@@ -19,12 +19,12 @@ public class MallocFileTest {
             MappedFile mf = new MappedFile(tmpFile.getAbsolutePath(), FILE_SIZE);
             try {
                 Malloc m = new MallocMT(mf);
-                System.out.println("Run " + (++run) + ", free = " + m.freeMemory());
-                if (lastFree != 0 && lastFree != m.freeMemory()) {
-                    throw new AssertionError("Last free = " + lastFree + ", current free = " + m.freeMemory());
+                System.out.println("Run " + (++run) + ", free = " + m.getFreeMemory());
+                if (lastFree != 0 && lastFree != m.getFreeMemory()) {
+                    throw new AssertionError("Last free = " + lastFree + ", current free = " + m.getFreeMemory());
                 }
                 test(m);
-                lastFree = m.freeMemory();
+                lastFree = m.getFreeMemory();
             } finally {
                 mf.close();
             }

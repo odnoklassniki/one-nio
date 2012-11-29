@@ -17,6 +17,10 @@ final class SelectorThread extends Thread {
     final Server server;
     final Selector selector;
 
+    long operations;
+    long sessions;
+    int maxReady;
+
     SelectorThread(Server server, int num) throws IOException {
         super("NIO Selector #" + num);
         setUncaughtExceptionHandler(server);
@@ -38,7 +42,8 @@ final class SelectorThread extends Thread {
         final byte[] buffer = new byte[BUFFER_SIZE];
 
         while (server.isRunning()) {
-            for (Iterator<Session> selectedSessions = selector.select(); selectedSessions.hasNext(); ) {
+            int ready = 0;
+            for (Iterator<Session> selectedSessions = selector.select(); selectedSessions.hasNext(); ready++) {
                 Session session = selectedSessions.next();
                 try {
                     session.process(buffer);
@@ -53,6 +58,12 @@ final class SelectorThread extends Thread {
                     }
                     session.close();
                 }
+            }
+
+            operations++;
+            sessions += ready;
+            if (ready > maxReady) {
+                maxReady = ready;
             }
         }
     }

@@ -1,6 +1,7 @@
 package one.nio.serial;
 
 import one.nio.rpc.RemoteMethodCall;
+import one.nio.util.Management;
 
 import java.io.Externalizable;
 import java.io.Serializable;
@@ -8,11 +9,11 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class Repository {
-    private static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
-    private static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
-    private static final Serializer[] bootstrapSerializers = new Serializer[128];
-    private static final int ENUM = 0x4000;
-    private static long nextBootstrapUid = -10;
+    static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
+    static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
+    static final Serializer[] bootstrapSerializers = new Serializer[128];
+    static final int ENUM = 0x4000;
+    static long nextBootstrapUid = -10;
 
     static {
         addBootstrap(new IntegerSerializer());
@@ -73,6 +74,8 @@ public class Repository {
 
         addBootstrap(new TimestampSerializer());
         addBootstrap(new GeneratedSerializer(RemoteMethodCall.class));
+
+        Management.registerMXBean(new SerializationMXBeanImpl(), "type=Serialization");
     }
     
     private static void addBootstrap(Serializer serializer) {
@@ -113,12 +116,6 @@ public class Repository {
         }
     }
 
-    public static synchronized void dump() {
-        for (Serializer s : uidMap.values()) {
-            System.out.print(s);
-        }
-    }
-
     private static synchronized Serializer generateFor(Class cls) {
         Serializer serializer = classMap.get(cls);
         if (serializer == null) {
@@ -148,4 +145,4 @@ public class Repository {
         }
         return serializer;
     }
- }
+}

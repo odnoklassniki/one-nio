@@ -8,13 +8,13 @@ final class CleanupThread extends Thread {
     private static final Log log = LogFactory.getLog(CleanupThread.class);
 
     final Server server;
-    final int keepAlive;
+    final long keepAlive;
 
     CleanupThread(Server server, int keepAlive) {
         super("NIO Cleanup");
         setUncaughtExceptionHandler(server);
         this.server = server;
-        this.keepAlive = keepAlive;
+        this.keepAlive = keepAlive * 1000L;
     }
 
     void shutdown() {

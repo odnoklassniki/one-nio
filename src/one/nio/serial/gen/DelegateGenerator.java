@@ -56,7 +56,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
 
         ClassWriter cv = new ClassWriter(0);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, "sun/reflect/" + className, null, SUPER_CLASS,
-                new String[] {"one/nio/serial/gen/Delegate"});
+                new String[] { "one/nio/serial/gen/Delegate" });
 
         generateConstructor(cv);
         generateWrite(cv, cls, fieldsInfo);
