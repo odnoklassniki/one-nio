@@ -7,21 +7,26 @@ import one.nio.server.Server;
 
 import java.io.IOException;
 
-public class RpcServer extends Server {
-    protected final RpcService service;
+public class RpcServer<Q, R> extends Server implements RpcService<Q, R> {
+    protected RpcService<Q, R> delegate;
 
     protected RpcServer(ConnectionString conn) throws IOException {
         super(conn);
-        this.service = (RpcService) this;
+        this.delegate = null;
     }
 
-    public RpcServer(ConnectionString conn, RpcService service) throws IOException {
+    public RpcServer(ConnectionString conn, RpcService<Q, R> delegate) throws IOException {
         super(conn);
-        this.service = service;
+        this.delegate = delegate;
     }
 
     @Override
     public Session createSession(Socket socket) {
-        return new RpcSession(socket, service);
+        return new RpcSession(socket, this);
+    }
+
+    @Override
+    public R invoke(Q request) throws Exception {
+        return delegate.invoke(request);
     }
 }

@@ -52,7 +52,7 @@ final class SelectorThread extends Thread {
                         log.debug("Connection closed: " + session.clientIp());
                     }
                     session.close();
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     if (server.isRunning()) {
                         log.error("Cannot process session", e);
                     }

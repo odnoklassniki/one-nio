@@ -29,6 +29,10 @@ public class ConnectionString {
         return uri.getPort();
     }
 
+    public String getStringParam(String key) {
+        return params.get(key);
+    }
+
     public String getStringParam(String key, String defaultValue) {
         String result = params.get(key);
         return result != null ? result : defaultValue;

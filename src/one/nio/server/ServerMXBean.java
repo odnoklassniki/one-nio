@@ -3,6 +3,7 @@ package one.nio.server;
 public interface ServerMXBean {
     boolean isRunning();
     int getConnections();
+    boolean getWorkersUsed();
     int getWorkers();
     int getWorkersActive();
     long getAcceptedSessions();

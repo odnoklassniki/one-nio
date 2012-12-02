@@ -24,6 +24,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     protected SelectorThread[] selectors;
     protected WorkerPool workers;
     protected CleanupThread cleanup;
+    protected boolean useWorkers;
 
     public Server(ConnectionString conn) throws IOException {
         InetAddress address = InetAddress.getByName(conn.getHost());
@@ -39,6 +40,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         this.acceptor = new AcceptorThread(this, address, port, backlog, buffers);
         this.selectors = new SelectorThread[selectorCount];
         this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
+        this.useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
 
         for (int i = 0; i < selectorCount; i++) {
             this.selectors[i] = new SelectorThread(this, i);
@@ -61,6 +63,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         workers.setCorePoolSize(conn.getIntParam("minWorkers", 0));
         workers.setMaximumPoolSize(conn.getIntParam("maxWorkers", 1000));
         workers.setQueueTime(conn.getLongParam("queueTime", 0));
+        useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
 
         int selectorCount = conn.getIntParam("selectors", 32);
         if (selectorCount > selectors.length) {
@@ -124,6 +127,11 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
             result += selector.selector.size();
         }
         return result;
+    }
+
+    @Override
+    public boolean getWorkersUsed() {
+        return useWorkers;
     }
 
     @Override

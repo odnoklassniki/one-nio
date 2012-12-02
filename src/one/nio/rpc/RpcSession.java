@@ -7,23 +7,29 @@ import one.nio.serial.DeserializeStream;
 import one.nio.serial.SerializeStream;
 import one.nio.serial.SerializerNotFoundException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.IOException;
+import java.net.SocketException;
 
 public class RpcSession extends Session {
+    private static final Log log = LogFactory.getLog(RpcSession.class);
     private static final int BUFFER_SIZE = 8000;
 
-    private final RpcService service;
+    private final RpcServer server;
     private byte[] buffer;
     private int bytesRead;
     private int requestSize;
 
-    public RpcSession(Socket socket, RpcService service) {
+    public RpcSession(Socket socket, RpcServer server) {
         super(socket);
-        this.service = service;
+        this.server = server;
         this.buffer = new byte[BUFFER_SIZE];
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     protected void processRead(byte[] unusedBuffer) throws Exception {
         byte[] buffer = this.buffer;
         int bytesRead = this.bytesRead;
@@ -55,34 +61,66 @@ public class RpcSession extends Session {
             return;
         }
 
-        // Request is complete - proceed with the invocation
+        // Request is complete - deserialize it
         this.bytesRead = 0;
         this.requestSize = 0;
-        processRequest(buffer);
-        if (requestSize > BUFFER_SIZE) {
-            this.buffer = new byte[BUFFER_SIZE];
+
+        final Object request;
+        try {
+            request = new DeserializeStream(buffer).readObject();
+        } catch (SerializerNotFoundException e) {
+            writeResponse(e);
+            return;
+        } finally {
+            if (requestSize > BUFFER_SIZE) {
+                this.buffer = new byte[BUFFER_SIZE];
+            }
+        }
+
+        // Perform the invocation
+        if (server.getWorkersUsed()) {
+            server.asyncExecute(new AsyncRequest(request));
+        } else {
+            writeResponse(server.invoke(request));
         }
     }
 
-    @SuppressWarnings("unchecked")
-    protected void processRequest(byte[] buffer) throws Exception {
-        Object response;
-        try {
-            Object request = new DeserializeStream(buffer).readObject();
-            response = service.invoke(request);
-        } catch (SerializerNotFoundException e) {
-            response = e;
-        }
-
+    protected void writeResponse(Object response) throws IOException {
         CalcSizeStream calcSizeStream = new CalcSizeStream();
         calcSizeStream.writeObject(response);
         int size = calcSizeStream.count();
-        buffer = new byte[size + 4];
+        byte[] buffer = new byte[size + 4];
 
         SerializeStream ss = new SerializeStream(buffer);
         ss.writeInt(size);
         ss.writeObject(response);
 
         super.write(buffer, 0, buffer.length, false);
+    }
+
+    private class AsyncRequest implements Runnable {
+        private final Object request;
+
+        AsyncRequest(Object request) {
+            this.request = request;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public void run() {
+            try {
+                writeResponse(server.invoke(request));
+            } catch (SocketException e) {
+                if (server.isRunning() && log.isDebugEnabled()) {
+                    log.debug("Connection closed: " + clientIp());
+                }
+                close();
+            } catch (Throwable e) {
+                if (server.isRunning()) {
+                    log.error("Cannot process session", e);
+                }
+                close();
+            }
+        }
     }
 }

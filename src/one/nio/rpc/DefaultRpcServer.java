@@ -7,7 +7,7 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DefaultRpcServer extends RpcServer implements RpcService<RemoteMethodCall, Object> {
+public class DefaultRpcServer extends RpcServer<RemoteMethodCall, Object> {
     protected final Map<Long, Method> idToMethod;
     protected final Object instance;
 
