@@ -26,7 +26,7 @@ public class DefaultRpcServer extends RpcServer<RemoteMethodCall, Object> {
         this.instance = serviceInstance;
 
         for (Class cls = serviceInstance.getClass(); cls != Object.class; cls = cls.getSuperclass()) {
-            registerRemoteMethods(serviceInstance.getClass());
+            registerRemoteMethods(cls);
             for (Class intf : cls.getInterfaces()) {
                 registerRemoteMethods(intf);
             }
