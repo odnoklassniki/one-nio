@@ -15,7 +15,10 @@ public class RemoteMethodCall implements Serializable {
 
     public RemoteMethodCall(Method m, Object... args) {
         Long methodId = methodToId.get(m);
-        this.methodId = methodId != null ? methodId : calculateMethodId(m);
+        if (methodId == null) {
+            methodToId.put(m, methodId = calculateMethodId(m));
+        }
+        this.methodId = methodId;
         this.args = args;
     }
 

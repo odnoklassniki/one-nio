@@ -12,16 +12,6 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public int getClassSerializerCount() {
-        return Repository.classMap.size();
-    }
-
-    @Override
-    public int getUidSerializerCount() {
-        return Repository.uidMap.size();
-    }
-
-    @Override
     public List<String> getClassSerializers() {
         return getSerializerList(Repository.classMap);
     }

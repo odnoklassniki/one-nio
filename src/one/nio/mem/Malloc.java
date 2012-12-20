@@ -31,6 +31,8 @@ public class Malloc implements MallocMXBean {
     static final int OCCUPIED_MASK   = 0x80000000;
     static final int FREE_MASK       = 0x7ffffff8;
 
+    static final int MAX_SCAN_COUNT  = 255;
+
     final long base;
     final long capacity;
 
@@ -219,6 +221,7 @@ public class Malloc implements MallocMXBean {
     private long findChunk(long binAddress, int size) {
         int bestFitSize = Integer.MAX_VALUE;
         long bestFitChunk = 0;
+        int scanCount = MAX_SCAN_COUNT;
 
         for (long chunk = binAddress; (chunk = unsafe.getLong(chunk + NEXT_OFFSET)) != 0; ) {
             int chunkSize = unsafe.getInt(chunk + SIZE_OFFSET);
@@ -236,6 +239,9 @@ public class Malloc implements MallocMXBean {
                 // Search for a chunk with the minimum leftover size
                 bestFitSize = leftoverSize;
                 bestFitChunk = chunk;
+            } else if (--scanCount <= 0 && bestFitChunk != 0) {
+                // Do not let scan for too long
+                break;
             }
         }
 

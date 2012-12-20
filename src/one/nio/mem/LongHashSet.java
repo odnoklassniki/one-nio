@@ -17,14 +17,17 @@ public class LongHashSet {
     protected long keys;
 
     public LongHashSet(int capacity) {
-        this.capacity = roundUp(capacity);
+        if (capacity <= 0) {
+            throw new IllegalArgumentException("Capacity must be positive");
+        }
+        this.capacity = capacity;
         this.maxSteps = (int) Math.sqrt(capacity);
         this.keys = DirectMemory.allocateAndFill((long) this.capacity * 8, this, (byte) 0);
     }
 
     public LongHashSet(int capacity, long keys) {
-        if (capacity != roundUp(capacity)) {
-            throw new IllegalArgumentException("Capacity must be power of 2");
+        if (capacity <= 0) {
+            throw new IllegalArgumentException("Capacity must be positive");
         }
         this.capacity = capacity;
         this.maxSteps = (int) Math.sqrt(capacity);
@@ -41,9 +44,8 @@ public class LongHashSet {
     }
 
     public final int getKey(long key) {
-        final int mask = capacity - 1;
-        int step = 0;
-        int index = hash(key) & mask;
+        int step = 1;
+        int index = hash(key) % capacity;
 
         do {
             long cur = keyAt(index);
@@ -53,16 +55,15 @@ public class LongHashSet {
                 return -1;
             }
 
-            index = (index + ++step) & mask;
-        } while (step < maxSteps);
+            if ((index += step) >= capacity) index -= capacity;
+        } while (++step <= maxSteps);
 
         return -1;
     }
 
     public final int putKey(long key) {
-        final int mask = capacity - 1;
-        int step = 0;
-        int index = hash(key) & mask;
+        int step = 1;
+        int index = hash(key) % capacity;
 
         do {
             long cur = keyAt(index);
@@ -76,8 +77,8 @@ public class LongHashSet {
                 return index;
             }
 
-            index = (index + ++step) & mask;
-        } while (step < maxSteps);
+            if ((index += step) >= capacity) index -= capacity;
+        } while (++step <= maxSteps);
 
         throw new OutOfMemoryException("No room for a new key");
     }
@@ -97,6 +98,10 @@ public class LongHashSet {
 
     public final void setKeyAt(int index, long value) {
         unsafe.putLong(keys + (long) index * 8, value);
+    }
+
+    public void clear() {
+        unsafe.setMemory(keys, (long) capacity * 8, (byte) 0);
     }
 
     protected void incrementSize() {
@@ -129,16 +134,6 @@ public class LongHashSet {
     }
 
     protected static int hash(long key) {
-        return (int) key ^ (int) (key >>> 21) ^ (int) (key >>> 42);
-    }
-
-    protected static int roundUp(int n) {
-        n--;
-        n |= n >>> 1;
-        n |= n >>> 2;
-        n |= n >>> 4;
-        n |= n >>> 8;
-        n |= n >>> 16;
-        return n + 1;
+        return ((int) key ^ (int) (key >>> 21) ^ (int) (key >>> 42)) & 0x7fffffff;
     }
 }

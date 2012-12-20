@@ -15,7 +15,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -228,6 +227,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         // Type widening
         if (src.isAssignableFrom(dst)) {
             mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
+            return;
         }
 
         // Primitive -> Primitive
@@ -269,15 +269,6 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             // continue
         }
 
-        // new Dst(src)
-        try {
-            Constructor c = dst.getConstructor(src);
-            generateConstructorInvoke(mv, c);
-            return;
-        } catch (NoSuchMethodException e) {
-            // continue
-        }
-
         // dst = src.someMethod()
         for (Method m : src.getMethods()) {
             if (!Modifier.isStatic(m.getModifiers()) && m.getParameterTypes().length == 0 && m.getReturnType() == dst) {
@@ -286,8 +277,9 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             }
         }
 
-        // The types are not convertible, though let us throw exception during serialization, not now
-        mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
+        // The types are not convertible, just leave the default value
+        mv.visitInsn(FieldType.valueOf(src).dataSize == 8 ? POP2 : POP);
+        mv.visitInsn(FieldType.valueOf(dst).defaultOpcode);
     }
 
     private static void generateFieldAccess(MethodVisitor mv, int opcode, Field f) {
@@ -302,12 +294,5 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         String name = m.getName();
         String sig = Type.getMethodDescriptor(m);
         mv.visitMethodInsn(opcode, holder, name, sig);
-    }
-
-    private static void generateConstructorInvoke(MethodVisitor mv, Constructor c) {
-        String holder = Type.getInternalName(c.getDeclaringClass());
-        String name = c.getName();
-        String sig = Type.getConstructorDescriptor(c);
-        mv.visitMethodInsn(INVOKESPECIAL, holder, name, sig);
     }
 }

@@ -4,8 +4,9 @@ import java.util.Random;
 
 public class LongHashSetTest {
 
-    private static long benchmark(int count) {
-        LongHashSet set = new LongHashSet(count);
+    private static long benchmark(int capacity, float loadFactor) {
+        LongHashSet set = new LongHashSet(capacity);
+        int count = (int) (capacity * loadFactor);
         Random random = new Random(0);
 
         long startTime = System.currentTimeMillis();
@@ -18,7 +19,7 @@ public class LongHashSetTest {
     }
 
     public static void main(String[] args) {
-        System.out.println(benchmark(10000000));
-        System.out.println(benchmark(10000000));
+        System.out.println(benchmark(10000000, 0.75f));
+        System.out.println(benchmark(10000000, 0.99f));
     }
 }

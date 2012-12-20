@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 class EnumSerializer extends Serializer<Enum> {
-    private static final Log log = LogFactory.getLog(GeneratedSerializer.class);
+    private static final Log log = LogFactory.getLog(EnumSerializer.class);
 
     static final AtomicInteger enumOldSerializers = new AtomicInteger();
     static final AtomicInteger enumCountMismatches = new AtomicInteger();

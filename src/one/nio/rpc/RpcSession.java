@@ -117,7 +117,7 @@ public class RpcSession extends Session {
                 close();
             } catch (Throwable e) {
                 if (server.isRunning()) {
-                    log.error("Cannot process session", e);
+                    log.error("Cannot process session from " + clientIp(), e);
                 }
                 close();
             }

@@ -13,27 +13,27 @@ public class LongLongHashMap extends LongHashSet {
         this.values = values;
     }
 
-    public final long get(long key) {
+    public long get(long key) {
         int index = getKey(key);
         return index >= 0 ? valueAt(index) : 0;
     }
 
-    public final void put(long key, long value) {
+    public void put(long key, long value) {
         int index = putKey(key);
         setValueAt(index, value);
     }
 
-    public final boolean replace(long key, long oldValue, long newValue) {
+    public boolean replace(long key, long oldValue, long newValue) {
         int index = getKey(key);
         return index >= 0 && unsafe.compareAndSwapLong(null, values + (long) index * 8, oldValue, newValue);
     }
 
-    public final long replace(long key, long newValue) {
+    public long replace(long key, long newValue) {
         int index = putKey(key);
         return replaceValueAt(index, newValue);
     }
 
-    public final long remove(long key) {
+    public long remove(long key) {
         int index = getKey(key);
         return index >= 0 ? replaceValueAt(index, 0) : 0;
     }
@@ -54,5 +54,11 @@ public class LongLongHashMap extends LongHashSet {
                 return oldValue;
             }
         }
+    }
+
+    @Override
+    public void clear() {
+        super.clear();
+        unsafe.setMemory(values, (long) capacity * 8, (byte) 0);
     }
 }

@@ -3,8 +3,6 @@ package one.nio.serial;
 import java.util.List;
 
 public interface SerializationMXBean {
-    int getClassSerializerCount();
-    int getUidSerializerCount();
     List<String> getClassSerializers();
     List<String> getUidSerializers();
     String getSerializer(String uid);
