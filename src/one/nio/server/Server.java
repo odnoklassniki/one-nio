@@ -3,7 +3,7 @@ package one.nio.server;
 import one.nio.net.ConnectionString;
 import one.nio.net.Session;
 import one.nio.net.Socket;
-import one.nio.util.Management;
+import one.nio.mgt.Management;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,7 +52,10 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         this.selectorStats = new SelectorStats();
         this.queueStats = new QueueStats();
-        Management.registerMXBean(this, "type=Server,port=" + port);
+
+        if (conn.getBooleanParam("jmx", true)) {
+            Management.registerMXBean(this, "type=Server,port=" + port);
+        }
     }
 
     public boolean reconfigure(ConnectionString conn) throws IOException {

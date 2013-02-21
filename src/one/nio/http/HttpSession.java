@@ -88,7 +88,7 @@ public class HttpSession extends Session {
         throw new HttpException("Invalid request");
     }
 
-    private void processRequest(Request request) throws IOException {
+    protected void processRequest(Request request) throws IOException {
         Response response;
         try {
             response = server.processRequest(request);
@@ -105,6 +105,11 @@ public class HttpSession extends Session {
     private void writeResponse(Response response, boolean includeBody, boolean close) throws IOException {
         response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
 
+        final ByteArrayBuilder byteArrayBuilder = toByteResponse(response, includeBody);
+        write(byteArrayBuilder.buffer(), 0, byteArrayBuilder.length(), close);
+    }
+
+    protected ByteArrayBuilder toByteResponse(Response response, boolean includeBody) {
         final byte[] body = response.getBody();
         final int headerCount = response.getHeaderCount();
         final String[] headers = response.getHeaders();
@@ -126,11 +131,11 @@ public class HttpSession extends Session {
         if (includeBody && body != null) {
             builder.append(body);
         }
-
-        write(builder.buffer(), 0, builder.length(), close);
+        return builder;
     }
 
-    private void writeError(String code) throws IOException {
-        writeResponse(new Response(code), true, true);
+    protected void writeError(String code) throws IOException {
+        final Response response = new Response(code, Response.EMPTY);
+        writeResponse(response, true, true);
     }
 }

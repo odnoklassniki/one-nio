@@ -1,6 +1,7 @@
 package one.nio.http;
 
 import one.nio.net.Socket;
+import one.nio.util.URLEncoder;
 
 import java.net.InetSocketAddress;
 
@@ -45,9 +46,9 @@ public final class Request {
         if (p > 0) {
             p = path.indexOf(key, p);
             if (p > 0) {
-                p += key.length();
-                int q = path.indexOf('&', p);
-                return q > 0 ? path.substring(p, q) : path.substring(p);
+                int q = path.indexOf('&', p += key.length());
+                String rawValue = q > 0 ? path.substring(p, q) : path.substring(p);
+                return URLEncoder.decode(rawValue);
             }
         }
         return null;

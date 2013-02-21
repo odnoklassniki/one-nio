@@ -22,7 +22,7 @@ public class LongHashSet {
         }
         this.capacity = capacity;
         this.maxSteps = (int) Math.sqrt(capacity);
-        this.keys = DirectMemory.allocateAndFill((long) this.capacity * 8, this, (byte) 0);
+        this.keys = DirectMemory.allocateAndFill(sizeInBytes(capacity), this, (byte) 0);
     }
 
     public LongHashSet(int capacity, long keys) {
@@ -135,5 +135,9 @@ public class LongHashSet {
 
     protected static int hash(long key) {
         return ((int) key ^ (int) (key >>> 21) ^ (int) (key >>> 42)) & 0x7fffffff;
+    }
+
+    public static long sizeInBytes(int capacity) {
+        return (long) capacity * 8;
     }
 }

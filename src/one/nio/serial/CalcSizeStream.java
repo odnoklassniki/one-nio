@@ -7,12 +7,11 @@ import java.io.ObjectOutput;
 import java.util.IdentityHashMap;
 
 public class CalcSizeStream implements ObjectOutput {
+    protected IdentityHashMap context;
     protected int count;
-    protected IdentityHashMap<Object, Object> context;
 
     public CalcSizeStream() {
-        this.count = 0;
-        this.context = new IdentityHashMap<Object, Object>(16);
+        this.context = new IdentityHashMap();
     }
 
     public int count() {

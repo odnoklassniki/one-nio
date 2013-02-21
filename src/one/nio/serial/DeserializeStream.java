@@ -10,7 +10,7 @@ public class DeserializeStream extends ByteArrayStream {
     
     public DeserializeStream(byte[] input) {
         super(input);
-        this.context = new ArrayList<Object>(16);
+        this.context = new ArrayList<Object>(24);
     }
 
     @Override

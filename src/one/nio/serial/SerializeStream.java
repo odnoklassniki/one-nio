@@ -10,10 +10,10 @@ public class SerializeStream extends ByteArrayStream {
     static final byte REF_RECURSIVE = -2;
 
     protected IdentityHashMap<Object, Integer> context;
-    
+
     public SerializeStream(byte[] input) {
         super(input);
-        this.context = new IdentityHashMap<Object, Integer>(16); 
+        this.context = new IdentityHashMap<Object, Integer>();
     }
 
     @Override
@@ -26,7 +26,7 @@ public class SerializeStream extends ByteArrayStream {
             if (index != null) {
                 context.put(obj, index);
                 buf[count++] = REF_RECURSIVE;
-                writeShort(index.shortValue());
+                writeShort(index);
             } else {
                 Serializer serializer = Repository.get(obj.getClass());
                 if (serializer.uid < 0) {

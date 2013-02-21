@@ -9,6 +9,7 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
     protected int createdCount;
     protected int maxCount;
     protected int timeout;
+    protected int waitingThreads;
 
     protected Pool(int initialCount, int maxCount, int timeout) {
         this.initialCount = initialCount;
@@ -54,7 +55,10 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
                 } else if (currentTime >= timeLimit) {
                     throw new PoolException("Borrow timed out");
                 }
+
+                waitingThreads++;
                 wait(timeLimit - currentTime);
+                waitingThreads--;
             }
         }
 
@@ -69,9 +73,7 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
     public final void returnObject(T object) {
         synchronized (this) {
             if (!closed) {
-                if (isEmpty() && createdCount == maxCount) {
-                    notify();
-                }
+                if (waitingThreads > 0) notify();
                 addFirst(object);
                 return;
             }
@@ -110,8 +112,9 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
     }
 
     private synchronized void decreaseCount() {
-        if (!closed && createdCount-- == maxCount && isEmpty()) {
-            notify();
+        if (!closed) {
+            createdCount--;
+            if (waitingThreads > 0) notify();
         }
     }
 }

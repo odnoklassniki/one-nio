@@ -1,7 +1,7 @@
 package one.nio.serial;
 
 import one.nio.rpc.RemoteMethodCall;
-import one.nio.util.Management;
+import one.nio.mgt.Management;
 
 import java.io.Externalizable;
 import java.io.Serializable;

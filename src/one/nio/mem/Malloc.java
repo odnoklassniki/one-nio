@@ -1,7 +1,7 @@
 package one.nio.mem;
 
 import one.nio.util.JavaInternals;
-import one.nio.util.Management;
+import one.nio.mgt.Management;
 
 import sun.misc.Unsafe;
 

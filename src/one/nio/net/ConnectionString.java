@@ -16,9 +16,13 @@ public class ConnectionString {
     private URI uri;
     private HashMap<String, String> params;
 
-    public ConnectionString(String connectionString) throws URISyntaxException {
-        uri = new URI(expand(connectionString));
-        params = parseParameters(uri.getQuery());
+    public ConnectionString(String connectionString) {
+        try {
+            this.uri = new URI(expand(connectionString));
+            this.params = parseParameters(uri.getQuery());
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public String getHost() {

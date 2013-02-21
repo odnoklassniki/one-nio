@@ -61,4 +61,8 @@ public class LongLongHashMap extends LongHashSet {
         super.clear();
         unsafe.setMemory(values, (long) capacity * 8, (byte) 0);
     }
+
+    public static long sizeInBytes(int capacity) {
+        return (long) capacity * 16;
+    }
 }

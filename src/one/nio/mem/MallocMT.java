@@ -1,6 +1,6 @@
 package one.nio.mem;
 
-import one.nio.util.Management;
+import one.nio.mgt.Management;
 
 import java.util.Random;
 
@@ -33,6 +33,14 @@ public class MallocMT extends Malloc {
 
     public final Malloc segment(int index) {
         return segments[index];
+    }
+
+    public Malloc segmentFor(int n) {
+        return segments[n & SEGMENT_MASK];
+    }
+
+    public Malloc segmentFor(long n) {
+        return segments[(int) n & SEGMENT_MASK];
     }
 
     @Override
