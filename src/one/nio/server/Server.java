@@ -11,12 +11,15 @@ import org.apache.commons.logging.LogFactory;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     private static final Log log = LogFactory.getLog(Server.class);
 
     private final SelectorStats selectorStats;
     private final QueueStats queueStats;
+    private final AtomicLong requestsProcessed;
+    private final AtomicLong requestsRejected;
 
     private volatile boolean running;
 
@@ -52,6 +55,8 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         this.selectorStats = new SelectorStats();
         this.queueStats = new QueueStats();
+        this.requestsProcessed = new AtomicLong();
+        this.requestsRejected = new AtomicLong();
 
         if (conn.getBooleanParam("jmx", true)) {
             Management.registerMXBean(this, "type=Server,port=" + port);
@@ -116,6 +121,14 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     public Session createSession(Socket socket) {
         return new Session(socket);
+    }
+
+    public final long incRequestsProcessed() {
+        return requestsProcessed.incrementAndGet();
+    }
+
+    public final long incRequestsRejected() {
+        return requestsProcessed.incrementAndGet();
     }
 
     @Override
@@ -198,6 +211,16 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     @Override
+    public long getRequestsProcessed() {
+        return requestsProcessed.get();
+    }
+
+    @Override
+    public long getRequestsRejected() {
+        return requestsRejected.get();
+    }
+
+    @Override
     public void reset() {
         acceptor.acceptedSessions = 0;
         for (SelectorThread selector : selectors) {
@@ -205,6 +228,8 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
             selector.sessions = 0;
             selector.maxReady = 0;
         }
+        requestsProcessed.set(0);
+        requestsRejected.set(0);
     }
 
     public final void asyncExecute(Runnable command) {

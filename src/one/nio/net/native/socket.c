@@ -16,8 +16,8 @@
 #define SIG_WAKEUP (__SIGRTMAX - 2)
 
 static jfieldID f_fd;
-static jfieldID f_address;
 static pthread_t* fd_table;
+static int use_IPv6;
 
 
 static void throw_by_name(JNIEnv* env, const char* exception, const char* msg) {
@@ -72,6 +72,49 @@ static jfieldID cache_field(JNIEnv* env, const char* holder, const char* field, 
     return (*env)->GetFieldID(env, cls, field, signature);
 }
 
+static int check_IPv6(JNIEnv* env) {
+    int s = socket(PF_INET6, SOCK_STREAM, 0);
+    if (s != -1) {
+        jclass cls = (*env)->FindClass(env, "java/lang/Boolean");
+        jmethodID method = (*env)->GetStaticMethodID(env, cls, "getBoolean", "(Ljava/lang/String;)Z");
+        jstring str = (*env)->NewStringUTF(env, "java.net.preferIPv4Stack");
+        close(s);
+        return (*env)->CallStaticBooleanMethod(env, cls, method, str) ? 0 : 1;
+    }
+    return 0;
+}
+
+static int sockaddr_from_java(JNIEnv* env, jbyteArray address, jint port, struct sockaddr_storage* sa) {
+    if (use_IPv6) {
+        struct sockaddr_in6* sin = (struct sockaddr_in6*)sa;
+        sin->sin6_family = AF_INET6;
+        sin->sin6_port = htons(port);
+        sin->sin6_flowinfo = 0;
+        sin->sin6_scope_id = 0;
+        if ((*env)->GetArrayLength(env, address) == 4) {
+            ((int*)&sin->sin6_addr)[0] = 0;
+            ((int*)&sin->sin6_addr)[1] = 0;
+            ((int*)&sin->sin6_addr)[2] = 0xffff0000;
+            (*env)->GetByteArrayRegion(env, address, 0, 4, (jbyte*)&sin->sin6_addr + 12);
+        } else {
+            (*env)->GetByteArrayRegion(env, address, 0, 16, (jbyte*)&sin->sin6_addr);
+        }
+        return sizeof(struct sockaddr_in6);
+    } else {
+        struct sockaddr_in* sin = (struct sockaddr_in*)sa;
+        sin->sin_family = AF_INET;
+        sin->sin_port = htons(port);
+        (*env)->GetByteArrayRegion(env, address, 0, 4, (jbyte*)&sin->sin_addr);
+        return sizeof(struct sockaddr_in);
+    }
+}
+
+static int sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_storage* sa) {
+    int len = sa->ss_family == AF_INET6 ? 24 : 8;
+    (*env)->SetByteArrayRegion(env, buffer, 0, len, (jbyte*)sa);
+    return len;
+}
+
 static void wakeup_handler(int sig) {
     // Empty handler
 }
@@ -104,9 +147,11 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
         return JNI_ERR;
     }
 
-    // Cache fields IDs to access Socket.fd and InetAddress.addreess
+    // Check IPv6 support
+    use_IPv6 = check_IPv6(env);
+
+    // Cache fields ID to access Socket.fd and InetAddress.addreess
     f_fd = cache_field(env, "one/nio/net/NativeSocket", "fd", "I");
-    f_address = cache_field(env, "java/net/InetAddress", "address", "I");
 
     // Allocate table for thread pointer per file descriptor
     getrlimit(RLIMIT_NOFILE, &max_files);
@@ -123,7 +168,7 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls) {
-    int result = socket(AF_INET, SOCK_STREAM, 0);
+    int result = socket(use_IPv6 ? PF_INET6 : PF_INET, SOCK_STREAM, 0);
     if (result == -1) {
         throw_exception(env);
     }
@@ -160,34 +205,30 @@ Java_one_nio_net_NativeSocket_close(JNIEnv* env, jobject self) {
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_connect(JNIEnv* env, jobject self, jobject address, jint port) {
+Java_one_nio_net_NativeSocket_connect0(JNIEnv* env, jobject self, jbyteArray address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int addr = (*env)->GetIntField(env, address, f_address);
-    struct sockaddr_in sa;
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
-    sa.sin_addr.s_addr = htonl(addr);
-
     if (fd == -1) {
         throw_socket_closed(env);
-    } else if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
-        throw_exception(env);
+    } else {
+        struct sockaddr_storage sa;
+        int len = sockaddr_from_java(env, address, port, &sa);
+        if (connect(fd, (struct sockaddr*)&sa, len) != 0) {
+            throw_exception(env);
+        }
     }
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_bind(JNIEnv* env, jobject self, jobject address, jint port, jint backlog) {
+Java_one_nio_net_NativeSocket_bind0(JNIEnv* env, jobject self, jbyteArray address, jint port, jint backlog) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int addr = (*env)->GetIntField(env, address, f_address);
-    struct sockaddr_in sa;
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
-    sa.sin_addr.s_addr = htonl(addr);
-
     if (fd == -1) {
         throw_socket_closed(env);
-    } else if (bind(fd, (struct sockaddr*)&sa, sizeof(sa)) != 0 || listen(fd, backlog) != 0) {
-        throw_exception(env);
+    } else {
+        struct sockaddr_storage sa;
+        int len = sockaddr_from_java(env, address, port, &sa);
+        if (bind(fd, (struct sockaddr*)&sa, len) != 0 || listen(fd, backlog) != 0) {
+            throw_exception(env);
+        }
     }
 }
 
@@ -322,27 +363,25 @@ Java_one_nio_net_NativeSocket_readFully(JNIEnv* env, jobject self, jbyteArray da
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_getsockname(JNIEnv* env, jobject self, jbyteArray address) {
+Java_one_nio_net_NativeSocket_getsockname(JNIEnv* env, jobject self, jbyteArray buffer) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    struct sockaddr_in sa;
+    struct sockaddr_storage sa;
     int len = sizeof(sa);
     if (getsockname(fd, (struct sockaddr*)&sa, &len) != 0) {
         return -1;
     }
-    (*env)->SetByteArrayRegion(env, address, 0, 4, (jbyte*)&sa.sin_addr);
-    return ntohs(sa.sin_port);
+    return sockaddr_to_java(env, buffer, &sa);
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_getpeername(JNIEnv* env, jobject self, jbyteArray address) {
+Java_one_nio_net_NativeSocket_getpeername(JNIEnv* env, jobject self, jbyteArray buffer) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    struct sockaddr_in sa;
+    struct sockaddr_storage sa;
     int len = sizeof(sa);
     if (getpeername(fd, (struct sockaddr*)&sa, &len) != 0) {
         return -1;
     }
-    (*env)->SetByteArrayRegion(env, address, 0, 4, (jbyte*)&sa.sin_addr);
-    return ntohs(sa.sin_port);
+    return sockaddr_to_java(env, buffer, &sa);
 }
 
 JNIEXPORT void JNICALL

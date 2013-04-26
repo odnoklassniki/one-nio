@@ -15,21 +15,24 @@ public class ManagementServer extends HttpServer {
     }
 
     public ManagementServer(String address) throws IOException {
-        super(new ConnectionString("socket://" + address + "/?selectors=1&jmx=false"));
+        super(new ConnectionString(address + "?selectors=1&jmx=false"));
     }
 
     @Override
     public Response processRequest(Request request) {
+        Response response;
         String path = request.getPath();
         if (path.startsWith("/getstatus")) {
-            return getStatusResponse(request);
+            response = getStatusResponse(request);
         } else if (path.startsWith("/monitor")) {
-            return getMonitorResponse(request);
+            response = getMonitorResponse(request);
         } else if (path.startsWith("/jmx")) {
-            return getJmxResponse(request, request.getParameter("name="), request.getParameter("attr="));
+            response = getJmxResponse(request, request.getParameter("name="), request.getParameter("attr="));
         } else {
-            return getDefaultResponse(request);
+            response = getDefaultResponse(request);
         }
+        response.setCloseConnection(true);
+        return response;
     }
 
     protected Response getStatusResponse(Request request) {
@@ -41,7 +44,7 @@ public class ManagementServer extends HttpServer {
         if (path.startsWith("/mem", 8)) {
             return getJmxResponse(request, "one.nio.mem:type=MallocMT,*", "TotalMemory,UsedMemory,FreeMemory");
         } else if (path.startsWith("/server", 8)) {
-            return getJmxResponse(request, "*:type=Server,*", "AcceptedSessions,Connections,Workers,WorkersActive,SelectorMaxReady");
+            return getJmxResponse(request, "*:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady");
         } else {
             return getDefaultResponse(request);
         }

@@ -4,14 +4,13 @@ import one.nio.util.Utf8;
 
 import java.io.IOException;
 import java.io.ObjectOutput;
-import java.util.IdentityHashMap;
 
 public class CalcSizeStream implements ObjectOutput {
-    protected IdentityHashMap context;
+    protected SerializationContext context;
     protected int count;
 
     public CalcSizeStream() {
-        this.context = new IdentityHashMap();
+        this.context = new SerializationContext();
     }
 
     public int count() {
@@ -79,7 +78,7 @@ public class CalcSizeStream implements ObjectOutput {
     public void writeObject(Object obj) throws IOException {
         if (obj == null) {
             count++;
-        } else if (context.put(obj, obj) != null) {
+        } else if (context.put(obj) >= 0) {
             count += 3;
         } else {
             Serializer serializer = Repository.get(obj.getClass());

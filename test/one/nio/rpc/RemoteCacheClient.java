@@ -4,7 +4,6 @@ import one.nio.net.ConnectionString;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
-import java.net.URISyntaxException;
 
 public class RemoteCacheClient {
 
@@ -35,8 +34,8 @@ public class RemoteCacheClient {
     }
 
     @SuppressWarnings("unchecked")
-    private static CacheService<Entity> getCacheService(String host) throws URISyntaxException, IOException {
-        String url = "socket://" + host + ":" + CacheService.DEFAULT_PORT + "/";
+    private static CacheService<Entity> getCacheService(String host) throws IOException {
+        String url = host + ':' + CacheService.DEFAULT_PORT;
         RpcClient client = new RpcClient(new ConnectionString(url));
         return (CacheService<Entity>) Proxy.newProxyInstance(
                 CacheService.class.getClassLoader(), new Class[] { CacheService.class }, client);

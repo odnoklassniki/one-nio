@@ -51,6 +51,7 @@ public final class Response {
     private int headerCount;
     private String[] headers;
     private byte[] body;
+    private boolean closeConnection;
 
     public Response(String resultCode) {
         this.headerCount = 1;
@@ -99,5 +100,27 @@ public final class Response {
 
     public byte[] getBody() {
         return body;
+    }
+
+    public boolean getCloseConnection() {
+        return closeConnection;
+    }
+
+    public void setCloseConnection(boolean closeConnection) {
+        this.closeConnection = closeConnection;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(400);
+        sb.append("HTTP/1.0 ");
+        for (int i = 0; i < headerCount; i++) {
+            sb.append(headers[i]).append("\r\n");
+        }
+        sb.append("\r\n");
+        if (body != null) {
+            sb.append(Utf8.toString(body));
+        }
+        return sb.toString();
     }
 }

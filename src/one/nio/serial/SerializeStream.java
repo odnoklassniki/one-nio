@@ -3,17 +3,16 @@ package one.nio.serial;
 import one.nio.util.ByteArrayStream;
 
 import java.io.IOException;
-import java.util.IdentityHashMap;
 
 public class SerializeStream extends ByteArrayStream {
     static final byte REF_NULL      = -1;
     static final byte REF_RECURSIVE = -2;
 
-    protected IdentityHashMap<Object, Integer> context;
+    protected SerializationContext context;
 
     public SerializeStream(byte[] input) {
         super(input);
-        this.context = new IdentityHashMap<Object, Integer>();
+        this.context = new SerializationContext();
     }
 
     @Override
@@ -22,12 +21,8 @@ public class SerializeStream extends ByteArrayStream {
         if (obj == null) {
             buf[count++] = REF_NULL;
         } else {
-            Integer index = context.put(obj, context.size());
-            if (index != null) {
-                context.put(obj, index);
-                buf[count++] = REF_RECURSIVE;
-                writeShort(index);
-            } else {
+            int index = context.put(obj);
+            if (index < 0) {
                 Serializer serializer = Repository.get(obj.getClass());
                 if (serializer.uid < 0) {
                     buf[count++] = (byte) serializer.uid;
@@ -35,6 +30,11 @@ public class SerializeStream extends ByteArrayStream {
                     writeLong(serializer.uid);
                 }
                 serializer.write(obj, this);
+            } else if (index <= 0xffff) {
+                buf[count++] = REF_RECURSIVE;
+                writeShort(index);
+            } else {
+                throw new IOException("Recursive reference overflow");
             }
         }
     }

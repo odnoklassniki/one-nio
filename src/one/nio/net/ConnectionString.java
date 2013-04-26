@@ -1,10 +1,13 @@
 package one.nio.net;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,24 +16,43 @@ public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
     private static final String DEFAULT_ADDRESS = "0.0.0.0";
 
-    private URI uri;
-    private HashMap<String, String> params;
+    private String host;
+    private int port;
+    private Map<String, String> params;
 
     public ConnectionString(String connectionString) {
-        try {
-            this.uri = new URI(expand(connectionString));
-            this.params = parseParameters(uri.getQuery());
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(e);
+        connectionString = expand(connectionString);
+
+        int p = connectionString.indexOf("://");
+        int addrStart = p >= 0 ? p + 3 : 0;
+
+        int queryString = connectionString.indexOf('?', addrStart);
+        if (queryString >= 0) {
+            this.params = parseParameters(connectionString.substring(queryString + 1));
+        } else {
+            queryString = connectionString.length();
+            this.params = Collections.emptyMap();
+        }
+
+        p = connectionString.indexOf('/', addrStart);
+        int addrEnd = p >= 0 && p < queryString ? p : queryString;
+
+        p = connectionString.lastIndexOf(':', addrEnd);
+        if (p >= addrStart && p < addrEnd) {
+            this.host = connectionString.substring(addrStart, p);
+            this.port = Integer.parseInt(connectionString.substring(p + 1, addrEnd));
+        } else {
+            this.host = connectionString.substring(addrStart, addrEnd);
+            this.port = 0;
         }
     }
 
     public String getHost() {
-        return uri.getHost();
+        return host;
     }
 
     public int getPort() {
-        return uri.getPort();
+        return port;
     }
 
     public String getStringParam(String key) {
@@ -65,21 +87,28 @@ public class ConnectionString {
     private static String getInterfaceAddress(String interfaceName) {
         try {
             NetworkInterface intf = NetworkInterface.getByName(interfaceName);
-            return intf != null ? intf.getInetAddresses().nextElement().getHostAddress() : DEFAULT_ADDRESS;
+            if (intf == null) {
+                return DEFAULT_ADDRESS;
+            }
+
+            Enumeration<InetAddress> addrs = intf.getInetAddresses();
+            InetAddress result = addrs.nextElement();
+            while (!(result instanceof Inet4Address) && addrs.hasMoreElements()) {
+                result = addrs.nextElement();
+            }
+            return result.getHostAddress();
         } catch (SocketException e) {
             throw new IllegalArgumentException(e);
         }
     }
 
-    private static HashMap<String, String> parseParameters(String parameters) {
+    private static Map<String, String> parseParameters(String parameters) {
         HashMap<String, String> result = new HashMap<String, String>();
-        if (parameters != null) {
-            for (StringTokenizer tokenizer = new StringTokenizer(parameters, "&"); tokenizer.hasMoreElements(); ) {
-                String param = tokenizer.nextToken();
-                int p = param.indexOf('=');
-                if (p > 0) {
-                    result.put(param.substring(0, p), param.substring(p + 1));
-                }
+        for (StringTokenizer tokenizer = new StringTokenizer(parameters, "&"); tokenizer.hasMoreElements(); ) {
+            String param = tokenizer.nextToken();
+            int p = param.indexOf('=');
+            if (p > 0) {
+                result.put(param.substring(0, p), param.substring(p + 1));
             }
         }
         return result;

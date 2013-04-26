@@ -10,6 +10,8 @@ public final class Request {
     public static final int METHOD_POST = 2;
     public static final int METHOD_HEAD = 3;
 
+    private static final String[] METHODS = { "", "GET", "POST", "HEAD" };
+
     private int method;
     private String path;
     private int headerCount;
@@ -66,5 +68,16 @@ public final class Request {
         if (headerCount < headers.length) {
             headers[headerCount++] = header;
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(400);
+        sb.append("Request from ").append(getRemoteAddress()).append(":\r\n");
+        sb.append(METHODS[method]).append(' ').append(path).append(" HTTP/1.0\r\n");
+        for (int i = 0; i < headerCount; i++) {
+            sb.append(headers[i]).append("\r\n");
+        }
+        return sb.toString();
     }
 }

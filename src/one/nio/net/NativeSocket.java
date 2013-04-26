@@ -28,34 +28,49 @@ final class NativeSocket extends Socket {
 
     @Override
     public final InetSocketAddress getLocalAddress() {
-        byte[] address = new byte[4];
-        int port = getsockname(address);
-        try {
-            return port >= 0 ? new InetSocketAddress(InetAddress.getByAddress(address), port) : null;
-        } catch (UnknownHostException e) {
-            return null;
-        }
+        byte[] buffer = new byte[24];
+        return makeAddress(buffer, getsockname(buffer));
     }
 
     @Override
     public final InetSocketAddress getRemoteAddress() {
-        byte[] address = new byte[4];
-        int port = getpeername(address);
+        byte[] buffer = new byte[24];
+        return makeAddress(buffer, getpeername(buffer));
+    }
+
+    private InetSocketAddress makeAddress(byte[] buffer, int length) {
+        byte[] address;
+        if (length == 8) {
+            address = new byte[4];
+            System.arraycopy(buffer, 4, address, 0, 4);
+        } else if (length == 24) {
+            address = new byte[16];
+            System.arraycopy(buffer, 8, address, 0, 16);
+        } else {
+            return null;
+        }
+
+        int port = (buffer[2] & 0xff) << 8 | (buffer[3] & 0xff);
+
         try {
-            return port >= 0 ? new InetSocketAddress(InetAddress.getByAddress(address), port) : null;
+            return new InetSocketAddress(InetAddress.getByAddress(address), port);
         } catch (UnknownHostException e) {
             return null;
         }
     }
 
     @Override
+    public final void connect(InetAddress address, int port) throws IOException {
+        connect0(address.getAddress(), port);
+    }
+
+    @Override
+    public final void bind(InetAddress address, int port, int backlog) throws IOException {
+        bind0(address.getAddress(), port, backlog);
+    }
+
+    @Override
     public final native void close();
-
-    @Override
-    public final native void connect(InetAddress address, int port) throws IOException;
-
-    @Override
-    public final native void bind(InetAddress address, int port, int backlog) throws IOException;
 
     @Override
     public final native int writeRaw(long buf, int count) throws IOException;
@@ -95,6 +110,8 @@ final class NativeSocket extends Socket {
 
     private static native int socket0() throws IOException;
     private native int accept0() throws IOException;
-    private native int getsockname(byte[] address);
-    private native int getpeername(byte[] address);
+    private native void connect0(byte[] address, int port) throws IOException;
+    private native void bind0(byte[] address, int port, int backlog) throws IOException;
+    private native int getsockname(byte[] buffer);
+    private native int getpeername(byte[] buffer);
 }

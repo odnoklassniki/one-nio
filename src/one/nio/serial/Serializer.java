@@ -9,15 +9,20 @@ import java.io.ObjectOutput;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class Serializer<T> implements Externalizable {
-    Class cls;
-    long uid;
+    protected Class cls;
+    protected long uid;
 
     static final AtomicInteger serializersSent = new AtomicInteger();
     static final AtomicInteger serializersReceived = new AtomicInteger();
 
-    Serializer(Class cls) {
+    protected Serializer(Class cls) {
         this.cls = cls;
         this.uid = generateLongUid();
+    }
+
+    protected Serializer(Class cls, long uid) {
+        this.cls = cls;
+        this.uid = uid;
     }
 
     public String uid() {

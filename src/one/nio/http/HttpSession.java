@@ -21,7 +21,7 @@ public class HttpSession extends Session {
     private static final byte[] POST = Utf8.toBytes("POST ");
     private static final byte[] HEAD = Utf8.toBytes("HEAD ");
 
-    private final HttpServer server;
+    protected final HttpServer server;
     private byte[] fragment;
     private int fragmentLength;
     private Request request;
@@ -92,21 +92,25 @@ public class HttpSession extends Session {
         Response response;
         try {
             response = server.processRequest(request);
+            server.incRequestsProcessed();
         } catch (Exception e) {
             log.error("Internal error", e);
             writeError(Response.INTERNAL_ERROR);
+            server.incRequestsRejected();
             return;
         }
 
-        boolean keepAlive = "Keep-Alive".equalsIgnoreCase(request.getHeader("Connection: "));
-        writeResponse(response, request.getMethod() != Request.METHOD_HEAD, !keepAlive);
+        boolean close = response.getCloseConnection() || !"Keep-Alive".equalsIgnoreCase(request.getHeader("Connection: "));
+        response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
+        ByteArrayBuilder builder = toByteResponse(response, request.getMethod() != Request.METHOD_HEAD);
+        write(builder.buffer(), 0, builder.length(), close);
     }
 
-    private void writeResponse(Response response, boolean includeBody, boolean close) throws IOException {
-        response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
-
-        final ByteArrayBuilder byteArrayBuilder = toByteResponse(response, includeBody);
-        write(byteArrayBuilder.buffer(), 0, byteArrayBuilder.length(), close);
+    protected void writeError(String code) throws IOException {
+        Response response = new Response(code, Response.EMPTY);
+        response.addHeader("Connection: close");
+        ByteArrayBuilder builder = toByteResponse(response, true);
+        write(builder.buffer(), 0, builder.length(), true);
     }
 
     protected ByteArrayBuilder toByteResponse(Response response, boolean includeBody) {
@@ -132,10 +136,5 @@ public class HttpSession extends Session {
             builder.append(body);
         }
         return builder;
-    }
-
-    protected void writeError(String code) throws IOException {
-        final Response response = new Response(code, Response.EMPTY);
-        writeResponse(response, true, true);
     }
 }

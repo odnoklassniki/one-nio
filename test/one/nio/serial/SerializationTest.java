@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 
 public class SerializationTest extends TestCase {
     private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
@@ -41,6 +43,16 @@ public class SerializationTest extends TestCase {
         return result;
     }
 
+    private List makeList(int length) {
+        ArrayList<Integer> result = new ArrayList<Integer>(length * 2);
+        for (int i = 0; i < length; i++) {
+            Integer obj = i;
+            result.add(obj);
+            result.add(obj);
+        }
+        return result;
+    }
+
     public void testStrings() throws IOException, ClassNotFoundException {
         checkSerialize("");
         checkSerialize("a");
@@ -67,6 +79,23 @@ public class SerializationTest extends TestCase {
         checkSerialize(makeBitSet(2048));
         checkSerialize(makeBitSet(2049));
         checkSerialize(makeBitSet(100000));
+    }
+
+    public void testRecursiveRef() throws IOException, ClassNotFoundException {
+        checkSerialize(makeList(0));
+        checkSerialize(makeList(1));
+        checkSerialize(makeList(10));
+        checkSerialize(makeList(32767));
+        checkSerialize(makeList(32768));
+        checkSerialize(makeList(50000));
+        checkSerialize(makeList(65535));
+
+        try {
+            checkSerialize(makeList(65536));
+            Assert.fail("Should have thrown IOException");
+        } catch (IOException e) {
+            // Passed
+        }
     }
 
     private enum SimpleEnum {

@@ -16,5 +16,7 @@ public interface ServerMXBean {
     long getQueueAvgBytes();
     long getQueueMaxLength();
     long getQueueMaxBytes();
+    long getRequestsProcessed();
+    long getRequestsRejected();
     void reset();
 }

@@ -293,4 +293,9 @@ public class Malloc implements MallocMXBean {
         int index = 29 - Integer.numberOfLeadingZeros(size);
         return (index << 2) + ((size >>> index) & 3);
     }
+
+    static int binSize(int bin) {
+        bin++;
+        return (4 + (bin & 3)) << (bin >>> 2);
+    }
 }

@@ -18,6 +18,7 @@ public class Session implements Closeable {
 
     public Session(Socket socket) {
         this.socket = socket;
+        this.lastAccessTime = System.currentTimeMillis();
     }
 
     public final String clientIp() {

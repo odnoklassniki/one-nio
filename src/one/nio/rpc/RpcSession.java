@@ -12,12 +12,13 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 import java.net.SocketException;
+import java.util.concurrent.RejectedExecutionException;
 
 public class RpcSession extends Session {
     private static final Log log = LogFactory.getLog(RpcSession.class);
     private static final int BUFFER_SIZE = 8000;
 
-    private final RpcServer server;
+    protected final RpcServer server;
     private byte[] buffer;
     private int bytesRead;
     private int requestSize;
@@ -79,9 +80,16 @@ public class RpcSession extends Session {
 
         // Perform the invocation
         if (server.getWorkersUsed()) {
-            server.asyncExecute(new AsyncRequest(request));
+            try {
+                server.asyncExecute(new AsyncRequest(request));
+                server.incRequestsProcessed();
+            } catch (RejectedExecutionException e) {
+                handleRejectedExecution(e, request);
+                server.incRequestsRejected();
+            }
         } else {
             writeResponse(server.invoke(request));
+            server.incRequestsProcessed();
         }
     }
 
@@ -96,6 +104,13 @@ public class RpcSession extends Session {
         ss.writeObject(response);
 
         super.write(buffer, 0, buffer.length, false);
+    }
+
+    protected void handleRejectedExecution(RejectedExecutionException e, Object request) throws IOException {
+        writeResponse(e);
+        if (log.isWarnEnabled()) {
+            log.warn("RejectedExecutionException for request: " + request);
+        }
     }
 
     private class AsyncRequest implements Runnable {

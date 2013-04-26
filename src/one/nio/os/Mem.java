@@ -24,17 +24,19 @@ public final class Mem {
     public static final int MAP_NORESERVE = 0x4000;
     public static final int MAP_POPULATE  = 0x8000;
     public static final int MAP_NONBLOCK  = 0x10000;
+    public static final int MAP_STACK     = 0x20000;
+    public static final int MAP_HUGETLB   = 0x40000;
 
     public static final int MREMAP_MAYMOVE = 1;
     public static final int MREMAP_FIXED   = 2;
 
-    public static native long mmap(long start, long length, int prot, int flags, int fd, long offset);
+    public static native long mmap(long addr, long length, int prot, int flags, int fd, long offset);
     public static native long mremap(long oldAddress, long oldSize, long newSize, int flags);
-    public static native int munmap(long start, long length);
+    public static native int munmap(long addr, long length);
     public static native int mprotect(long addr, long len, int prot);
 
-    public static long mmap(long start, long length, int prot, int flags, FileDescriptor fd, long offset) {
-        return mmap(start, length, prot, flags, getFD(fd), offset);
+    public static long mmap(long addr, long length, int prot, int flags, FileDescriptor fd, long offset) {
+        return mmap(addr, length, prot, flags, getFD(fd), offset);
     }
 
     public static final int MS_ASYNC      = 1;

@@ -1,5 +1,6 @@
 package one.nio.mem;
 
+import one.nio.os.Mem;
 import one.nio.util.JavaInternals;
 
 import sun.nio.ch.FileChannelImpl;
@@ -9,7 +10,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.nio.channels.FileChannel;
 
 public class MappedFile implements Closeable {
     private static Method map0 = JavaInternals.getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
@@ -23,17 +23,24 @@ public class MappedFile implements Closeable {
     private long size;
 
     public MappedFile(String name, long size) throws IOException {
-        size = (size + 0xfffL) & ~0xfffL;
+        this(name, size, MAP_RW);
+    }
 
-        RandomAccessFile f = new RandomAccessFile(name, "rw");
-        FileChannel ch = f.getChannel();
-
+    public MappedFile(String name, long size, int mode) throws IOException {
+        RandomAccessFile f = new RandomAccessFile(name, mode == MAP_RW ? "rw" : "r");
         try {
-            f.setLength(size);
-            this.addr = map(ch, MAP_RW, 0, size);
+            if (size == 0) {
+                size = (f.length() + 0xfffL) & ~0xfffL;
+            } else {
+                size = (size + 0xfffL) & ~0xfffL;
+                if (mode == MAP_RW) {
+                    f.setLength(size);
+                }
+            }
+
+            this.addr = map(f, mode, 0, size);
             this.size = size;
         } finally {
-            ch.close();
             f.close();
         }
     }
@@ -53,9 +60,18 @@ public class MappedFile implements Closeable {
         return size;
     }
 
-    public static long map(FileChannel ch, int mode, long start, long size) throws IOException {
+    public static long map(RandomAccessFile f, int mode, long start, long size) throws IOException {
+        if (Mem.IS_SUPPORTED) {
+            int prot = (mode == MAP_RO) ? Mem.PROT_READ : Mem.PROT_READ | Mem.PROT_WRITE;
+            int flags = (mode == MAP_PV) ? Mem.MAP_PRIVATE : Mem.MAP_SHARED;
+            long result = Mem.mmap(0, size, prot, flags, f.getFD(), start);
+            if (result != -1) {
+                return result;
+            }
+        }
+
         try {
-            return (Long) map0.invoke(ch, mode, start, size);
+            return (Long) map0.invoke(f.getChannel(), mode, start, size);
         } catch (IllegalAccessException e) {
             throw new IllegalStateException(e);
         } catch (InvocationTargetException e) {
@@ -65,6 +81,11 @@ public class MappedFile implements Closeable {
     }
 
     public static void unmap(long start, long size) {
+        if (Mem.IS_SUPPORTED) {
+            Mem.munmap(start, size);
+            return;
+        }
+
         try {
             unmap0.invoke(null, start, size);
         } catch (IllegalAccessException e) {

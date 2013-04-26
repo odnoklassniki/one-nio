@@ -9,6 +9,7 @@ import java.net.InetAddress;
 public class SocketPool extends Pool<Socket> {
     protected InetAddress address;
     protected int port;
+    protected int readTimeout;
     protected int connectTimeout;
 
     public SocketPool(ConnectionString conn) throws IOException {
@@ -17,7 +18,8 @@ public class SocketPool extends Pool<Socket> {
               conn.getIntParam("timeout", 3000));
         this.address = InetAddress.getByName(conn.getHost());
         this.port = conn.getPort();
-        this.connectTimeout = conn.getIntParam("connectTimeout", timeout);
+        this.readTimeout = conn.getIntParam("readTimeout", timeout);
+        this.connectTimeout = conn.getIntParam("connectTimeout", readTimeout);
         initialize();
     }
 
@@ -30,7 +32,7 @@ public class SocketPool extends Pool<Socket> {
             socket.setNoDelay(true);
             socket.setTimeout(connectTimeout);
             socket.connect(address, port);
-            socket.setTimeout(timeout);
+            socket.setTimeout(readTimeout);
             return socket;
         } catch (Exception e) {
             if (socket != null) socket.close();

@@ -23,7 +23,7 @@ public class RemoteCacheServer implements CacheService<Entity> {
     }
 
     public static void main(String[] args) throws Exception {
-        String url = "socket://0.0.0.0:" + DEFAULT_PORT + "/";
+        String url = "0.0.0.0:" + DEFAULT_PORT;
         DefaultRpcServer server = new DefaultRpcServer(new ConnectionString(url), new RemoteCacheServer());
         server.start();
     }

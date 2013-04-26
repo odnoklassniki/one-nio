@@ -46,6 +46,7 @@ final class JavaSelector extends Selector {
     @Override
     public final void listen(Session session, int events) {
         ((JavaSocket) session.socket).ch.keyFor(impl).interestOps(events);
+        impl.wakeup();
     }
 
     @Override
