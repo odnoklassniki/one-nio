@@ -2,6 +2,8 @@ package one.nio.serial.gen;
 
 import one.nio.util.JavaInternals;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -18,10 +20,12 @@ import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class DelegateGenerator extends ClassLoader implements Opcodes {
     private static final DelegateGenerator INSTANCE = new DelegateGenerator();
+    private static final Log log = LogFactory.getLog(DelegateGenerator.class);
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final ObjectInputStream nullObjectInputStream;
     private static final ObjectOutputStream nullObjectOutputStream;
@@ -59,7 +63,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
 
         generateConstructor(cv);
         generateWrite(cv, cls, fieldsInfo);
-        generateRead(cv, cls);
+        generateRead(cv, cls, fieldsInfo);
         generateFill(cv, cls, fieldsInfo);
         generateSkip(cv, fieldsInfo);
 
@@ -85,8 +89,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             fos.write(classData);
             fos.close();
         } catch (IOException e) {
-            System.err.println("Could not dump " + className);
-            e.printStackTrace();
+            log.error("Could not dump " + className, e);
         }
     }
 
@@ -102,7 +105,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         mv.visitEnd();
     }
 
-    private static void generateWrite(ClassVisitor cv, Class cls, FieldInfo[] fieldInfos) {
+    private static void generateWrite(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Ljava/io/ObjectOutput;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
@@ -113,7 +116,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "writeObject", "(Ljava/io/ObjectOutputStream;)V");
         }
 
-        for (FieldInfo fi : fieldInfos) {
+        for (FieldInfo fi : fieldsInfo) {
             Field f = fi.field;
             FieldType srcType = fi.sourceType;
 
@@ -123,6 +126,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 mv.visitInsn(srcType.defaultOpcode);
             } else {
                 mv.visitVarInsn(ALOAD, 1);
+                if (fi.parent != null) generateFieldAccess(mv, GETFIELD, fi.parent);
                 generateFieldAccess(mv, GETFIELD, f);
                 generateTypeCast(mv, f.getType(), fi.sourceClass);
             }
@@ -135,24 +139,37 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         mv.visitEnd();
     }
 
-    private static void generateRead(ClassVisitor cv, Class cls) {
+    private static void generateRead(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "read", "(Ljava/io/ObjectInput;)Ljava/lang/Object;",
                 null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
         mv.visitCode();
 
         mv.visitTypeInsn(NEW, Type.getInternalName(cls));
 
+        ArrayList<Field> parents = new ArrayList<Field>(1);
+        for (FieldInfo fi : fieldsInfo) {
+            if (fi.parent != null && !parents.contains(fi.parent)) {
+                parents.add(fi.parent);
+                mv.visitInsn(DUP);
+                mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
+                mv.visitInsn(SWAP);
+                mv.visitLdcInsn(unsafe.objectFieldOffset(fi.parent));
+                mv.visitTypeInsn(NEW, Type.getInternalName(fi.parent.getType()));
+                mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", "putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V");
+            }
+        }
+
         mv.visitInsn(ARETURN);
-        mv.visitMaxs(2, 2);
+        mv.visitMaxs(6, 2);
         mv.visitEnd();
     }
 
-    private static void generateFill(ClassVisitor cv, Class cls, FieldInfo[] fieldInfos) {
+    private static void generateFill(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "fill", "(Ljava/lang/Object;Ljava/io/ObjectInput;)V",
                 null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
         mv.visitCode();
 
-        for (FieldInfo fi : fieldInfos) {
+        for (FieldInfo fi : fieldsInfo) {
             Field f = fi.field;
             FieldType srcType = fi.sourceType;
             FieldType dstType = fi.targetType;
@@ -164,6 +181,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             } else if (Modifier.isFinal(f.getModifiers())) {
                 mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 1);
+                if (fi.parent != null) generateFieldAccess(mv, GETFIELD, fi.parent);
                 mv.visitLdcInsn(unsafe.objectFieldOffset(f));
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
@@ -171,6 +189,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
             } else {
                 mv.visitVarInsn(ALOAD, 1);
+                if (fi.parent != null) generateFieldAccess(mv, GETFIELD, fi.parent);
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
                 generateTypeCast(mv, fi.sourceClass, f.getType());
@@ -189,12 +208,12 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         mv.visitEnd();
     }
 
-    private static void generateSkip(ClassVisitor cv, FieldInfo[] fieldInfos) {
+    private static void generateSkip(ClassVisitor cv, FieldInfo[] fieldsInfo) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "skip", "(Ljava/io/ObjectInput;)V",
                 null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
         mv.visitCode();
 
-        for (FieldInfo fi : fieldInfos) {
+        for (FieldInfo fi : fieldsInfo) {
             FieldType srcType = fi.sourceType;
 
             if (srcType == FieldType.Object) {

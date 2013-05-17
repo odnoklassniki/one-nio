@@ -415,6 +415,13 @@ Java_one_nio_net_NativeSocket_setNoDelay(JNIEnv* env, jobject self, jboolean noD
 }
 
 JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_setDeferAccept(JNIEnv* env, jobject self, jboolean deferAccept) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    int value = (int) deferAccept;
+    setsockopt(fd, SOL_TCP, TCP_DEFER_ACCEPT, &value, sizeof(value));
+}
+
+JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean reuseAddr) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     int value = (int) reuseAddr;

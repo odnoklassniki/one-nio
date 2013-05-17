@@ -44,7 +44,7 @@ public class ManagementServer extends HttpServer {
         if (path.startsWith("/mem", 8)) {
             return getJmxResponse(request, "one.nio.mem:type=MallocMT,*", "TotalMemory,UsedMemory,FreeMemory");
         } else if (path.startsWith("/server", 8)) {
-            return getJmxResponse(request, "*:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady");
+            return getJmxResponse(request, "one.nio.server:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady");
         } else {
             return getDefaultResponse(request);
         }

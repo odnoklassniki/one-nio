@@ -13,11 +13,9 @@ import java.io.ObjectOutput;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
 import java.util.concurrent.atomic.AtomicInteger;
 
-class GeneratedSerializer extends Serializer {
+public class GeneratedSerializer extends Serializer {
     private static final Log log = LogFactory.getLog(GeneratedSerializer.class);
     private static final ClassSerializer classSerializer = (ClassSerializer) Repository.get(Class.class);
 
@@ -30,10 +28,10 @@ class GeneratedSerializer extends Serializer {
     GeneratedSerializer(Class cls) {
         super(cls);
 
-        List<Field> ownFields = getSerializableFields();
-        FieldInfo[] fieldsInfo = new FieldInfo[ownFields.size()];
-        for (int i = 0; i < fieldsInfo.length; i++) {
-            fieldsInfo[i] = new FieldInfo(ownFields.get(i));
+        Field[] ownFields = getSerializableFields();
+        FieldInfo[] fieldsInfo = new FieldInfo[ownFields.length / 2];
+        for (int i = 0; i < ownFields.length; i += 2) {
+            fieldsInfo[i / 2] = new FieldInfo(ownFields[i], ownFields[i + 1]);
         }
 
         this.delegate = DelegateGenerator.generate(cls, fieldsInfo);
@@ -43,12 +41,12 @@ class GeneratedSerializer extends Serializer {
     public void writeExternal(ObjectOutput out) throws IOException {
         super.writeExternal(out);
 
-        List<Field> ownFields = getSerializableFields();
-        out.writeShort(ownFields.size());
+        Field[] ownFields = getSerializableFields();
+        out.writeShort(ownFields.length / 2);
         
-        for (Field f : ownFields) {
-            out.writeUTF(f.getName());
-            classSerializer.write(f.getType(), out);
+        for (int i = 0; i < ownFields.length; i += 2) {
+            out.writeUTF(ownFields[i].getName());
+            classSerializer.write(ownFields[i].getType(), out);
         }
     }
 
@@ -56,16 +54,22 @@ class GeneratedSerializer extends Serializer {
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         super.readExternal(in);
 
-        List<Field> ownFields = getSerializableFields();
+        Field[] ownFields = getSerializableFields();
         FieldInfo[] fieldsInfo = new FieldInfo[in.readUnsignedShort()];
         for (int i = 0; i < fieldsInfo.length; i++) {
             String sourceName = in.readUTF();
             Class sourceType = classSerializer.read(in);
-            Field f = findField(ownFields, sourceName, sourceType);
-            fieldsInfo[i] = new FieldInfo(f, sourceType);
+            int found = findField(ownFields, sourceName, sourceType);
+            if (found >= 0) {
+                fieldsInfo[i] = new FieldInfo(ownFields[found], ownFields[found + 1], sourceType);
+                ownFields[found] = null;
+            } else {
+                fieldsInfo[i] = new FieldInfo(null, null, sourceType);
+            }
         }
 
-        for (Field f : ownFields) {
+        for (int i = 0; i < ownFields.length; i += 2) {
+            Field f = ownFields[i];
             if (f != null) {
                 logFieldMismatch("Local field is missed in stream", f.getType(), f.getDeclaringClass(), f.getName());
                 missedLocalFields.incrementAndGet();
@@ -99,55 +103,64 @@ class GeneratedSerializer extends Serializer {
     public String toString() {
         StringBuilder builder = new StringBuilder(super.toString());
         builder.append("Fields:\n");
-        for (Field f : getSerializableFields()) {
+        Field[] ownFields = getSerializableFields();
+        for (int i = 0; i < ownFields.length; i += 2) {
+            Field f = ownFields[i];
             builder.append(" - Name: ").append(f.getName()).append('\n');
             builder.append("   Type: ").append(f.getType().getName()).append('\n');
+            if (ownFields[i + 1] != null) {
+                builder.append("   Parent: ").append(ownFields[i + 1].getName()).append('\n');
+            }
         }
         return builder.toString();
     }
 
-    private Field findField(List<Field> list, String name, Class type) {
+    private int findField(Field[] ownFields, String name, Class type) {
         // 1. Find exact match
-        for (ListIterator<Field> itr = list.listIterator(); itr.hasNext(); ) {
-            Field f = itr.next();
+        for (int i = 0; i < ownFields.length; i += 2) {
+            Field f = ownFields[i];
             if (f != null && f.getName().equals(name) && f.getType() == type) {
-                itr.set(null);
-                return f;
+                return i;
             }
         }
 
         // 2. Find match by name only
-        for (ListIterator<Field> itr = list.listIterator(); itr.hasNext(); ) {
-            Field f = itr.next();
+        for (int i = 0; i < ownFields.length; i += 2) {
+            Field f = ownFields[i];
             if (f != null && f.getName().equals(name)) {
                 logFieldMismatch("Field type migrated from " + type.getName(), f.getType(), f.getDeclaringClass(), f.getName());
                 migratedFields.incrementAndGet();
-                itr.set(null);
-                return f;
+                return i;
             }
         }
 
         logFieldMismatch("Stream field is missed locally", type, cls, name);
         missedStreamFields.incrementAndGet();
-        return null;
+        return -1;
     }
 
     private void logFieldMismatch(String msg, Class type, Class holder, String name) {
         log.warn("[" + uid() + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
     }
 
-    private List<Field> getSerializableFields() {
+    private Field[] getSerializableFields() {
         ArrayList<Field> list = new ArrayList<Field>();
-        getSerializableFields(cls, list);
-        return list;
+        getSerializableFields(cls, null, list);
+        return list.toArray(new Field[list.size()]);
     }
 
-    private static void getSerializableFields(Class cls, List<Field> list) {
+    private void getSerializableFields(Class cls, Field parentField, ArrayList<Field> list) {
         if (cls != null) {
-            getSerializableFields(cls.getSuperclass(), list);
+            getSerializableFields(cls.getSuperclass(), parentField, list);
             for (Field f : cls.getDeclaredFields()) {
-                if (!Modifier.isStatic(f.getModifiers()) && !Modifier.isTransient(f.getModifiers())) {
+                if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) == 0) {
                     list.add(f);
+                    list.add(parentField);
+                } else if ((f.getModifiers() & Modifier.STATIC) == 0
+                        && Repository.inlinedClasses.contains(f.getType())
+                        && parentField == null) {
+                    logFieldMismatch("Inlining field", f.getType(), cls, f.getName());
+                    getSerializableFields(f.getType(), f, list);
                 }
             }
         }

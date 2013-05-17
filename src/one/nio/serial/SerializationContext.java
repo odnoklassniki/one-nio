@@ -104,12 +104,6 @@ class SerializationContext {
     }
 
     private static boolean canUseMarkWord() {
-        if (!System.getProperty("os.arch").contains("64")) {
-            return false;
-        }
-
-        Object obj = new Object();
-        int hashCode = System.identityHashCode(obj);
-        return hashCode > 0 && (int) (unsafe.getLong(obj, 0L) >>> 8) == hashCode;
+        return System.getProperty("os.arch").contains("64") && Boolean.getBoolean("one.nio.serial.useMarkWord");
     }
 }

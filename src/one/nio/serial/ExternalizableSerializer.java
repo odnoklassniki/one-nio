@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-class ExternalizableSerializer extends Serializer<Externalizable> {
+public class ExternalizableSerializer extends Serializer<Externalizable> {
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
 
     ExternalizableSerializer(Class cls) {

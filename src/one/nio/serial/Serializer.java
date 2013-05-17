@@ -25,6 +25,10 @@ public abstract class Serializer<T> implements Externalizable {
         this.uid = uid;
     }
 
+    protected Class<? extends Serializer> type() {
+        return getClass();
+    }
+
     public String uid() {
         return Long.toHexString(uid);
     }
@@ -63,10 +67,15 @@ public abstract class Serializer<T> implements Externalizable {
         return false;
     }
 
+    @Override
+    public int hashCode() {
+        return (int) uid ^ (int) (uid >>> 32) ^ cls.hashCode();
+    }
+
     private long generateLongUid() {
         DigestStream ds = new DigestStream("MD5");
         try {
-            ds.writeUTF(getClass().getName());
+            ds.writeUTF(type().getName());
             writeExternal(ds);
         } catch (IOException e) {
             throw new IllegalStateException(e);

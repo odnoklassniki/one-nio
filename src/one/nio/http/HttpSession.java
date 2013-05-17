@@ -10,7 +10,7 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 
-public class HttpSession extends Session {
+public class HttpSession<T extends HttpServer> extends Session {
     private static final Log log = LogFactory.getLog(HttpSession.class);
 
     private static final int MAX_HEADERS = 32;
@@ -21,12 +21,12 @@ public class HttpSession extends Session {
     private static final byte[] POST = Utf8.toBytes("POST ");
     private static final byte[] HEAD = Utf8.toBytes("HEAD ");
 
-    protected final HttpServer server;
+    protected final T server;
     private byte[] fragment;
     private int fragmentLength;
     private Request request;
 
-    public HttpSession(Socket socket, HttpServer server) {
+    public HttpSession(Socket socket, T server) {
         super(socket);
         this.server = server;
         this.fragment = new byte[MAX_FRAGMENT_LENGTH];
@@ -100,6 +100,10 @@ public class HttpSession extends Session {
             return;
         }
 
+        sendResponse(request, response);
+    }
+
+    protected void sendResponse(Request request, Response response) throws IOException {
         boolean close = response.getCloseConnection() || !"Keep-Alive".equalsIgnoreCase(request.getHeader("Connection: "));
         response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
         ByteArrayBuilder builder = toByteResponse(response, request.getMethod() != Request.METHOD_HEAD);

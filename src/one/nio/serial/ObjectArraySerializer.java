@@ -5,7 +5,7 @@ import java.io.ObjectOutput;
 import java.io.IOException;
 import java.lang.reflect.Array;
 
-class ObjectArraySerializer extends Serializer<Object[]> {
+public class ObjectArraySerializer extends Serializer<Object[]> {
     private Class componentType;
 
     ObjectArraySerializer(Class cls) {

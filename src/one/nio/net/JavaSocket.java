@@ -129,6 +129,11 @@ final class JavaSocket extends Socket {
     }
 
     @Override
+    public final void setDeferAccept(boolean deferAccept) {
+        // Ignore
+    }
+
+    @Override
     public final void setReuseAddr(boolean reuseAddr) {
         try {
             ch.socket().setReuseAddress(reuseAddr);

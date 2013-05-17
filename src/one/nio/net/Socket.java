@@ -23,6 +23,7 @@ public abstract class Socket implements Closeable {
     public abstract void setTimeout(int timeout);
     public abstract void setKeepAlive(boolean keepAlive);
     public abstract void setNoDelay(boolean noDelay);
+    public abstract void setDeferAccept(boolean deferAccept);
     public abstract void setReuseAddr(boolean reuseAddr);
     public abstract void setBufferSize(int recvBuf, int sendBuf);
     public abstract InetSocketAddress getLocalAddress();

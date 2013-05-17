@@ -12,6 +12,7 @@ public class Repository {
     static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
     static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
     static final Serializer[] bootstrapSerializers = new Serializer[128];
+    static final Collection<Class> inlinedClasses = new ArrayList<Class>();
     static final int ENUM = 0x4000;
     static long nextBootstrapUid = -10;
 
@@ -75,14 +76,17 @@ public class Repository {
         addBootstrap(new TimestampSerializer());
         addBootstrap(new GeneratedSerializer(RemoteMethodCall.class));
 
-        Management.registerMXBean(new SerializationMXBeanImpl(), "type=Serialization");
+        // At some moment Inet4Address fields were moved to an auxilary holder class.
+        // This resolves backward compatibility problem by inlining holder fields during serialization.
+        addInlinedClass("java.net.InetAddress$InetAddressHolder");
+
+        Management.registerMXBean(new SerializationMXBeanImpl(), "one.nio.serial:type=Serialization");
     }
     
     private static void addBootstrap(Serializer serializer) {
         serializer.uid = nextBootstrapUid--;
-        bootstrapSerializers[128 + (int) serializer.uid] = serializer;
+        provideSerializer(serializer);
         classMap.put(serializer.cls, serializer);
-        uidMap.put(serializer.uid, serializer);
     }
 
     public static Serializer get(Class cls) {
@@ -114,6 +118,28 @@ public class Repository {
         if (oldSerializer != null && oldSerializer.cls != serializer.cls) {
             throw new IllegalStateException("UID collision: " + serializer.cls + " overwrites " + oldSerializer.cls);
         }
+        if (serializer.uid < 0) {
+            bootstrapSerializers[128 + (int) serializer.uid] = serializer;
+        }
+    }
+
+    public static synchronized void provideReplacement(Serializer serializer) {
+        Serializer replacingSerializer = classMap.get(serializer.type());
+        if (replacingSerializer == null) {
+            throw new IllegalArgumentException("No replacing serializer found for " + serializer.type().getName());
+        }
+
+        provideSerializer(serializer);
+        classMap.put(serializer.cls, serializer);
+        classMap.put(serializer.getClass(), replacingSerializer);
+    }
+
+    public static synchronized void addInlinedClass(String className) {
+        try {
+            inlinedClasses.add(Class.forName(className, false, Repository.class.getClassLoader()));
+        } catch (ClassNotFoundException e) {
+            // Ignore
+        }
     }
 
     private static synchronized Serializer generateFor(Class cls) {
@@ -140,8 +166,8 @@ public class Repository {
             } else {
                 serializer = new InvalidSerializer(cls);
             }
-            classMap.put(cls, serializer);
             provideSerializer(serializer);
+            classMap.put(cls, serializer);
         }
         return serializer;
     }

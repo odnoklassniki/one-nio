@@ -16,12 +16,11 @@ import java.util.Set;
 public class Management {
     private static final Log log = LogFactory.getLog(Management.class);
 
-    public static void registerMXBean(Object object, String id) {
-        String name = object.getClass().getPackage().getName() + ':' + id;
+    public static void registerMXBean(Object object, String name) {
         try {
             StandardMBean mb = new StandardMBean(object, null, true);
-            
             MBeanServer beanServer = ManagementFactory.getPlatformMBeanServer();
+
             ObjectName objectName = new ObjectName(name);
             if (beanServer.isRegistered(objectName)) {
                 beanServer.unregisterMBean(objectName);

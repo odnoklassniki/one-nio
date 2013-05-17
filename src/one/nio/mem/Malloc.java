@@ -169,7 +169,7 @@ public class Malloc implements MallocMXBean {
 
     // Initial setup of the empty heap
     void init() {
-        Management.registerMXBean(this, "type=Malloc,base=" + Long.toHexString(base));
+        Management.registerMXBean(this, "one.nio.mem:type=Malloc,base=" + Long.toHexString(base));
 
         long oldBase = unsafe.getLong(base + BASE_OFFSET);
         long oldCapacity = unsafe.getLong(base + CAPACITY_OFFSET);

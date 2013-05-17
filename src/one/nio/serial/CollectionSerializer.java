@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 
-class CollectionSerializer extends Serializer<Collection> {
+public class CollectionSerializer extends Serializer<Collection> {
     private Constructor constructor;
 
     CollectionSerializer(Class cls) {

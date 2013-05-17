@@ -103,6 +103,9 @@ final class NativeSocket extends Socket {
     public final native void setNoDelay(boolean noDelay);
 
     @Override
+    public final native void setDeferAccept(boolean deferAccept);
+
+    @Override
     public final native void setReuseAddr(boolean reuseAddr);
 
     @Override

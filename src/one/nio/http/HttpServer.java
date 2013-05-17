@@ -15,8 +15,10 @@ public abstract class HttpServer extends Server {
 
     @Override
     public Session createSession(Socket socket) {
-        return new HttpSession(socket, this);
+        return new HttpSession<HttpServer>(socket, this);
     }
 
-    public abstract Response processRequest(Request request) throws Exception;
+    public Response processRequest(Request request) throws Exception {
+        return new Response(Response.NOT_FOUND, Response.EMPTY);
+    }
 }

@@ -34,13 +34,14 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         int port = conn.getPort();
         int backlog = conn.getIntParam("backlog", 128);
         int buffers = conn.getIntParam("buffers", 0);
+        boolean defer = conn.getBooleanParam("defer", false);
         int selectorCount = conn.getIntParam("selectors", 32);
         int minWorkers = conn.getIntParam("minWorkers", 0);
         int maxWorkers = conn.getIntParam("maxWorkers", 1000);
         long queueTime = conn.getLongParam("queueTime", 0);
         int keepAlive = conn.getIntParam("keepalive", 0);
 
-        this.acceptor = new AcceptorThread(this, address, port, backlog, buffers);
+        this.acceptor = new AcceptorThread(this, address, port, backlog, buffers, defer);
         this.selectors = new SelectorThread[selectorCount];
         this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
         this.useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
@@ -59,7 +60,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         this.requestsRejected = new AtomicLong();
 
         if (conn.getBooleanParam("jmx", true)) {
-            Management.registerMXBean(this, "type=Server,port=" + port);
+            Management.registerMXBean(this, "one.nio.server:type=Server,port=" + port);
         }
     }
 

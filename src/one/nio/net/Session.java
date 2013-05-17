@@ -34,6 +34,7 @@ public class Session implements Closeable {
         return writeQueue != null;
     }
 
+    @Override
     public synchronized void close() {
         if (socket.isOpen()) {
             writeQueue = null;

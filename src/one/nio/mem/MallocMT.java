@@ -87,7 +87,7 @@ public class MallocMT extends Malloc {
 
     @Override
     void init() {
-        Management.registerMXBean(this, "type=MallocMT,base=" + Long.toHexString(base));
+        Management.registerMXBean(this, "one.nio.mem:type=MallocMT,base=" + Long.toHexString(base));
 
         long segmentSize = (capacity / SEGMENT_COUNT) & ~7;
         segments = new Malloc[SEGMENT_COUNT];

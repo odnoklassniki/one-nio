@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 
-class MapSerializer extends Serializer<Map> {
+public class MapSerializer extends Serializer<Map> {
     private Constructor constructor;
 
     MapSerializer(Class cls) {
