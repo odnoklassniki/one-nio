@@ -41,7 +41,7 @@ public enum FieldType implements Opcodes {
     }
 
     public String writeSignature() {
-        return this == Byte || this == Short ? "(I)V" : "(" + sig + ")V";
+        return this == Byte || this == Short || this == Char ? "(I)V" : "(" + sig + ")V";
     }
 
     public String putMethod() {
