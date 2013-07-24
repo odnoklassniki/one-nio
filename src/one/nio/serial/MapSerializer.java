@@ -23,6 +23,15 @@ public class MapSerializer extends Serializer<Map> {
     }
 
     @Override
+    public void calcSize(Map obj, CalcSizeStream css) throws IOException {
+        css.count += 4;
+        for (Map.Entry e : ((Map<?, ?>) obj).entrySet()) {
+            css.writeObject(e.getKey());
+            css.writeObject(e.getValue());
+        }
+    }
+
+    @Override
     public void write(Map obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.size());
         for (Map.Entry e : ((Map<?, ?>) obj).entrySet()) {
@@ -58,6 +67,7 @@ public class MapSerializer extends Serializer<Map> {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Constructor findConstructor() {
         try {
             return cls.getConstructor();

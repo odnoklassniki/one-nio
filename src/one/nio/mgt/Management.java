@@ -31,6 +31,18 @@ public class Management {
         }
     }
 
+    public static void unregisterMXBean(String name) {
+        try {
+            MBeanServer beanServer = ManagementFactory.getPlatformMBeanServer();
+            ObjectName objectName = new ObjectName(name);
+            if (beanServer.isRegistered(objectName)) {
+                beanServer.unregisterMBean(objectName);
+            }
+        } catch (Exception e) {
+            log.error("Cannot unregister MXBean " + name, e);
+        }
+    }
+
     public static Object getAttribute(String name, String attribute) throws JMException {
         ObjectName objName = resolveName(name);
         return ManagementFactory.getPlatformMBeanServer().getAttribute(objName, attribute);

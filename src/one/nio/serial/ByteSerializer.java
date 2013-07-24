@@ -11,6 +11,11 @@ class ByteSerializer extends Serializer<Byte> {
     }
 
     @Override
+    public void calcSize(Byte obj, CalcSizeStream css) {
+        css.count++;
+    }
+
+    @Override
     public void write(Byte v, ObjectOutput out) throws IOException {
        out.writeByte(v);
     }

@@ -12,10 +12,11 @@ import java.util.BitSet;
 import java.util.List;
 
 public class SerializationTest extends TestCase {
+
     private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
-        CalcSizeStream calcSizeStream = new CalcSizeStream();
-        calcSizeStream.writeObject(obj);
-        int length = calcSizeStream.count();
+        CalcSizeStream css = new CalcSizeStream();
+        css.writeObject(obj);
+        int length = css.count();
 
         byte[] buf = new byte[length];
         SerializeStream out = new SerializeStream(buf);
@@ -89,13 +90,8 @@ public class SerializationTest extends TestCase {
         checkSerialize(makeList(32768));
         checkSerialize(makeList(50000));
         checkSerialize(makeList(65535));
-
-        try {
-            checkSerialize(makeList(65536));
-            Assert.fail("Should have thrown IOException");
-        } catch (IOException e) {
-            // Passed
-        }
+        checkSerialize(makeList(65536));
+        checkSerialize(makeList(200000));
     }
 
     private enum SimpleEnum {
@@ -125,5 +121,19 @@ public class SerializationTest extends TestCase {
     public void testUrls() throws IOException, ClassNotFoundException, URISyntaxException {
         checkSerialize(new URI("socket://192.168.0.1:2222/?param1=value1&param2=value2"));
         checkSerialize(new URL("http://www.example.com/somePath/file.txt#anchor"));
+    }
+
+    public void testExceptions() throws IOException, ClassNotFoundException {
+        Exception e = new NullPointerException();
+
+        CalcSizeStream css1 = new CalcSizeStream();
+        css1.writeObject(e);
+
+        e.getStackTrace();
+
+        CalcSizeStream css2 = new CalcSizeStream();
+        css2.writeObject(e);
+
+        Assert.assertEquals(css1.count(), css2.count());
     }
 }

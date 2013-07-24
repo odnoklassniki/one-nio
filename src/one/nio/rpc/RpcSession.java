@@ -72,6 +72,10 @@ public class RpcSession extends Session {
         } catch (SerializerNotFoundException e) {
             writeResponse(e);
             return;
+        } catch (ClassNotFoundException e) {
+            handleClassNotFound(e);
+            server.incRequestsRejected();
+            return;
         } finally {
             if (requestSize > BUFFER_SIZE) {
                 this.buffer = new byte[BUFFER_SIZE];
@@ -94,23 +98,26 @@ public class RpcSession extends Session {
     }
 
     protected void writeResponse(Object response) throws IOException {
-        CalcSizeStream calcSizeStream = new CalcSizeStream();
-        calcSizeStream.writeObject(response);
-        int size = calcSizeStream.count();
-        byte[] buffer = new byte[size + 4];
+        CalcSizeStream css = new CalcSizeStream();
+        css.writeObject(response);
+        int responseSize = css.count();
+        byte[] buffer = new byte[responseSize + 4];
 
         SerializeStream ss = new SerializeStream(buffer);
-        ss.writeInt(size);
+        ss.writeInt(responseSize);
         ss.writeObject(response);
 
-        super.write(buffer, 0, buffer.length, false);
+        super.write(buffer, 0, buffer.length);
+    }
+
+    protected void handleClassNotFound(ClassNotFoundException e) throws IOException {
+        writeResponse(e);
+        log.error("Cannot deserialize request from " + clientIp(), e);
     }
 
     protected void handleRejectedExecution(RejectedExecutionException e, Object request) throws IOException {
         writeResponse(e);
-        if (log.isWarnEnabled()) {
-            log.warn("RejectedExecutionException for request: " + request);
-        }
+        log.error("RejectedExecutionException for request: " + request);
     }
 
     private class AsyncRequest implements Runnable {

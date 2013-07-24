@@ -25,7 +25,8 @@ public abstract class Socket implements Closeable {
     public abstract void setNoDelay(boolean noDelay);
     public abstract void setDeferAccept(boolean deferAccept);
     public abstract void setReuseAddr(boolean reuseAddr);
-    public abstract void setBufferSize(int recvBuf, int sendBuf);
+    public abstract void setRecvBuffer(int recvBuf);
+    public abstract void setSendBuffer(int sendBuf);
     public abstract InetSocketAddress getLocalAddress();
     public abstract InetSocketAddress getRemoteAddress();
 

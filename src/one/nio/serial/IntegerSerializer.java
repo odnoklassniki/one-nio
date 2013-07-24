@@ -11,6 +11,11 @@ class IntegerSerializer extends Serializer<Integer> {
     }
 
     @Override
+    public void calcSize(Integer obj, CalcSizeStream css) {
+        css.count += 4;
+    }
+
+    @Override
     public void write(Integer v, ObjectOutput out) throws IOException {
         out.writeInt(v);
     }

@@ -4,9 +4,6 @@ import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.FieldInfo;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -16,12 +13,13 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GeneratedSerializer extends Serializer {
-    private static final Log log = LogFactory.getLog(GeneratedSerializer.class);
     private static final ClassSerializer classSerializer = (ClassSerializer) Repository.get(Class.class);
 
+    static final AtomicInteger newTypes = new AtomicInteger();
     static final AtomicInteger missedLocalFields = new AtomicInteger();
     static final AtomicInteger missedStreamFields = new AtomicInteger();
     static final AtomicInteger migratedFields = new AtomicInteger();
+    static final AtomicInteger renamedFields = new AtomicInteger();
 
     private Delegate delegate;
 
@@ -45,8 +43,10 @@ public class GeneratedSerializer extends Serializer {
         out.writeShort(ownFields.length / 2);
         
         for (int i = 0; i < ownFields.length; i += 2) {
-            out.writeUTF(ownFields[i].getName());
-            classSerializer.write(ownFields[i].getType(), out);
+            Field f = ownFields[i];
+            Renamed renamed = f.getAnnotation(Renamed.class);
+            out.writeUTF(renamed == null ? f.getName() : f.getName() + '|' + renamed.from());
+            classSerializer.write(f.getType(), out);
         }
     }
 
@@ -56,9 +56,18 @@ public class GeneratedSerializer extends Serializer {
 
         Field[] ownFields = getSerializableFields();
         FieldInfo[] fieldsInfo = new FieldInfo[in.readUnsignedShort()];
+
         for (int i = 0; i < fieldsInfo.length; i++) {
             String sourceName = in.readUTF();
-            Class sourceType = classSerializer.read(in);
+            Class sourceType;
+            try {
+                sourceType = classSerializer.read(in);
+            } catch (ClassNotFoundException e) {
+                logFieldMismatch("Local class not found: " + e.getMessage(), Object.class, cls, sourceName);
+                newTypes.incrementAndGet();
+                sourceType = Object.class;
+            }
+
             int found = findField(ownFields, sourceName, sourceType);
             if (found >= 0) {
                 fieldsInfo[i] = new FieldInfo(ownFields[found], ownFields[found + 1], sourceType);
@@ -77,6 +86,11 @@ public class GeneratedSerializer extends Serializer {
         }
 
         this.delegate = DelegateGenerator.generate(cls, fieldsInfo);
+    }
+
+    @Override
+    public void calcSize(Object obj, CalcSizeStream css) throws IOException {
+        delegate.calcSize(obj, css);
     }
 
     @Override
@@ -108,6 +122,10 @@ public class GeneratedSerializer extends Serializer {
             Field f = ownFields[i];
             builder.append(" - Name: ").append(f.getName()).append('\n');
             builder.append("   Type: ").append(f.getType().getName()).append('\n');
+            Renamed renamed = f.getAnnotation(Renamed.class);
+            if (renamed != null) {
+                builder.append("   Renamed: ").append(renamed.from()).append('\n');
+            }
             if (ownFields[i + 1] != null) {
                 builder.append("   Parent: ").append(ownFields[i + 1].getName()).append('\n');
             }
@@ -116,6 +134,13 @@ public class GeneratedSerializer extends Serializer {
     }
 
     private int findField(Field[] ownFields, String name, Class type) {
+        String oldName = null;
+        int p = name.indexOf('|');
+        if (p >= 0) {
+            oldName = name.substring(p + 1);
+            name = name.substring(0, p);
+        }
+
         // 1. Find exact match
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
@@ -124,10 +149,22 @@ public class GeneratedSerializer extends Serializer {
             }
         }
 
-        // 2. Find match by name only
+        // 2. Find exact match by old name
+        if (oldName != null) {
+            for (int i = 0; i < ownFields.length; i += 2) {
+                Field f = ownFields[i];
+                if (f != null && f.getName().equals(oldName) && f.getType() == type) {
+                    logFieldMismatch("Field renamed from " + oldName, f.getType(), f.getDeclaringClass(), f.getName());
+                    renamedFields.incrementAndGet();
+                    return i;
+                }
+            }
+        }
+
+        // 3. Find match by name only
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
-            if (f != null && f.getName().equals(name)) {
+            if (f != null && (f.getName().equals(name) || f.getName().equals(oldName))) {
                 logFieldMismatch("Field type migrated from " + type.getName(), f.getType(), f.getDeclaringClass(), f.getName());
                 migratedFields.incrementAndGet();
                 return i;
@@ -140,7 +177,7 @@ public class GeneratedSerializer extends Serializer {
     }
 
     private void logFieldMismatch(String msg, Class type, Class holder, String name) {
-        log.warn("[" + uid() + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
+        Repository.log.warn("[" + uid() + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
     }
 
     private Field[] getSerializableFields() {

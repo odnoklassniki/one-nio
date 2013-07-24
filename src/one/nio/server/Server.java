@@ -23,17 +23,19 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     private volatile boolean running;
 
-    protected AcceptorThread acceptor;
+    protected AcceptorThread[] acceptors;
     protected SelectorThread[] selectors;
     protected WorkerPool workers;
     protected CleanupThread cleanup;
     protected boolean useWorkers;
 
     public Server(ConnectionString conn) throws IOException {
-        InetAddress address = InetAddress.getByName(conn.getHost());
+        String[] hosts = conn.getHosts();
         int port = conn.getPort();
         int backlog = conn.getIntParam("backlog", 128);
         int buffers = conn.getIntParam("buffers", 0);
+        int recvBuf = conn.getIntParam("recvBuf", buffers);
+        int sendBuf = conn.getIntParam("sendBuf", buffers);
         boolean defer = conn.getBooleanParam("defer", false);
         int selectorCount = conn.getIntParam("selectors", 32);
         int minWorkers = conn.getIntParam("minWorkers", 0);
@@ -41,14 +43,19 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         long queueTime = conn.getLongParam("queueTime", 0);
         int keepAlive = conn.getIntParam("keepalive", 0);
 
-        this.acceptor = new AcceptorThread(this, address, port, backlog, buffers, defer);
-        this.selectors = new SelectorThread[selectorCount];
-        this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
-        this.useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
+        this.acceptors = new AcceptorThread[hosts.length];
+        for (int i = 0; i < hosts.length; i++) {
+            InetAddress address = InetAddress.getByName(hosts[i]);
+            acceptors[i] = new AcceptorThread(this, address, port, backlog, recvBuf, sendBuf, defer);
+        }
 
+        this.selectors = new SelectorThread[selectorCount];
         for (int i = 0; i < selectorCount; i++) {
             this.selectors[i] = new SelectorThread(this, i);
         }
+
+        this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
+        this.useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
 
         if (keepAlive > 0) {
             this.cleanup = new CleanupThread(this, keepAlive);
@@ -65,7 +72,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     public boolean reconfigure(ConnectionString conn) throws IOException {
-        if (acceptor.port != conn.getPort()) {
+        if (acceptors[0].port != conn.getPort()) {
             return false;
         }
 
@@ -92,7 +99,9 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         for (SelectorThread selector : selectors) {
             selector.start();
         }
-        acceptor.start();
+        for (AcceptorThread acceptor : acceptors) {
+            acceptor.start();
+        }
         if (cleanup != null) {
             cleanup.start();
         }
@@ -104,9 +113,11 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
             cleanup.shutdown();
             cleanup = null;
         }
-        if (acceptor != null) {
-            acceptor.shutdown();
-            acceptor = null;
+        if (acceptors != null) {
+            for (AcceptorThread acceptor : acceptors) {
+                acceptor.shutdown();
+            }
+            acceptors = null;
         }
         if (selectors != null) {
             for (SelectorThread selector : selectors) {
@@ -129,7 +140,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     public final long incRequestsRejected() {
-        return requestsProcessed.incrementAndGet();
+        return requestsRejected.incrementAndGet();
     }
 
     @Override
@@ -163,7 +174,11 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     @Override
     public long getAcceptedSessions() {
-        return acceptor.acceptedSessions;
+        long result = 0;
+        for (AcceptorThread acceptor : acceptors) {
+            result += acceptor.acceptedSessions;
+        }
+        return result;
     }
 
     @Override
@@ -223,7 +238,9 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     @Override
     public void reset() {
-        acceptor.acceptedSessions = 0;
+        for (AcceptorThread acceptor : acceptors) {
+            acceptor.acceptedSessions = 0;
+        }
         for (SelectorThread selector : selectors) {
             selector.operations = 0;
             selector.sessions = 0;

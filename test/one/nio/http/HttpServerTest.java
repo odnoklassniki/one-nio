@@ -11,11 +11,22 @@ public class HttpServerTest extends HttpServer {
         super(conn);
     }
 
+    @HttpHandler("/simple")
+    public Response handleSimple() {
+        return Response.ok("Simple");
+    }
+
+    @HttpHandler({"/multi1", "/multi2"})
+    public void handleMultiple(Request request, HttpSession session) throws IOException {
+        Response response = Response.ok("Multiple: " + request.getPath());
+        session.writeResponse(request, response);
+    }
+
     @Override
-    public Response processRequest(Request request) throws Exception {
-        Response response = Response.ok(Utf8.toBytes("<html><body><pre>It works!</pre></body></html>"));
+    public void handleDefault(Request request, HttpSession session) throws IOException {
+        Response response = Response.ok(Utf8.toBytes("<html><body><pre>Default</pre></body></html>"));
         response.addHeader("Content-Type: text/html");
-        return response;
+        session.writeResponse(request, response);
     }
 
     public static void main(String[] args) throws Exception {

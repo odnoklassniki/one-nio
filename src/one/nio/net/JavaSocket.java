@@ -143,11 +143,18 @@ final class JavaSocket extends Socket {
     }
 
     @Override
-    public final void setBufferSize(int recvBuf, int sendBuf) {
+    public final void setRecvBuffer(int recvBuf) {
         try {
-            java.net.Socket s = ch.socket();
-            s.setReceiveBufferSize(recvBuf);
-            s.setSendBufferSize(sendBuf);
+            ch.socket().setReceiveBufferSize(recvBuf);
+        } catch (SocketException e) {
+            // Ignore
+        }
+    }
+
+    @Override
+    public final void setSendBuffer(int sendBuf) {
+        try {
+            ch.socket().setSendBufferSize(sendBuf);
         } catch (SocketException e) {
             // Ignore
         }

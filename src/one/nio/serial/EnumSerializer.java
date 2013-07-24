@@ -2,17 +2,12 @@ package one.nio.serial;
 
 import one.nio.util.DigestStream;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class EnumSerializer extends Serializer<Enum> {
-    private static final Log log = LogFactory.getLog(EnumSerializer.class);
-
     static final AtomicInteger enumOldSerializers = new AtomicInteger();
     static final AtomicInteger enumCountMismatches = new AtomicInteger();
     static final AtomicInteger enumMissedConstants = new AtomicInteger();
@@ -41,7 +36,7 @@ public class EnumSerializer extends Serializer<Enum> {
 
         if (uid == oldVersionUid()) {
             this.values = ownValues;
-            log.warn("Old EnumSerializer [" + uid() + "] for " + cls.getName());
+            Repository.log.warn("Old EnumSerializer [" + uid() + "] for " + cls.getName());
             enumOldSerializers.incrementAndGet();
         } else {
             this.values = new Enum[in.readUnsignedShort()];
@@ -50,11 +45,16 @@ public class EnumSerializer extends Serializer<Enum> {
             }
 
             if (ownValues.length != values.length) {
-                log.warn("Enum count mismatch [" + uid() + "] for " + cls.getName() + ": " +
+                Repository.log.warn("Enum count mismatch [" + uid() + "] for " + cls.getName() + ": " +
                         ownValues.length + " local vs. " + values.length + " stream constants");
                 enumCountMismatches.incrementAndGet();
             }
         }
+    }
+
+    @Override
+    public void calcSize(Enum obj, CalcSizeStream css) {
+        css.count += 2;
     }
 
     @Override
@@ -87,7 +87,7 @@ public class EnumSerializer extends Serializer<Enum> {
             }
         }
 
-        log.warn("Missed local enum constant " + cls.getName() + "." + name);
+        Repository.log.warn("Missed local enum constant " + cls.getName() + "." + name);
         enumMissedConstants.incrementAndGet();
         return defaultIndex < values.length ? values[defaultIndex] : null;
     }

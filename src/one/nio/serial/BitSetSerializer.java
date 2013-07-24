@@ -17,6 +17,15 @@ class BitSetSerializer extends Serializer<BitSet> {
     }
 
     @Override
+    public void calcSize(BitSet obj, CalcSizeStream css) {
+        try {
+            css.count += 4 + wordsInUseField.getInt(obj) * 8;
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Override
     public void write(BitSet obj, ObjectOutput out) throws IOException {
         try {
             long[] words = (long[]) wordsField.get(obj);
@@ -26,7 +35,7 @@ class BitSetSerializer extends Serializer<BitSet> {
                 out.writeLong(words[i]);
             }
         } catch (IllegalAccessException e) {
-            throw new IOException(e);
+            throw new IllegalStateException(e);
         }
     }
 
@@ -48,6 +57,6 @@ class BitSetSerializer extends Serializer<BitSet> {
 
     @Override
     public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(in.readInt() << 3);
+        in.skipBytes(in.readInt() * 8);
     }
 }

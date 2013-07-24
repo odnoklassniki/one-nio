@@ -1,17 +1,23 @@
 package one.nio.serial;
 
-import one.nio.util.ByteArrayStream;
+import one.nio.util.DataStream;
 
 import java.io.IOException;
 
-public class SerializeStream extends ByteArrayStream {
-    static final byte REF_NULL      = -1;
-    static final byte REF_RECURSIVE = -2;
+public class SerializeStream extends DataStream {
+    static final byte REF_NULL       = -1;
+    static final byte REF_RECURSIVE  = -2;
+    static final byte REF_RECURSIVE2 = -3;
 
     protected SerializationContext context;
 
-    public SerializeStream(byte[] input) {
-        super(input);
+    public SerializeStream(byte[] array) {
+        super(array);
+        this.context = new SerializationContext();
+    }
+
+    public SerializeStream(long address, int capacity) {
+        super(address, capacity);
         this.context = new SerializationContext();
     }
 
@@ -19,22 +25,23 @@ public class SerializeStream extends ByteArrayStream {
     @SuppressWarnings("unchecked")
     public void writeObject(Object obj) throws IOException {
         if (obj == null) {
-            buf[count++] = REF_NULL;
+            writeByte(REF_NULL);
         } else {
             int index = context.put(obj);
             if (index < 0) {
                 Serializer serializer = Repository.get(obj.getClass());
                 if (serializer.uid < 0) {
-                    buf[count++] = (byte) serializer.uid;
+                    writeByte((byte) serializer.uid);
                 } else {
                     writeLong(serializer.uid);
                 }
                 serializer.write(obj, this);
             } else if (index <= 0xffff) {
-                buf[count++] = REF_RECURSIVE;
+                writeByte(REF_RECURSIVE);
                 writeShort(index);
             } else {
-                throw new IOException("Recursive reference overflow");
+                writeByte(REF_RECURSIVE2);
+                writeInt(index);
             }
         }
     }

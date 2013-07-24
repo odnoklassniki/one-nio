@@ -109,7 +109,10 @@ final class NativeSocket extends Socket {
     public final native void setReuseAddr(boolean reuseAddr);
 
     @Override
-    public final native void setBufferSize(int recvBuf, int sendBuf);
+    public final native void setRecvBuffer(int recvBuf);
+
+    @Override
+    public final native void setSendBuffer(int sendBuf);
 
     private static native int socket0() throws IOException;
     private native int accept0() throws IOException;

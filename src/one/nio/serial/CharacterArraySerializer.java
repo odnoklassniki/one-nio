@@ -12,6 +12,11 @@ class CharacterArraySerializer extends Serializer<char[]> {
     }
 
     @Override
+    public void calcSize(char[] obj, CalcSizeStream css) {
+        css.count += 4 + obj.length * 2;
+    }
+
+    @Override
     public void write(char[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         for (char v : obj) {
@@ -37,7 +42,7 @@ class CharacterArraySerializer extends Serializer<char[]> {
     public void skip(ObjectInput in) throws IOException {
         int length = in.readInt();
         if (length > 0) {
-            in.skipBytes(length << 1);
+            in.skipBytes(length * 2);
         }
     }
 }

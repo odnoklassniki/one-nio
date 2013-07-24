@@ -1,5 +1,7 @@
 package one.nio.serial;
 
+import one.nio.util.Utf8;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
@@ -8,6 +10,12 @@ class StringSerializer extends Serializer<String> {
 
     StringSerializer() {
         super(String.class);
+    }
+
+    @Override
+    public void calcSize(String obj, CalcSizeStream css) {
+        int length = Utf8.length(obj);
+        css.count += length + (length <= 0x7fff ? 2 : 4);
     }
 
     @Override

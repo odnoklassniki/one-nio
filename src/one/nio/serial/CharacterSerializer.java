@@ -11,6 +11,11 @@ class CharacterSerializer extends Serializer<Character> {
     }
 
     @Override
+    public void calcSize(Character obj, CalcSizeStream css) {
+        css.count += 2;
+    }
+
+    @Override
     public void write(Character v, ObjectOutput out) throws IOException {
         out.writeChar(v);
     }

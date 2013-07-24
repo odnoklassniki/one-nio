@@ -39,6 +39,16 @@ public final class JavaInternals {
         }
     }
 
+    public static Field findFieldRecursively(Class<?> cls, String name) {
+        for (; cls != null; cls = cls.getSuperclass()) {
+            Field f = getField(cls, name);
+            if (f != null) {
+                return f;
+            }
+        }
+        return null;
+    }
+
     public static Method getMethod(Class<?> cls, String name, Class... params) {
         try {
             Method m = cls.getDeclaredMethod(name, params);
@@ -55,6 +65,16 @@ public final class JavaInternals {
         } catch (ClassNotFoundException e) {
             return null;
         }
+    }
+
+    public static Method findMethodRecursively(Class<?> cls, String name, Class... params) {
+        for (; cls != null; cls = cls.getSuperclass()) {
+            Method m = getMethod(cls, name, params);
+            if (m != null) {
+                return m;
+            }
+        }
+        return null;
     }
 
     public static Constructor getConstructor(Class<?> cls, Class... params) {

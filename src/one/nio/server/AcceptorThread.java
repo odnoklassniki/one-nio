@@ -22,8 +22,8 @@ final class AcceptorThread extends Thread {
 
     long acceptedSessions;
 
-    AcceptorThread(Server server, InetAddress address, int port, int backlog, int buffers, boolean defer) throws IOException {
-        super("NIO Acceptor");
+    AcceptorThread(Server server, InetAddress address, int port, int backlog, int recvBuf, int sendBuf, boolean defer) throws IOException {
+        super("NIO Acceptor " + address + ":" + port);
         setUncaughtExceptionHandler(server);
         this.server = server;
         this.address = address;
@@ -31,8 +31,11 @@ final class AcceptorThread extends Thread {
         this.serverSocket = Socket.createServerSocket();
         this.random = new Random();
 
-        if (buffers != 0) {
-            serverSocket.setBufferSize(buffers, buffers);
+        if (recvBuf != 0) {
+            serverSocket.setRecvBuffer(recvBuf);
+        }
+        if (sendBuf != 0) {
+            serverSocket.setSendBuffer(sendBuf);
         }
         if (defer) {
             serverSocket.setDeferAccept(true);

@@ -2,7 +2,6 @@ package one.nio.http;
 
 import one.nio.net.Session;
 import one.nio.net.Socket;
-import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
 
 import org.apache.commons.logging.Log;
@@ -10,23 +9,22 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 
-public class HttpSession<T extends HttpServer> extends Session {
+public class HttpSession extends Session {
     private static final Log log = LogFactory.getLog(HttpSession.class);
 
     private static final int MAX_HEADERS = 32;
     private static final int MAX_FRAGMENT_LENGTH = 512;
 
-    private static final byte[] RESPONSE_PROTOCOL = Utf8.toBytes("HTTP/1.0 ");
     private static final byte[] GET = Utf8.toBytes("GET ");
     private static final byte[] POST = Utf8.toBytes("POST ");
     private static final byte[] HEAD = Utf8.toBytes("HEAD ");
 
-    protected final T server;
+    protected final HttpServer server;
     private byte[] fragment;
     private int fragmentLength;
     private Request request;
 
-    public HttpSession(Socket socket, T server) {
+    public HttpSession(Socket socket, HttpServer server) {
         super(socket);
         this.server = server;
         this.fragment = new byte[MAX_FRAGMENT_LENGTH];
@@ -54,7 +52,7 @@ public class HttpSession<T extends HttpServer> extends Session {
             if (log.isDebugEnabled()) {
                 log.debug("Bad request", e);
             }
-            writeError(Response.BAD_REQUEST);
+            writeError(Response.BAD_REQUEST, e.getMessage());
         }
     }
 
@@ -68,7 +66,7 @@ public class HttpSession<T extends HttpServer> extends Session {
                 } else if (lineLength > 0) {
                     request.addHeader(Utf8.read(buffer, lineStart, lineLength));
                 } else {
-                    processRequest(request);
+                    server.handleRequest(request, this);
                     request = null;
                 }
                 lineStart = i + 1;
@@ -79,66 +77,30 @@ public class HttpSession<T extends HttpServer> extends Session {
 
     private Request parseRequest(byte[] buffer, int start, int length) throws HttpException {
         if (length > 13 && Utf8.startsWith(GET, buffer, start)) {
-            return new Request(Request.METHOD_GET, Utf8.read(buffer, start + 4, length - 13), MAX_HEADERS, socket);
+            return new Request(Request.METHOD_GET, Utf8.read(buffer, start + 4, length - 13), MAX_HEADERS);
         } else if (length > 14 && Utf8.startsWith(POST, buffer, start)) {
-            return new Request(Request.METHOD_POST, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS, socket);
+            return new Request(Request.METHOD_POST, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS);
         } else if (length > 14 && Utf8.startsWith(HEAD, buffer, start)) {
-            return new Request(Request.METHOD_HEAD, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS, socket);
+            return new Request(Request.METHOD_HEAD, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS);
         }
         throw new HttpException("Invalid request");
     }
 
-    protected void processRequest(Request request) throws IOException {
-        Response response;
-        try {
-            response = server.processRequest(request);
-            server.incRequestsProcessed();
-        } catch (Exception e) {
-            log.error("Internal error", e);
-            writeError(Response.INTERNAL_ERROR);
-            server.incRequestsRejected();
-            return;
-        }
-
-        sendResponse(request, response);
-    }
-
-    protected void sendResponse(Request request, Response response) throws IOException {
-        boolean close = response.getCloseConnection() || !"Keep-Alive".equalsIgnoreCase(request.getHeader("Connection: "));
+    public void writeResponse(Request request, Response response) throws IOException {
+        server.incRequestsProcessed();
+        boolean close = !"Keep-Alive".equalsIgnoreCase(request.getHeader("Connection: "));
         response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
-        ByteArrayBuilder builder = toByteResponse(response, request.getMethod() != Request.METHOD_HEAD);
-        write(builder.buffer(), 0, builder.length(), close);
+        byte[] bytes = response.toBytes(request.getMethod() != Request.METHOD_HEAD);
+        super.write(bytes, 0, bytes.length);
+        if (close) scheduleClose();
     }
 
-    protected void writeError(String code) throws IOException {
-        Response response = new Response(code, Response.EMPTY);
+    public void writeError(String code, String message) throws IOException {
+        server.incRequestsRejected();
+        Response response = new Response(code, message == null ? Response.EMPTY : Utf8.toBytes(message));
         response.addHeader("Connection: close");
-        ByteArrayBuilder builder = toByteResponse(response, true);
-        write(builder.buffer(), 0, builder.length(), true);
-    }
-
-    protected ByteArrayBuilder toByteResponse(Response response, boolean includeBody) {
-        final byte[] body = response.getBody();
-        final int headerCount = response.getHeaderCount();
-        final String[] headers = response.getHeaders();
-
-        int estimatedSize = 16 + headerCount * 2;
-        for (int i = 0; i < headerCount; i++) {
-            estimatedSize += headers[i].length();
-        }
-        if (includeBody && body != null) {
-            estimatedSize += body.length;
-        }
-
-        ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
-        builder.append(RESPONSE_PROTOCOL);
-        for (int i = 0; i < headerCount; i++) {
-            builder.append(headers[i]).append('\r').append('\n');
-        }
-        builder.append('\r').append('\n');
-        if (includeBody && body != null) {
-            builder.append(body);
-        }
-        return builder;
+        byte[] bytes = response.toBytes(true);
+        super.write(bytes, 0, bytes.length);
+        scheduleClose();
     }
 }

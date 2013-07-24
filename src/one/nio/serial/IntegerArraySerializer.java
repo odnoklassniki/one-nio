@@ -12,6 +12,11 @@ class IntegerArraySerializer extends Serializer<int[]> {
     }
 
     @Override
+    public void calcSize(int[] obj, CalcSizeStream css) {
+        css.count += 4 + obj.length * 4;
+    }
+
+    @Override
     public void write(int[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         for (int v : obj) {
@@ -37,7 +42,7 @@ class IntegerArraySerializer extends Serializer<int[]> {
     public void skip(ObjectInput in) throws IOException {
         int length = in.readInt();
         if (length > 0) {
-            in.skipBytes(length << 2);
+            in.skipBytes(length * 4);
         }
     }
 }

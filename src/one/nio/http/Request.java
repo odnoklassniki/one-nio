@@ -1,37 +1,72 @@
 package one.nio.http;
 
-import one.nio.net.Socket;
+import one.nio.util.ByteArrayBuilder;
 import one.nio.util.URLEncoder;
+import one.nio.util.Utf8;
 
-import java.net.InetSocketAddress;
-
-public final class Request {
+public final class Request implements Cloneable {
     public static final int METHOD_GET  = 1;
     public static final int METHOD_POST = 2;
     public static final int METHOD_HEAD = 3;
 
-    private static final String[] METHODS = { "", "GET", "POST", "HEAD" };
+    private static final byte[][] METHOD_PREFIX = {
+            new byte[0],
+            Utf8.toBytes("GET "),
+            Utf8.toBytes("POST "),
+            Utf8.toBytes("HEAD " )
+    };
+
+    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
+    private static final int PROTOCOL_HEADER_LENGTH = 11;
 
     private int method;
-    private String path;
+    private String uri;
     private int headerCount;
     private String[] headers;
-    private Socket socket;
 
-    public Request(int method, String path, int maxHeaderCount, Socket socket) {
+    public Request(int method, String uri, int maxHeaderCount) {
         this.method = method;
-        this.path = path;
+        this.uri = uri;
         this.headerCount = 0;
         this.headers = new String[maxHeaderCount];
-        this.socket = socket;
+    }
+
+    private Request(Request prototype) {
+        this.method = prototype.method;
+        this.uri = prototype.uri;
+        this.headerCount = prototype.headerCount;
+        this.headers = prototype.headers.clone();
     }
 
     public int getMethod() {
         return method;
     }
 
+    public String getURI() {
+        return uri;
+    }
+
     public String getPath() {
-        return path;
+        int p = uri.indexOf('?');
+        return p >= 0 ? uri.substring(0, p) : uri;
+    }
+
+    public String getQueryString() {
+        int p = uri.indexOf('?');
+        return p >= 0 ? URLEncoder.decode(uri.substring(p + 1)) : null;
+    }
+
+    public String getParameter(String key) {
+        int p = uri.indexOf('?');
+        if (p >= 0) {
+            p = uri.indexOf(key, p);
+            if (p > 0) {
+                int q = uri.indexOf('&', p += key.length());
+                String rawValue = q > 0 ? uri.substring(p, q) : uri.substring(p);
+                return URLEncoder.decode(rawValue);
+            }
+        }
+        return null;
     }
 
     public String getHeader(String key) {
@@ -43,41 +78,33 @@ public final class Request {
         return null;
     }
 
-    public String getParameter(String key) {
-        int p = path.indexOf('?');
-        if (p > 0) {
-            p = path.indexOf(key, p);
-            if (p > 0) {
-                int q = path.indexOf('&', p += key.length());
-                String rawValue = q > 0 ? path.substring(p, q) : path.substring(p);
-                return URLEncoder.decode(rawValue);
-            }
-        }
-        return null;
-    }
-
-    public InetSocketAddress getLocalAddress() {
-        return socket.getLocalAddress();
-    }
-
-    public InetSocketAddress getRemoteAddress() {
-        return socket.getRemoteAddress();
-    }
-
     public void addHeader(String header) {
         if (headerCount < headers.length) {
             headers[headerCount++] = header;
         }
     }
 
+    public byte[] toBytes() {
+        int estimatedSize = METHOD_PREFIX[method].length + Utf8.length(uri) + PROTOCOL_HEADER_LENGTH + headerCount * 2;
+        for (int i = 0; i < headerCount; i++) {
+            estimatedSize += headers[i].length();
+        }
+
+        ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
+        builder.append(METHOD_PREFIX[method]).append(uri).append(PROTOCOL_HEADER);
+        for (int i = 0; i < headerCount; i++) {
+            builder.append(headers[i]).append('\r').append('\n');
+        }
+        return builder.buffer();
+    }
+
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder(400);
-        sb.append("Request from ").append(getRemoteAddress()).append(":\r\n");
-        sb.append(METHODS[method]).append(' ').append(path).append(" HTTP/1.0\r\n");
-        for (int i = 0; i < headerCount; i++) {
-            sb.append(headers[i]).append("\r\n");
-        }
-        return sb.toString();
+        return Utf8.toString(toBytes());
+    }
+
+    @Override
+    public Request clone() {
+        return new Request(this);
     }
 }

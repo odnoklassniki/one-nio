@@ -12,6 +12,11 @@ class LongArraySerializer extends Serializer<long[]> {
     }
 
     @Override
+    public void calcSize(long[] obj, CalcSizeStream css) {
+        css.count += 4 + obj.length * 8;
+    }
+
+    @Override
     public void write(long[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         for (long v : obj) {
@@ -37,7 +42,7 @@ class LongArraySerializer extends Serializer<long[]> {
     public void skip(ObjectInput in) throws IOException {
         int length = in.readInt();
         if (length > 0) {
-            in.skipBytes(length << 3);
+            in.skipBytes(length * 8);
         }
     }
 }

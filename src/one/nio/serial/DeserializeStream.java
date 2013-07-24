@@ -1,30 +1,39 @@
 package one.nio.serial;
 
-import one.nio.util.ByteArrayStream;
+import one.nio.util.DataStream;
 
 import java.io.IOException;
 import java.util.ArrayList;
 
-public class DeserializeStream extends ByteArrayStream {
+public class DeserializeStream extends DataStream {
+    static final int INITIAL_CAPACITY = 24;
+
     protected ArrayList<Object> context;
     
-    public DeserializeStream(byte[] input) {
-        super(input);
-        this.context = new ArrayList<Object>(24);
+    public DeserializeStream(byte[] array) {
+        super(array);
+        this.context = new ArrayList<Object>(INITIAL_CAPACITY);
+    }
+
+    public DeserializeStream(long address, int capacity) {
+        super(address, capacity);
+        this.context = new ArrayList<Object>(INITIAL_CAPACITY);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Object readObject() throws IOException, ClassNotFoundException {
         Serializer serializer;
-        byte b = buf[count++];
+        byte b = readByte();
         if (b >= 0) {
-            count--;
+            offset--;
             serializer = Repository.requestSerializer(readLong());
         } else if (b == SerializeStream.REF_NULL) {
             return null;
         } else if (b == SerializeStream.REF_RECURSIVE) {
             return context.get(readUnsignedShort());
+        } else if (b == SerializeStream.REF_RECURSIVE2) {
+            return context.get(readInt());
         } else {
             serializer = Repository.requestBootstrapSerializer(b);
         }

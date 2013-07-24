@@ -10,9 +10,13 @@ public interface SerializationMXBean {
     int getSerializersSent();
     int getSerializersReceived();
 
+    int getAnonymousClasses();
+    int getRenamedClasses();
+    int getNewTypes();
     int getMissedLocalFields();
     int getMissedStreamFields();
     int getMigratedFields();
+    int getRenamedFields();
 
     int getEnumOldSerializers();
     int getEnumCountMismatches();

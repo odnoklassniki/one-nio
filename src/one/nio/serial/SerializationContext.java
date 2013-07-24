@@ -26,9 +26,11 @@ class SerializationContext {
         this.values = new int[INITIAL_CAPACITY];
         this.threshold = INITIAL_CAPACITY * 2 / 3;
 
-        final Thread thread = Thread.currentThread();
-        if (unsafe.getLong(thread, threadFieldOffset) == 0) {
-            unsafe.putLong(thread, threadFieldOffset, thread.getId());
+        if (useMarkWord) {
+            final Thread thread = Thread.currentThread();
+            if (unsafe.getLong(thread, threadFieldOffset) == 0) {
+                unsafe.putLong(thread, threadFieldOffset, thread.getId());
+            }
         }
     }
 

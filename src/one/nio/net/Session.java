@@ -3,6 +3,7 @@ package one.nio.net;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 
 public class Session implements Closeable {
     public static final int READABLE  = 1;
@@ -13,6 +14,7 @@ public class Session implements Closeable {
     protected Selector selector;
     protected int slot;
     protected int events;
+    protected boolean closing;
     protected WriteQueue writeQueue;
     protected volatile long lastAccessTime;
 
@@ -37,9 +39,18 @@ public class Session implements Closeable {
     @Override
     public synchronized void close() {
         if (socket.isOpen()) {
+            closing = true;
             writeQueue = null;
             selector.unregister(this);
             socket.close();
+        }
+    }
+
+    public synchronized void scheduleClose() {
+        if (writeQueue == null) {
+            close();
+        } else {
+            closing = true;
         }
     }
 
@@ -54,23 +65,23 @@ public class Session implements Closeable {
         stats[1] = bytes;
     }
 
-    public synchronized void write(byte[] data, int offset, int count, boolean close) throws IOException {
-        if (writeQueue != null) {
-            WriteQueue tail = writeQueue;
-            while (tail.next != null) {
-                tail = tail.next;
-            }
-            tail.next = new WriteQueue(data, offset, count, close);
-        } else if (socket.isOpen()) {
+    public synchronized void write(byte[] data, int offset, int count) throws IOException {
+        if (writeQueue == null) {
             int bytesWritten = socket.write(data, offset, count);
             if (bytesWritten < count) {
                 offset += bytesWritten;
                 count -= bytesWritten;
-                writeQueue = new WriteQueue(data, offset, count, close);
+                writeQueue = new WriteQueue(data, offset, count);
                 selector.listen(this, WRITEABLE);
-            } else if (close) {
-                close();
             }
+        } else if (!closing) {
+            WriteQueue tail = writeQueue;
+            while (tail.next != null) {
+                tail = tail.next;
+            }
+            tail.next = new WriteQueue(data, offset, count);
+        } else {
+            throw new SocketException("Socket closed");
         }
     }
 
@@ -82,7 +93,7 @@ public class Session implements Closeable {
                 head.count -= bytesWritten;
                 writeQueue = head;
                 return;
-            } else if (head.close) {
+            } else if (closing) {
                 close();
                 return;
             }
@@ -110,14 +121,12 @@ public class Session implements Closeable {
         byte[] data;
         int offset;
         int count;
-        boolean close;
         WriteQueue next;
 
-        WriteQueue(byte[] data, int offset, int count, boolean close) {
+        WriteQueue(byte[] data, int offset, int count) {
             this.data = data;
             this.offset = offset;
             this.count = count;
-            this.close = close;
         }
     }
 }

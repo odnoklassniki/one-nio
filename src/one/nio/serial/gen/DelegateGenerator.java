@@ -1,19 +1,15 @@
 package one.nio.serial.gen;
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.util.JavaInternals;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import sun.misc.Unsafe;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -23,15 +19,13 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DelegateGenerator extends ClassLoader implements Opcodes {
+public class DelegateGenerator extends BytecodeGenerator {
     private static final DelegateGenerator INSTANCE = new DelegateGenerator();
-    private static final Log log = LogFactory.getLog(DelegateGenerator.class);
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final ObjectInputStream nullObjectInputStream;
     private static final ObjectOutputStream nullObjectOutputStream;
 
     private static final String SUPER_CLASS = "sun/reflect/MagicAccessorImpl";
-    private static final String DUMP_PATH = System.getProperty("one.nio.serial.gen.dump");
 
     private static AtomicInteger index = new AtomicInteger();
 
@@ -50,47 +44,22 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         }
     }
 
-    private DelegateGenerator() {
-        super(DelegateGenerator.class.getClassLoader());
-    }
-
     public static Delegate generate(Class cls, FieldInfo[] fieldsInfo) {
         String className = "Gen" + index.getAndIncrement() + "_" + cls.getSimpleName();
 
-        ClassWriter cv = new ClassWriter(0);
+        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, "sun/reflect/" + className, null, SUPER_CLASS,
                 new String[] { "one/nio/serial/gen/Delegate" });
 
         generateConstructor(cv);
+        generateCalcSize(cv, cls, fieldsInfo);
         generateWrite(cv, cls, fieldsInfo);
         generateRead(cv, cls, fieldsInfo);
         generateFill(cv, cls, fieldsInfo);
         generateSkip(cv, fieldsInfo);
 
         cv.visitEnd();
-
-        byte[] classData = cv.toByteArray();
-        if (DUMP_PATH != null) {
-            dumpClass(className, classData);
-        }
-
-        try {
-            Class generatedClass = INSTANCE.defineClass(null, classData, 0, classData.length, null);
-            return (Delegate) generatedClass.newInstance();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static void dumpClass(String className, byte[] classData) {
-        try {
-            File f = new File(DUMP_PATH, className + ".class");
-            FileOutputStream fos = new FileOutputStream(f);
-            fos.write(classData);
-            fos.close();
-        } catch (IOException e) {
-            log.error("Could not dump " + className, e);
-        }
+        return INSTANCE.instantiate(cv.toByteArray(), Delegate.class);
     }
 
     private static void generateConstructor(ClassVisitor cv) {
@@ -101,7 +70,53 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         mv.visitMethodInsn(INVOKESPECIAL, SUPER_CLASS, "<init>", "()V");
 
         mv.visitInsn(RETURN);
-        mv.visitMaxs(1, 1);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    private static void generateCalcSize(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V",
+                null, new String[] { "java/io/IOException" });
+        mv.visitCode();
+
+        Method writeObjectMethod = JavaInternals.findMethodRecursively(cls, "writeObject", ObjectOutputStream.class);
+        if (writeObjectMethod != null) {
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "nullObjectOutputStream", "Ljava/io/ObjectOutputStream;");
+            emitInvoke(mv, writeObjectMethod);
+        }
+
+        int primitiveFieldsSize = 0;
+
+        for (FieldInfo fi : fieldsInfo) {
+            Field f = fi.field;
+            FieldType srcType = fi.sourceType;
+
+            if (srcType != FieldType.Object) {
+                primitiveFieldsSize += srcType.dataSize;
+            } else if (f == null) {
+                primitiveFieldsSize++;  // 1 byte to encode null reference
+            } else {
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitVarInsn(ALOAD, 1);
+                if (fi.parent != null) emitGetField(mv, fi.parent);
+                emitGetField(mv, f);
+                emitTypeCast(mv, f.getType(), fi.sourceClass);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/CalcSizeStream", "writeObject", "(Ljava/lang/Object;)V");
+            }
+        }
+
+        if (primitiveFieldsSize != 0) {
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitInsn(DUP);
+            mv.visitFieldInsn(GETFIELD, "one/nio/serial/CalcSizeStream", "count", "I");
+            emitInt(mv, primitiveFieldsSize);
+            mv.visitInsn(IADD);
+            mv.visitFieldInsn(PUTFIELD, "one/nio/serial/CalcSizeStream", "count", "I");
+        }
+
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
@@ -110,10 +125,11 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
 
-        if (JavaInternals.getMethod(cls, "writeObject", ObjectOutputStream.class) != null) {
+        Method writeObjectMethod = JavaInternals.findMethodRecursively(cls, "writeObject", ObjectOutputStream.class);
+        if (writeObjectMethod != null) {
             mv.visitVarInsn(ALOAD, 1);
             mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "nullObjectOutputStream", "Ljava/io/ObjectOutputStream;");
-            mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "writeObject", "(Ljava/io/ObjectOutputStream;)V");
+            emitInvoke(mv, writeObjectMethod);
         }
 
         for (FieldInfo fi : fieldsInfo) {
@@ -126,16 +142,16 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 mv.visitInsn(srcType.defaultOpcode);
             } else {
                 mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent != null) generateFieldAccess(mv, GETFIELD, fi.parent);
-                generateFieldAccess(mv, GETFIELD, f);
-                generateTypeCast(mv, f.getType(), fi.sourceClass);
+                if (fi.parent != null) emitGetField(mv, fi.parent);
+                emitGetField(mv, f);
+                emitTypeCast(mv, f.getType(), fi.sourceClass);
             }
 
             mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectOutput", srcType.writeMethod(), srcType.writeSignature());
         }
 
         mv.visitInsn(RETURN);
-        mv.visitMaxs(3, 3);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
@@ -160,7 +176,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         }
 
         mv.visitInsn(ARETURN);
-        mv.visitMaxs(6, 2);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
@@ -181,30 +197,31 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
             } else if (Modifier.isFinal(f.getModifiers())) {
                 mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent != null) generateFieldAccess(mv, GETFIELD, fi.parent);
+                if (fi.parent != null) emitGetField(mv, fi.parent);
                 mv.visitLdcInsn(unsafe.objectFieldOffset(f));
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
-                generateTypeCast(mv, fi.sourceClass, f.getType());
+                emitTypeCast(mv, fi.sourceClass, f.getType());
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
             } else {
                 mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent != null) generateFieldAccess(mv, GETFIELD, fi.parent);
+                if (fi.parent != null) emitGetField(mv, fi.parent);
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
-                generateTypeCast(mv, fi.sourceClass, f.getType());
-                generateFieldAccess(mv, PUTFIELD, f);
+                emitTypeCast(mv, fi.sourceClass, f.getType());
+                emitPutField(mv, f);
             }
         }
 
-        if (JavaInternals.getMethod(cls, "readObject", ObjectInputStream.class) != null) {
+        Method readObjectMethod = JavaInternals.findMethodRecursively(cls, "readObject", ObjectInputStream.class);
+        if (readObjectMethod != null) {
             mv.visitVarInsn(ALOAD, 1);
             mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "nullObjectInputStream", "Ljava/io/ObjectInputStream;");
-            mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "readObject", "(Ljava/io/ObjectInputStream;)V");
+            emitInvoke(mv, readObjectMethod);
         }
 
         mv.visitInsn(RETURN);
-        mv.visitMaxs(6, 3);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
@@ -222,22 +239,18 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
                 mv.visitInsn(POP);
             } else {
                 mv.visitVarInsn(ALOAD, 1);
-                if (srcType.dataSize <= 4) {
-                    mv.visitInsn(ICONST_0 + srcType.dataSize);
-                } else {
-                    mv.visitIntInsn(BIPUSH, srcType.dataSize);
-                }
+                emitInt(mv, srcType.dataSize);
                 mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", "skipBytes", "(I)I");
                 mv.visitInsn(POP);
             }
         }
 
         mv.visitInsn(RETURN);
-        mv.visitMaxs(3, 2);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
-    private static void generateTypeCast(MethodVisitor mv, Class<?> src, Class<?> dst) {
+    private static void emitTypeCast(MethodVisitor mv, Class<?> src, Class<?> dst) {
         // Trivial case
         if (src == dst || dst.isAssignableFrom(src)) {
             return;
@@ -281,7 +294,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         try {
             Method m = dst.getMethod("valueOf", src);
             if (Modifier.isStatic(m.getModifiers())) {
-                generateMethodInvoke(mv, INVOKESTATIC, m);
+                emitInvoke(mv, m);
                 return;
             }
         } catch (NoSuchMethodException e) {
@@ -291,7 +304,7 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         // dst = src.someMethod()
         for (Method m : src.getMethods()) {
             if (!Modifier.isStatic(m.getModifiers()) && m.getParameterTypes().length == 0 && m.getReturnType() == dst) {
-                generateMethodInvoke(mv, m.getDeclaringClass().isInterface() ? INVOKEINTERFACE : INVOKEVIRTUAL, m);
+                emitInvoke(mv, m);
                 return;
             }
         }
@@ -299,19 +312,5 @@ public class DelegateGenerator extends ClassLoader implements Opcodes {
         // The types are not convertible, just leave the default value
         mv.visitInsn(FieldType.valueOf(src).dataSize == 8 ? POP2 : POP);
         mv.visitInsn(FieldType.valueOf(dst).defaultOpcode);
-    }
-
-    private static void generateFieldAccess(MethodVisitor mv, int opcode, Field f) {
-        String holder = Type.getInternalName(f.getDeclaringClass());
-        String name = f.getName();
-        String sig = Type.getDescriptor(f.getType());
-        mv.visitFieldInsn(opcode, holder, name, sig);
-    }
-
-    private static void generateMethodInvoke(MethodVisitor mv, int opcode, Method m) {
-        String holder = Type.getInternalName(m.getDeclaringClass());
-        String name = m.getName();
-        String sig = Type.getMethodDescriptor(m);
-        mv.visitMethodInsn(opcode, holder, name, sig);
     }
 }

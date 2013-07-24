@@ -12,6 +12,11 @@ class InvalidSerializer extends Serializer {
     }
 
     @Override
+    public void calcSize(Object obj, CalcSizeStream css) throws IOException {
+        throw new NotSerializableException("Cannot serialize " + cls);
+    }
+
+    @Override
     public void write(Object obj, ObjectOutput out) throws IOException {
         throw new NotSerializableException("Cannot serialize " + cls);
     }

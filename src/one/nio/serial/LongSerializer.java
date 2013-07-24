@@ -11,6 +11,11 @@ class LongSerializer extends Serializer<Long> {
     }
 
     @Override
+    public void calcSize(Long obj, CalcSizeStream css) {
+        css.count += 8;
+    }
+
+    @Override
     public void write(Long v, ObjectOutput out) throws IOException {
         out.writeLong(v);
     }

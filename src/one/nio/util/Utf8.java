@@ -4,6 +4,7 @@ import sun.misc.Unsafe;
 
 public final class Utf8 {
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
+    private static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
 
     public static int length(String s) {
         int result = 0;
@@ -22,72 +23,44 @@ public final class Utf8 {
     }
 
     public static int write(String s, byte[] buf, int start) {
-        int length = s.length();
-        int pos = start;
-        for (int i = 0; i < length; i++) {
-            int v = s.charAt(i);
-            if (v <= 0x7f && v != 0) {
-                buf[pos++] = (byte) v;
-            } else if (v > 0x7ff) {
-                buf[pos++] = (byte) (0xe0 | ((v >>> 12) & 0x0f));
-                buf[pos++] = (byte) (0x80 | ((v >>> 6) & 0x3f));
-                buf[pos++] = (byte) (0x80 | (v & 0x3f));
-            } else {
-                buf[pos++] = (byte) (0xc0 | ((v >>> 6) & 0x1f));
-                buf[pos++] = (byte) (0x80 | (v & 0x3f));
-            }
-        }
-        return pos - start;
+        return write(s, buf, byteArrayOffset + start);
     }
 
     public static String read(byte[] buf, int start, int length) {
-        char[] result = new char[length];
-        int chars = 0;
-        int end = start + length;
-        for (int pos = start; pos < end; chars++) {
-            byte b = buf[pos++];
-            if (b >= 0) {
-                result[chars] = (char) b;
-            } else if ((b & 0xe0) == 0xc0) {
-                result[chars] = (char) ((b & 0x1f) << 6 | (buf[pos++] & 0x3f));
-            } else {
-                result[chars] = (char) ((b & 0x0f) << 12 | (buf[pos++] & 0x3f) << 6 | (buf[pos++] & 0x3f));
-            }
-        }
-        return new String(result, 0, chars);
+        return read(buf, byteArrayOffset + start, length);
     }
 
-    public static int write(String s, long start) {
+    public static int write(String s, Object obj, long start) {
         int length = s.length();
         long pos = start;
         for (int i = 0; i < length; i++) {
             int v = s.charAt(i);
             if (v <= 0x7f && v != 0) {
-                unsafe.putByte(pos++, (byte) v);
+                unsafe.putByte(obj, pos++, (byte) v);
             } else if (v > 0x7ff) {
-                unsafe.putByte(pos++, (byte) (0xe0 | ((v >>> 12) & 0x0f)));
-                unsafe.putByte(pos++, (byte) (0x80 | ((v >>> 6) & 0x3f)));
-                unsafe.putByte(pos++, (byte) (0x80 | (v & 0x3f)));
+                unsafe.putByte(obj, pos++, (byte) (0xe0 | ((v >>> 12) & 0x0f)));
+                unsafe.putByte(obj, pos++, (byte) (0x80 | ((v >>> 6) & 0x3f)));
+                unsafe.putByte(obj, pos++, (byte) (0x80 | (v & 0x3f)));
             } else {
-                unsafe.putByte(pos++, (byte) (0xc0 | ((v >>> 6) & 0x1f)));
-                unsafe.putByte(pos++, (byte) (0x80 | (v & 0x3f)));
+                unsafe.putByte(obj, pos++, (byte) (0xc0 | ((v >>> 6) & 0x1f)));
+                unsafe.putByte(obj, pos++, (byte) (0x80 | (v & 0x3f)));
             }
         }
         return (int) (pos - start);
     }
 
-    public static String read(long start, int length) {
+    public static String read(Object obj, long start, int length) {
         char[] result = new char[length];
         int chars = 0;
         long end = start + length;
         for (long pos = start; pos < end; chars++) {
-            byte b = unsafe.getByte(pos++);
+            byte b = unsafe.getByte(obj, pos++);
             if (b >= 0) {
                 result[chars] = (char) b;
             } else if ((b & 0xe0) == 0xc0) {
-                result[chars] = (char) ((b & 0x1f) << 6 | (unsafe.getByte(pos++) & 0x3f));
+                result[chars] = (char) ((b & 0x1f) << 6 | (unsafe.getByte(obj, pos++) & 0x3f));
             } else {
-                result[chars] = (char) ((b & 0x0f) << 12 | (unsafe.getByte(pos++) & 0x3f) << 6 | (unsafe.getByte(pos++) & 0x3f));
+                result[chars] = (char) ((b & 0x0f) << 12 | (unsafe.getByte(obj, pos++) & 0x3f) << 6 | (unsafe.getByte(obj, pos++) & 0x3f));
             }
         }
         return new String(result, 0, chars);
@@ -95,12 +68,12 @@ public final class Utf8 {
 
     public static byte[] toBytes(String s) {
         byte[] result = new byte[length(s)];
-        write(s, result, 0);
+        write(s, result, byteArrayOffset);
         return result;
     }
     
     public static String toString(byte[] buf) {
-        return read(buf, 0, buf.length);
+        return read(buf, byteArrayOffset, buf.length);
     }
 
     public static int indexOf(byte c, byte[] haystack) {

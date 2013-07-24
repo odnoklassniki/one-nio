@@ -3,18 +3,25 @@ package one.nio.serial;
 import one.nio.rpc.RemoteMethodCall;
 import one.nio.mgt.Management;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.Externalizable;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class Repository {
+    static final Log log = LogFactory.getLog(Repository.class);
     static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
     static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
     static final Serializer[] bootstrapSerializers = new Serializer[128];
     static final Collection<Class> inlinedClasses = new ArrayList<Class>();
+    static final HashMap<String, Class> renamedClasses = new HashMap<String, Class>();
     static final int ENUM = 0x4000;
+
     static long nextBootstrapUid = -10;
+    static int anonymousClasseses = 0;
 
     static {
         addBootstrap(new IntegerSerializer());
@@ -123,17 +130,6 @@ public class Repository {
         }
     }
 
-    public static synchronized void provideReplacement(Serializer serializer) {
-        Serializer replacingSerializer = classMap.get(serializer.type());
-        if (replacingSerializer == null) {
-            throw new IllegalArgumentException("No replacing serializer found for " + serializer.type().getName());
-        }
-
-        provideSerializer(serializer);
-        classMap.put(serializer.cls, serializer);
-        classMap.put(serializer.getClass(), replacingSerializer);
-    }
-
     public static synchronized void addInlinedClass(String className) {
         try {
             inlinedClasses.add(Class.forName(className, false, Repository.class.getClassLoader()));
@@ -142,7 +138,7 @@ public class Repository {
         }
     }
 
-    private static synchronized Serializer generateFor(Class cls) {
+    private static synchronized Serializer generateFor(Class<?> cls) {
         Serializer serializer = classMap.get(cls);
         if (serializer == null) {
             if (cls.isArray()) {
@@ -166,8 +162,19 @@ public class Repository {
             } else {
                 serializer = new InvalidSerializer(cls);
             }
+
             provideSerializer(serializer);
             classMap.put(cls, serializer);
+
+            if (cls.isAnonymousClass()) {
+                log.warn("Trying to serialize anonymous class: " + cls.getName());
+                anonymousClasseses++;
+            }
+
+            Renamed renamed = cls.getAnnotation(Renamed.class);
+            if (renamed != null) {
+                renamedClasses.put(renamed.from(), cls);
+            }
         }
         return serializer;
     }

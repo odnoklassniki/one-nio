@@ -11,6 +11,11 @@ class DoubleSerializer extends Serializer<Double> {
     }
 
     @Override
+    public void calcSize(Double obj, CalcSizeStream css) {
+        css.count += 8;
+    }
+
+    @Override
     public void write(Double v, ObjectOutput out) throws IOException {
         out.writeDouble(v);
     }

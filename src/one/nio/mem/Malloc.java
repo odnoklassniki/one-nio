@@ -132,13 +132,13 @@ public class Malloc implements MallocMXBean {
         addFreeChunk(address, size);
     }
 
-    // Get the size of the allocated block or 0 if the given address is not allocated
+    // Get the actual size of the allocated block or 0 if the given address is not allocated
     public int allocatedSize(long address) {
         address -= HEADER_SIZE;
         if (address >= base + BIN_SPACE && address < base + capacity - HEADER_SIZE * 2) {
             int size = unsafe.getInt(address + SIZE_OFFSET);
             if ((size & OCCUPIED_MASK) != 0) {
-                return size & FREE_MASK;
+                return (size & FREE_MASK) - HEADER_SIZE;
             }
         }
         return 0;
@@ -169,33 +169,36 @@ public class Malloc implements MallocMXBean {
 
     // Initial setup of the empty heap
     void init() {
-        Management.registerMXBean(this, "one.nio.mem:type=Malloc,base=" + Long.toHexString(base));
-
         long oldBase = unsafe.getLong(base + BASE_OFFSET);
         long oldCapacity = unsafe.getLong(base + CAPACITY_OFFSET);
+        if (oldBase != 0 && oldCapacity != capacity) {
+            throw new IllegalArgumentException("Heap size changed");
+        }
+
         unsafe.putLong(base + BASE_OFFSET, base);
         unsafe.putLong(base + CAPACITY_OFFSET, capacity);
 
         // If the heap already contains data (e.g. backed by an existing file), do relocation instead of initialization
-        if (oldBase != 0 && oldCapacity == capacity) {
+        if (oldBase != 0) {
             relocate(base - oldBase);
-            return;
+        } else {
+            long start = base + BIN_SPACE;
+            long end = base + capacity - HEADER_SIZE * 2;
+            if (end - start < MIN_CHUNK) {
+                throw new IllegalArgumentException("Heap too small");
+            }
+
+            // Initialize the bins with the chunks of the maximum possible size
+            do {
+                int size = (int) Math.min(end - start, MAX_CHUNK);
+                addFreeChunk(start, size);
+                addBoundary(start + size);
+                freeMemory += size;
+                start += size + HEADER_SIZE;
+            } while (end - start >= MIN_CHUNK);
         }
 
-        long start = base + BIN_SPACE;
-        long end = base + capacity - HEADER_SIZE * 2;
-        if (end - start < MIN_CHUNK) {
-            throw new IllegalArgumentException("Heap too small");
-        }
-
-        // Initialize the bins with the chunks of the maximum possible size
-        do {
-            int size = (int) Math.min(end - start, MAX_CHUNK);
-            addFreeChunk(start, size);
-            addBoundary(start + size);
-            freeMemory += size;
-            start += size + HEADER_SIZE;
-        } while (end - start >= MIN_CHUNK);
+        Management.registerMXBean(this, "one.nio.mem:type=Malloc,base=" + Long.toHexString(base));
     }
 
     // Relocate absolute pointers when the heap is loaded from a snapshot

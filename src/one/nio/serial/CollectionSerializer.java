@@ -23,6 +23,14 @@ public class CollectionSerializer extends Serializer<Collection> {
     }
 
     @Override
+    public void calcSize(Collection obj, CalcSizeStream css) throws IOException {
+        css.count += 4;
+        for (Object v : obj) {
+            css.writeObject(v);
+        }
+    }
+
+    @Override
     public void write(Collection obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.size());
         for (Object v : obj) {
@@ -56,6 +64,7 @@ public class CollectionSerializer extends Serializer<Collection> {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Constructor findConstructor() {
         try {
             return cls.getConstructor();

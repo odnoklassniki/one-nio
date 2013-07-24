@@ -11,6 +11,11 @@ class ShortSerializer extends Serializer<Short> {
     }
 
     @Override
+    public void calcSize(Short obj, CalcSizeStream css) {
+        css.count += 2;
+    }
+
+    @Override
     public void write(Short v, ObjectOutput out) throws IOException {
         out.writeShort(v);
     }

@@ -12,6 +12,11 @@ class TimestampSerializer extends Serializer<Timestamp> {
     }
 
     @Override
+    public void calcSize(Timestamp obj, CalcSizeStream css) {
+        css.count += 12;
+    }
+
+    @Override
     public void write(Timestamp obj, ObjectOutput out) throws IOException {
         out.writeLong(obj.getTime());
         out.writeInt(obj.getNanos());

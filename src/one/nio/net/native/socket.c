@@ -429,8 +429,13 @@ Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean r
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_setBufferSize(JNIEnv* env, jobject self, jint recvBuf, jint sendBuf) {
+Java_one_nio_net_NativeSocket_setRecvBuffer(JNIEnv* env, jobject self, jint recvBuf) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &recvBuf, sizeof(recvBuf));
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_setSendBuffer(JNIEnv* env, jobject self, jint sendBuf) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
     setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendBuf, sizeof(sendBuf));
 }

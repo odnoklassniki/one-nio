@@ -12,6 +12,11 @@ class BooleanArraySerializer extends Serializer<boolean[]> {
     }
 
     @Override
+    public void calcSize(boolean[] obj, CalcSizeStream css) {
+        css.count += 4 + obj.length;
+    }
+
+    @Override
     public void write(boolean[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         for (boolean v : obj) {

@@ -11,6 +11,11 @@ class FloatSerializer extends Serializer<Float> {
     }
 
     @Override
+    public void calcSize(Float obj, CalcSizeStream css) {
+        css.count += 4;
+    }
+
+    @Override
     public void write(Float v, ObjectOutput out) throws IOException {
         out.writeFloat(v);
     }

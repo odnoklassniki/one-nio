@@ -14,7 +14,6 @@ import java.util.regex.Pattern;
 
 public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
-    private static final String DEFAULT_ADDRESS = "0.0.0.0";
 
     private String host;
     private int port;
@@ -55,6 +54,10 @@ public class ConnectionString {
         return port;
     }
 
+    public String[] getHosts() {
+        return host.indexOf('|') >= 0 ? host.split("\\|") : new String[] { host };
+    }
+
     public String getStringParam(String key) {
         return params.get(key);
     }
@@ -80,18 +83,39 @@ public class ConnectionString {
     }
 
     public static String expand(String url) {
-        Matcher m = INTERFACE_PATTERN.matcher(url);
-        return m.find() ? m.replaceFirst(getInterfaceAddress(m.group(1))) : url;
+        Matcher matcher = INTERFACE_PATTERN.matcher(url);
+        if (!matcher.find()) {
+            return url;
+        }
+
+        StringBuilder sb = new StringBuilder(url.length() + 32);
+        int lastPosition = 0;
+
+        do {
+            String interfaceAddress = getInterfaceAddress(matcher.group(1));
+            if (interfaceAddress != null) {
+                sb.append(url, lastPosition, matcher.start()).append(interfaceAddress);
+            } else {
+                sb.append(url, lastPosition, matcher.end());
+            }
+            lastPosition = matcher.end();
+        } while (matcher.find(lastPosition));
+
+        return sb.append(url, lastPosition, url.length()).toString();
     }
 
-    private static String getInterfaceAddress(String interfaceName) {
+    public static String getInterfaceAddress(String interfaceName) {
         try {
             NetworkInterface intf = NetworkInterface.getByName(interfaceName);
             if (intf == null) {
-                return DEFAULT_ADDRESS;
+                return null;
             }
 
             Enumeration<InetAddress> addrs = intf.getInetAddresses();
+            if (!addrs.hasMoreElements()) {
+                return null;
+            }
+
             InetAddress result = addrs.nextElement();
             while (!(result instanceof Inet4Address) && addrs.hasMoreElements()) {
                 result = addrs.nextElement();

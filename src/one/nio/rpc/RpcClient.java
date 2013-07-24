@@ -96,9 +96,9 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
     }
 
     private byte[] serialize(Object request) throws IOException {
-        CalcSizeStream calcSizeStream = new CalcSizeStream();
-        calcSizeStream.writeObject(request);
-        int requestSize = calcSizeStream.count();
+        CalcSizeStream css = new CalcSizeStream();
+        css.writeObject(request);
+        int requestSize = css.count();
 
         byte[] buffer = new byte[requestSize + 4];
         SerializeStream ss = new SerializeStream(buffer);

@@ -12,6 +12,11 @@ class DateSerializer extends Serializer<Date> {
     }
 
     @Override
+    public void calcSize(Date obj, CalcSizeStream css) {
+        css.count += 8;
+    }
+
+    @Override
     public void write(Date obj, ObjectOutput out) throws IOException {
         out.writeLong(obj.getTime());
     }

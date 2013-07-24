@@ -1,6 +1,8 @@
 package one.nio.mgt;
 
+import one.nio.http.HttpHandler;
 import one.nio.http.HttpServer;
+import one.nio.http.HttpSession;
 import one.nio.http.Request;
 import one.nio.http.Response;
 import one.nio.net.ConnectionString;
@@ -10,49 +12,50 @@ import java.io.IOException;
 
 public class ManagementServer extends HttpServer {
 
-    public ManagementServer(ConnectionString conn) throws IOException {
-        super(conn);
+    public ManagementServer(ConnectionString conn, Object... routers) throws IOException {
+        super(conn, routers);
     }
 
-    public ManagementServer(String address) throws IOException {
-        super(new ConnectionString(address + "?selectors=1&jmx=false"));
+    public ManagementServer(String address, Object... routers) throws IOException {
+        super(new ConnectionString(address + "?selectors=1&jmx=false"), routers);
     }
 
     @Override
-    public Response processRequest(Request request) {
-        Response response;
-        String path = request.getPath();
-        if (path.startsWith("/getstatus")) {
-            response = getStatusResponse(request);
-        } else if (path.startsWith("/monitor")) {
-            response = getMonitorResponse(request);
-        } else if (path.startsWith("/jmx")) {
-            response = getJmxResponse(request, request.getParameter("name="), request.getParameter("attr="));
-        } else {
-            response = getDefaultResponse(request);
-        }
-        response.setCloseConnection(true);
-        return response;
+    public void handleRequest(Request request, HttpSession session) throws IOException {
+        super.handleRequest(request, session);
+        session.scheduleClose();
     }
 
-    protected Response getStatusResponse(Request request) {
+    @HttpHandler("/getstatus")
+    public Response getStatusResponse() {
         return Response.ok("OK");
     }
 
-    protected Response getMonitorResponse(Request request) {
-        String path = request.getPath();
-        if (path.startsWith("/mem", 8)) {
-            return getJmxResponse(request, "one.nio.mem:type=MallocMT,*", "TotalMemory,UsedMemory,FreeMemory");
-        } else if (path.startsWith("/server", 8)) {
-            return getJmxResponse(request, "one.nio.server:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady");
-        } else {
-            return getDefaultResponse(request);
-        }
+    @HttpHandler("/monitor/mem")
+    public Response getMonitorMemResponse(Request request) {
+        return getJmxResponse(request, "one.nio.mem:type=MallocMT,*", "TotalMemory,UsedMemory,FreeMemory", true);
     }
 
-    protected Response getJmxResponse(Request request, String name, String attr) {
+    @HttpHandler("/monitor/server")
+    public Response getMonitorServerResponse(Request request) {
+        return getJmxResponse(request, "one.nio.server:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady", true);
+    }
+
+    @HttpHandler("/jmx")
+    public Response getJmxResponse(Request request) {
+        return getJmxResponse(request, request.getParameter("name="), request.getParameter("attr="), false);
+    }
+
+    public Response getJmxResponse(Request request, String name, String attr, boolean replaceWildcard) {
         if (name == null || attr == null) {
             return new Response(Response.BAD_REQUEST, Response.EMPTY);
+        }
+
+        if (replaceWildcard && name.endsWith(",*")) {
+            String queryString = request.getQueryString();
+            if (queryString != null) {
+                name = name.substring(0, name.length() - 1) + queryString.replace('&', ',');
+            }
         }
 
         String result;
@@ -69,11 +72,7 @@ public class ManagementServer extends HttpServer {
         return Response.ok(result);
     }
 
-    protected Response getDefaultResponse(Request request) {
-        return new Response(Response.NOT_FOUND, Response.EMPTY);
-    }
-
-    private static String toString(Object... values) {
+    protected static String toString(Object... values) {
         StringBuilder builder = new StringBuilder();
         for (Object value : values) {
             if (builder.length() != 0) builder.append(' ');

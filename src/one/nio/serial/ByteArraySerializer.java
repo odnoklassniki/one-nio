@@ -12,6 +12,11 @@ class ByteArraySerializer extends Serializer<byte[]> {
     }
 
     @Override
+    public void calcSize(byte[] obj, CalcSizeStream css) {
+        css.count += 4 + obj.length;
+    }
+
+    @Override
     public void write(byte[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         out.write(obj);

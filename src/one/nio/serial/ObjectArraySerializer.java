@@ -20,6 +20,14 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
     }
 
     @Override
+    public void calcSize(Object[] obj, CalcSizeStream css) throws IOException {
+        css.count += 4;
+        for (Object v : obj) {
+            css.writeObject(v);
+        }
+    }
+
+    @Override
     public void write(Object[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         for (Object v : obj) {

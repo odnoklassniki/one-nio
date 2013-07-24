@@ -11,6 +11,11 @@ class BooleanSerializer extends Serializer<Boolean> {
     }
 
     @Override
+    public void calcSize(Boolean obj, CalcSizeStream css) {
+        css.count++;
+    }
+
+    @Override
     public void write(Boolean v, ObjectOutput out) throws IOException {
         out.writeBoolean(v);
     }

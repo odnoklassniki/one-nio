@@ -1,10 +1,11 @@
 package one.nio.http;
 
+import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
 
 import java.util.Arrays;
 
-public final class Response {
+public final class Response implements Cloneable {
     public static final String CONTINUE                        = "100 Continue";
     public static final String SWITCHING_PROTOCOLS             = "101 Switching Protocols";
     public static final String OK                              = "200 OK";
@@ -48,10 +49,12 @@ public final class Response {
 
     public static final byte[] EMPTY = new byte[0];
 
+    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes("HTTP/1.0 ");
+    private static final int PROTOCOL_HEADER_LENGTH = 11;
+
     private int headerCount;
     private String[] headers;
     private byte[] body;
-    private boolean closeConnection;
 
     public Response(String resultCode) {
         this.headerCount = 1;
@@ -67,6 +70,12 @@ public final class Response {
         this.body = body;
     }
     
+    private Response(Response prototype) {
+        this.headerCount = prototype.headerCount;
+        this.headers = Arrays.copyOf(prototype.headers, prototype.headerCount + 4);
+        this.body = prototype.body;
+    }
+
     public static Response ok(byte[] body) {
         return new Response(OK, body);
     }
@@ -78,7 +87,7 @@ public final class Response {
     }
 
     public static Response redirect(String url) {
-        Response response = new Response(FOUND);
+        Response response = new Response(FOUND, EMPTY);
         response.addHeader("Location: " + url);
         return response;
     }
@@ -102,25 +111,34 @@ public final class Response {
         return body;
     }
 
-    public boolean getCloseConnection() {
-        return closeConnection;
-    }
+    public byte[] toBytes(boolean includeBody) {
+        int estimatedSize = PROTOCOL_HEADER_LENGTH + headerCount * 2;
+        for (int i = 0; i < headerCount; i++) {
+            estimatedSize += headers[i].length();
+        }
+        if (includeBody && body != null) {
+            estimatedSize += body.length;
+        }
 
-    public void setCloseConnection(boolean closeConnection) {
-        this.closeConnection = closeConnection;
+        ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
+        builder.append(PROTOCOL_HEADER);
+        for (int i = 0; i < headerCount; i++) {
+            builder.append(headers[i]).append('\r').append('\n');
+        }
+        builder.append('\r').append('\n');
+        if (includeBody && body != null) {
+            builder.append(body);
+        }
+        return builder.buffer();
     }
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder(400);
-        sb.append("HTTP/1.0 ");
-        for (int i = 0; i < headerCount; i++) {
-            sb.append(headers[i]).append("\r\n");
-        }
-        sb.append("\r\n");
-        if (body != null) {
-            sb.append(Utf8.toString(body));
-        }
-        return sb.toString();
+        return Utf8.toString(toBytes(true));
+    }
+
+    @Override
+    public Response clone() {
+        return new Response(this);
     }
 }

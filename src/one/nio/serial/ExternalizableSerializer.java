@@ -17,6 +17,11 @@ public class ExternalizableSerializer extends Serializer<Externalizable> {
     }
 
     @Override
+    public void calcSize(Externalizable obj, CalcSizeStream css) throws IOException {
+        obj.writeExternal(css);
+    }
+
+    @Override
     public void write(Externalizable obj, ObjectOutput out) throws IOException {
         obj.writeExternal(out);
     }

@@ -12,6 +12,11 @@ class DoubleArraySerializer extends Serializer<double[]> {
     }
 
     @Override
+    public void calcSize(double[] obj, CalcSizeStream css) {
+        css.count += 4 + obj.length * 8;
+    }
+
+    @Override
     public void write(double[] obj, ObjectOutput out) throws IOException {
         out.writeInt(obj.length);
         for (double v : obj) {
@@ -37,7 +42,7 @@ class DoubleArraySerializer extends Serializer<double[]> {
     public void skip(ObjectInput in) throws IOException {
         int length = in.readInt();
         if (length > 0) {
-            in.skipBytes(length << 3);
+            in.skipBytes(length * 8);
         }
     }
 }
