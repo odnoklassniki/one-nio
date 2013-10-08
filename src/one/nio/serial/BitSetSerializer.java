@@ -3,6 +3,7 @@ package one.nio.serial;
 import one.nio.util.JavaInternals;
 
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.Field;
@@ -58,5 +59,10 @@ class BitSetSerializer extends Serializer<BitSet> {
     @Override
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(in.readInt() * 8);
+    }
+
+    @Override
+    public void toJson(BitSet obj, StringBuilder builder) throws NotSerializableException {
+        throw new NotSerializableException(cls.getName());
     }
 }

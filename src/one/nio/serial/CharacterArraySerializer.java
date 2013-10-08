@@ -1,5 +1,7 @@
 package one.nio.serial;
 
+import one.nio.util.Json;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
@@ -44,5 +46,10 @@ class CharacterArraySerializer extends Serializer<char[]> {
         if (length > 0) {
             in.skipBytes(length * 2);
         }
+    }
+
+    @Override
+    public void toJson(char[] obj, StringBuilder builder) {
+        Json.appendChars(builder, obj);
     }
 }

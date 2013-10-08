@@ -29,4 +29,9 @@ class BooleanSerializer extends Serializer<Boolean> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(1);
     }
+
+    @Override
+    public void toJson(Boolean v, StringBuilder builder) {
+        builder.append(v.booleanValue());
+    }
 }

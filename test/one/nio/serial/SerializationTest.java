@@ -4,6 +4,10 @@ import junit.framework.Assert;
 import junit.framework.TestCase;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -13,7 +17,7 @@ import java.util.List;
 
 public class SerializationTest extends TestCase {
 
-    private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
+    private Object clone(Object obj) throws IOException, ClassNotFoundException {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(obj);
         int length = css.count();
@@ -27,7 +31,17 @@ public class SerializationTest extends TestCase {
         Object objCopy = in.readObject();
         assertEquals(in.count(), length);
 
+        return objCopy;
+    }
+
+    private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
+        Object objCopy = clone(obj);
         Assert.assertEquals(obj, objCopy);
+    }
+
+    private void checkSerializeToString(Object obj) throws IOException, ClassNotFoundException {
+        Object objCopy = clone(obj);
+        Assert.assertEquals(obj.toString(), objCopy.toString());
     }
 
     private String makeString(int length) {
@@ -135,5 +149,30 @@ public class SerializationTest extends TestCase {
         css2.writeObject(e);
 
         Assert.assertEquals(css1.count(), css2.count());
+    }
+
+    public void testInetAddress() throws IOException, ClassNotFoundException {
+        checkSerialize(InetAddress.getByName("123.45.67.89"));
+        checkSerialize(InetAddress.getByName("localhost"));
+        checkSerialize(InetAddress.getByAddress(new byte[4]));
+
+        checkSerialize(InetSocketAddress.createUnresolved("www.example.com", 80));
+        checkSerialize(new InetSocketAddress(21));
+        checkSerialize(new InetSocketAddress(InetAddress.getByAddress(new byte[] {8, 8, 8, 8}), 53));
+        checkSerialize(new InetSocketAddress("google.com", 443));
+    }
+
+    public void testBigDecimal() throws IOException, ClassNotFoundException {
+        checkSerialize(new BigInteger("12345678901234567890"));
+        checkSerialize(new BigInteger(-1, new byte[] { 11, 22, 33, 44, 55, 66, 77, 88, 99 }));
+        checkSerialize(new BigDecimal(999.999999999));
+        checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
+    }
+
+    public void testStringBuilder() throws IOException, ClassNotFoundException {
+        checkSerializeToString(new StringBuilder());
+        checkSerializeToString(new StringBuilder("asdasd").append(123).append(true));
+        checkSerializeToString(new StringBuffer());
+        checkSerializeToString(new StringBuffer(1000).append(new Object()).append("zzz").append(1234.56789));
     }
 }

@@ -29,4 +29,9 @@ class DoubleSerializer extends Serializer<Double> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(8);
     }
+
+    @Override
+    public void toJson(Double obj, StringBuilder builder) {
+        builder.append(obj.doubleValue());
+    }
 }

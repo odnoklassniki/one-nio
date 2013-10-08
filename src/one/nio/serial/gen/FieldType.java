@@ -14,6 +14,8 @@ public enum FieldType implements Opcodes {
     Float  (float.class,   4, FCONST_0,    new int[] { NOP, F2I, F2L, F2I | I2B << 8, F2I | I2B << 8, F2I | I2S << 8, F2I | I2C << 8, NOP, F2D }),
     Double (double.class,  8, DCONST_0,    new int[] { NOP, D2I, D2L, D2I | I2B << 8, D2I | I2B << 8, D2I | I2S << 8, D2I | I2C << 8, D2F, NOP });
 
+    private static final FieldType[] VALUES = values();
+
     final Class cls;
     final String sig;
     final int dataSize;
@@ -44,6 +46,10 @@ public enum FieldType implements Opcodes {
         return this == Byte || this == Short || this == Char ? "(I)V" : "(" + sig + ")V";
     }
 
+    public String appendSignature() {
+        return this == Byte || this == Short || this == Char ? "(I)Ljava/lang/StringBuilder;" : "(" + sig + ")Ljava/lang/StringBuilder;";
+    }
+
     public String putMethod() {
         return "put" + name();
     }
@@ -51,13 +57,14 @@ public enum FieldType implements Opcodes {
     public String putSignature() {
         return "(Ljava/lang/Object;J" + sig + ")V";
     }
+
     public int convertTo(FieldType target) {
         return convertOpcodes[target.ordinal()];
     }
 
     public static FieldType valueOf(Class cls) {
         if (cls.isPrimitive()) {
-            for (FieldType value : values()) {
+            for (FieldType value : VALUES) {
                 if (value.cls == cls) {
                     return value;
                 }

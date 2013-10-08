@@ -1,7 +1,9 @@
 package one.nio.serial;
 
+import one.nio.async.CompletedFuture;
 import one.nio.rpc.RemoteMethodCall;
 import one.nio.mgt.Management;
+import one.nio.serial.gen.StubGenerator;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -16,12 +18,24 @@ public class Repository {
     static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
     static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
     static final Serializer[] bootstrapSerializers = new Serializer[128];
-    static final Collection<Class> inlinedClasses = new ArrayList<Class>();
+    static final IdentityHashMap<Class, Integer> serializationOptions = new IdentityHashMap<Class, Integer>();
     static final HashMap<String, Class> renamedClasses = new HashMap<String, Class>();
     static final int ENUM = 0x4000;
 
     static long nextBootstrapUid = -10;
-    static int anonymousClasseses = 0;
+    static int anonymousClasses = 0;
+    static int stubOptions = 0;
+
+    public static final int SKIP_READ_OBJECT  = 1;
+    public static final int SKIP_WRITE_OBJECT = 2;
+    public static final int SKIP_CUSTOM_SERIALIZATION = SKIP_READ_OBJECT | SKIP_WRITE_OBJECT;
+    public static final int INLINE = 4;
+
+    public static final int ARRAY_STUBS      = 1;
+    public static final int COLLECTION_STUBS = 2;
+    public static final int MAP_STUBS        = 4;
+    public static final int ENUM_STUBS       = 8;
+    public static final int CUSTOM_STUBS     = 16;
 
     static {
         addBootstrap(new IntegerSerializer());
@@ -82,10 +96,20 @@ public class Repository {
 
         addBootstrap(new TimestampSerializer());
         addBootstrap(new GeneratedSerializer(RemoteMethodCall.class));
+        addBootstrap(new GeneratedSerializer(CompletedFuture.class));
 
-        // At some moment Inet4Address fields were moved to an auxilary holder class.
+        // Unable to run readObject/writeObject for the following classes.
+        // Fortunately standard serialization works well for them.
+        setOptions("java.net.InetAddress", SKIP_CUSTOM_SERIALIZATION);
+        setOptions("java.net.InetSocketAddress", SKIP_CUSTOM_SERIALIZATION);
+        setOptions("java.lang.StringBuilder", SKIP_CUSTOM_SERIALIZATION);
+        setOptions("java.lang.StringBuffer", SKIP_CUSTOM_SERIALIZATION);
+        setOptions("java.math.BigInteger", SKIP_CUSTOM_SERIALIZATION);
+
+        // At some moment InetAddress fields were moved to an auxilary holder class.
         // This resolves backward compatibility problem by inlining holder fields during serialization.
-        addInlinedClass("java.net.InetAddress$InetAddressHolder");
+        setOptions("java.net.InetAddress$InetAddressHolder", INLINE);
+        setOptions("java.net.InetSocketAddress$InetSocketAddressHolder", INLINE);
 
         Management.registerMXBean(new SerializationMXBeanImpl(), "one.nio.serial:type=Serialization");
     }
@@ -93,7 +117,6 @@ public class Repository {
     private static void addBootstrap(Serializer serializer) {
         serializer.uid = nextBootstrapUid--;
         provideSerializer(serializer);
-        classMap.put(serializer.cls, serializer);
     }
 
     public static Serializer get(Class cls) {
@@ -128,14 +151,27 @@ public class Repository {
         if (serializer.uid < 0) {
             bootstrapSerializers[128 + (int) serializer.uid] = serializer;
         }
+        if (serializer.original) {
+            classMap.put(serializer.cls, serializer);
+        }
     }
 
-    public static synchronized void addInlinedClass(String className) {
+    public static void setOptions(String className, int options) {
+        Class cls;
         try {
-            inlinedClasses.add(Class.forName(className, false, Repository.class.getClassLoader()));
+            cls = Class.forName(className, false, StubGenerator.INSTANCE);
         } catch (ClassNotFoundException e) {
-            // Ignore
+            return;
         }
+
+        synchronized (Repository.class) {
+            serializationOptions.put(cls, options);
+        }
+    }
+
+    public static boolean hasOptions(Class cls, int options) {
+        Integer value = serializationOptions.get(cls);
+        return value != null && (value & options) == options;
     }
 
     private static synchronized Serializer generateFor(Class<?> cls) {
@@ -164,11 +200,10 @@ public class Repository {
             }
 
             provideSerializer(serializer);
-            classMap.put(cls, serializer);
 
             if (cls.isAnonymousClass()) {
                 log.warn("Trying to serialize anonymous class: " + cls.getName());
-                anonymousClasseses++;
+                anonymousClasses++;
             }
 
             Renamed renamed = cls.getAnnotation(Renamed.class);

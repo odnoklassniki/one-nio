@@ -29,4 +29,9 @@ class ShortSerializer extends Serializer<Short> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(2);
     }
+
+    @Override
+    public void toJson(Short obj, StringBuilder builder) {
+        builder.append(obj.shortValue());
+    }
 }

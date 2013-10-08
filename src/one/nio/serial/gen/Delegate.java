@@ -12,4 +12,5 @@ public interface Delegate {
     Object read(ObjectInput in) throws IOException, ClassNotFoundException;
     void fill(Object obj, ObjectInput in) throws IOException;
     void skip(ObjectInput in) throws IOException;
+    void toJson(Object obj, StringBuilder builder) throws IOException;
 }

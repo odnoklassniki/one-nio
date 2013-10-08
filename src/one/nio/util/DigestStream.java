@@ -103,8 +103,9 @@ public class DigestStream implements ObjectOutput {
         int pos = 0;
         for (int i = 0; i < length; i++) {
             int v = s.charAt(i);
-            tmp[pos++] = (byte) (v >>> 8);
-            tmp[pos++] = (byte) v;
+            tmp[pos]     = (byte) (v >>> 8);
+            tmp[pos + 1] = (byte) v;
+            pos += 2;
         }
         md.update(tmp);
     }

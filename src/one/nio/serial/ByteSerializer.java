@@ -29,4 +29,9 @@ class ByteSerializer extends Serializer<Byte> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(1);
     }
+
+    @Override
+    public void toJson(Byte obj, StringBuilder builder) {
+        builder.append(obj.byteValue());
+    }
 }

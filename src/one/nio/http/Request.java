@@ -16,8 +16,8 @@ public final class Request implements Cloneable {
             Utf8.toBytes("HEAD " )
     };
 
-    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
-    private static final int PROTOCOL_HEADER_LENGTH = 11;
+    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
+    private static final int PROTOCOL_HEADER_LENGTH = 13;
 
     private int method;
     private String uri;
@@ -95,7 +95,7 @@ public final class Request implements Cloneable {
         for (int i = 0; i < headerCount; i++) {
             builder.append(headers[i]).append('\r').append('\n');
         }
-        return builder.buffer();
+        return builder.append('\r').append('\n').buffer();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package one.nio.serial;
 
+import one.nio.serial.gen.StubGenerator;
 import one.nio.util.DigestStream;
 
 import java.io.ObjectInput;
@@ -31,23 +32,42 @@ public class EnumSerializer extends Serializer<Enum> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.readExternal(in);
-        Enum[] ownValues = (Enum[]) cls.getEnumConstants();
+        String className = super.tryReadExternal(in, (Repository.stubOptions & Repository.ENUM_STUBS) == 0);
 
-        if (uid == oldVersionUid()) {
-            this.values = ownValues;
-            Repository.log.warn("Old EnumSerializer [" + uid() + "] for " + cls.getName());
-            enumOldSerializers.incrementAndGet();
-        } else {
-            this.values = new Enum[in.readUnsignedShort()];
-            for (int i = 0; i < values.length; i++) {
-                values[i] = find(ownValues, in.readUTF(), i);
+        if (uid == oldVersionUid(className)) {
+            if (cls == null) {
+                throw new ClassNotFoundException(className);
             }
+            this.values = (Enum[]) cls.getEnumConstants();
+            Repository.log.warn("Old EnumSerializer [" + uid() + "] for " + className);
+            enumOldSerializers.incrementAndGet();
+            return;
+        }
 
-            if (ownValues.length != values.length) {
-                Repository.log.warn("Enum count mismatch [" + uid() + "] for " + cls.getName() + ": " +
-                        ownValues.length + " local vs. " + values.length + " stream constants");
-                enumCountMismatches.incrementAndGet();
+        String[] constants = new String[in.readUnsignedShort()];
+        for (int i = 0; i < constants.length; i++) {
+            constants[i] = in.readUTF();
+        }
+
+        if (this.cls == null) {
+            this.cls = StubGenerator.generateEnum(className, constants);
+            this.original = true;
+        }
+
+        Enum[] ownValues = (Enum[]) cls.getEnumConstants();
+        if (ownValues.length != constants.length) {
+            Repository.log.warn("Enum count mismatch [" + uid() + "] for " + className + ": " +
+                    ownValues.length + " local vs. " + constants.length + " stream constants");
+            enumCountMismatches.incrementAndGet();
+        }
+
+        this.values = new Enum[constants.length];
+        for (int i = 0; i < constants.length; i++) {
+            values[i] = find(ownValues, constants[i]);
+            if (values[i] == null) {
+                Repository.log.warn("Missed local enum constant " + className + "." + constants[i]);
+                enumMissedConstants.incrementAndGet();
+                values[i] = i < ownValues.length ? ownValues[i] : null;
             }
         }
     }
@@ -72,23 +92,25 @@ public class EnumSerializer extends Serializer<Enum> {
         in.skipBytes(2);
     }
 
-    private long oldVersionUid() {
+    @Override
+    public void toJson(Enum obj, StringBuilder builder) {
+        builder.append('"').append(obj.name()).append('"');
+    }
+
+    private static long oldVersionUid(String className) {
         DigestStream ds = new DigestStream("MD5");
         ds.writeUTF("one.rmi.serial.EnumSerializer");
-        ds.writeUTF(cls.getName());
+        ds.writeUTF(className);
         ds.writeLong(0);
         return ds.digest();
     }
 
-    private Enum find(Enum[] values, String name, int defaultIndex) {
+    private static Enum find(Enum[] values, String name) {
         for (Enum v : values) {
             if (name.equals(v.name())) {
                 return v;
             }
         }
-
-        Repository.log.warn("Missed local enum constant " + cls.getName() + "." + name);
-        enumMissedConstants.incrementAndGet();
-        return defaultIndex < values.length ? values[defaultIndex] : null;
+        return null;
     }
 }

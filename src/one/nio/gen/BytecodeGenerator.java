@@ -12,18 +12,27 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class BytecodeGenerator extends ClassLoader implements Opcodes {
+public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorMXBean, Opcodes {
     private static final Log log = LogFactory.getLog(BytecodeGenerator.class);
-    private static final String DUMP_PATH = System.getProperty("one.nio.gen.dump");
+
+    protected final AtomicInteger totalClasses;
+    protected final AtomicInteger totalBytes;
+    protected String dumpPath;
 
     public BytecodeGenerator() {
         super(BytecodeGenerator.class.getClassLoader());
+        this.totalClasses = new AtomicInteger();
+        this.totalBytes = new AtomicInteger();
+        this.dumpPath = System.getProperty("one.nio.gen.dump");
     }
 
     public Class<?> defineClass(byte[] classData) {
         Class<?> result = super.defineClass(null, classData, 0, classData.length, null);
-        if (DUMP_PATH != null) {
+        totalClasses.incrementAndGet();
+        totalBytes.addAndGet(classData.length);
+        if (dumpPath != null && !"".equals(dumpPath)) {
             dumpClass(classData, result.getSimpleName());
         }
         return result;
@@ -40,7 +49,7 @@ public class BytecodeGenerator extends ClassLoader implements Opcodes {
 
     public void dumpClass(byte[] classData, String className) {
         try {
-            File f = new File(DUMP_PATH, className + ".class");
+            File f = new File(dumpPath, className + ".class");
             FileOutputStream fos = new FileOutputStream(f);
             fos.write(classData);
             fos.close();
@@ -123,5 +132,25 @@ public class BytecodeGenerator extends ClassLoader implements Opcodes {
         } else {
             mv.visitLdcInsn(c);
         }
+    }
+
+    @Override
+    public String getDumpPath() {
+        return dumpPath;
+    }
+
+    @Override
+    public void setDumpPath(String dumpPath) {
+        this.dumpPath = dumpPath;
+    }
+
+    @Override
+    public int getTotalClasses() {
+        return totalClasses.get();
+    }
+
+    @Override
+    public int getTotalBytes() {
+        return totalBytes.get();
     }
 }

@@ -3,6 +3,7 @@ package one.nio.serial;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.FieldInfo;
+import one.nio.serial.gen.StubGenerator;
 
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -13,9 +14,7 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GeneratedSerializer extends Serializer {
-    private static final ClassSerializer classSerializer = (ClassSerializer) Repository.get(Class.class);
-
-    static final AtomicInteger newTypes = new AtomicInteger();
+    static final AtomicInteger unknownTypes = new AtomicInteger();
     static final AtomicInteger missedLocalFields = new AtomicInteger();
     static final AtomicInteger missedStreamFields = new AtomicInteger();
     static final AtomicInteger migratedFields = new AtomicInteger();
@@ -44,36 +43,42 @@ public class GeneratedSerializer extends Serializer {
         
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
+            String name = f.getName();
+            Class type = f.getType();
+
             Renamed renamed = f.getAnnotation(Renamed.class);
-            out.writeUTF(renamed == null ? f.getName() : f.getName() + '|' + renamed.from());
-            classSerializer.write(f.getType(), out);
+            out.writeUTF(renamed == null ? name : name + '|' + renamed.from());
+
+            if (type.isPrimitive()) {
+                out.writeByte(primitiveIndex(type));
+            } else {
+                out.writeByte(-1);
+                OriginalType originalType = f.getAnnotation(OriginalType.class);
+                out.writeUTF(originalType == null ? classDescriptor(type) : originalType.value());
+            }
         }
     }
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.readExternal(in);
+        String className = super.tryReadExternal(in, (Repository.stubOptions & Repository.CUSTOM_STUBS) == 0);
+
+        FieldInfo[] fieldsInfo = new FieldInfo[in.readUnsignedShort()];
+        for (int i = 0; i < fieldsInfo.length; i++) {
+            fieldsInfo[i] = readFieldInfo(in);
+        }
+
+        if (this.cls == null) {
+            this.cls = StubGenerator.generateRegular(className, "java.lang.Object", fieldsInfo);
+            this.original = true;
+        }
 
         Field[] ownFields = getSerializableFields();
-        FieldInfo[] fieldsInfo = new FieldInfo[in.readUnsignedShort()];
-
-        for (int i = 0; i < fieldsInfo.length; i++) {
-            String sourceName = in.readUTF();
-            Class sourceType;
-            try {
-                sourceType = classSerializer.read(in);
-            } catch (ClassNotFoundException e) {
-                logFieldMismatch("Local class not found: " + e.getMessage(), Object.class, cls, sourceName);
-                newTypes.incrementAndGet();
-                sourceType = Object.class;
-            }
-
-            int found = findField(ownFields, sourceName, sourceType);
+        for (FieldInfo fi : fieldsInfo) {
+            int found = findField(ownFields, fi.sourceName(), fi.oldName(), fi.sourceClass());
             if (found >= 0) {
-                fieldsInfo[i] = new FieldInfo(ownFields[found], ownFields[found + 1], sourceType);
+                fi.assignField(ownFields[found], ownFields[found + 1]);
                 ownFields[found] = null;
-            } else {
-                fieldsInfo[i] = new FieldInfo(null, null, sourceType);
             }
         }
 
@@ -114,18 +119,31 @@ public class GeneratedSerializer extends Serializer {
     }
 
     @Override
+    public void toJson(Object obj, StringBuilder builder) throws IOException {
+        delegate.toJson(obj, builder);
+    }
+
+    @Override
     public String toString() {
         StringBuilder builder = new StringBuilder(super.toString());
         builder.append("Fields:\n");
         Field[] ownFields = getSerializableFields();
+
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
             builder.append(" - Name: ").append(f.getName()).append('\n');
             builder.append("   Type: ").append(f.getType().getName()).append('\n');
+
             Renamed renamed = f.getAnnotation(Renamed.class);
             if (renamed != null) {
                 builder.append("   Renamed: ").append(renamed.from()).append('\n');
             }
+
+            OriginalType originalType = f.getAnnotation(OriginalType.class);
+            if (originalType != null) {
+                builder.append("   Original: ").append(originalType.value()).append('\n');
+            }
+
             if (ownFields[i + 1] != null) {
                 builder.append("   Parent: ").append(ownFields[i + 1].getName()).append('\n');
             }
@@ -133,14 +151,24 @@ public class GeneratedSerializer extends Serializer {
         return builder.toString();
     }
 
-    private int findField(Field[] ownFields, String name, Class type) {
-        String oldName = null;
-        int p = name.indexOf('|');
-        if (p >= 0) {
-            oldName = name.substring(p + 1);
-            name = name.substring(0, p);
+    private FieldInfo readFieldInfo(ObjectInput in) throws IOException {
+        String sourceName = in.readUTF();
+        int index = in.readByte();
+        if (index >= 0) {
+            return new FieldInfo(sourceName, PRIMITIVE_CLASSES[index], null);
+        } else {
+            String sourceType = in.readUTF();
+            try {
+                return new FieldInfo(sourceName, classByDescriptor(sourceType), null);
+            } catch (ClassNotFoundException e) {
+                Repository.log.warn("[" + uid() + "] Local type not found: " + sourceType + ' ' + sourceName);
+                unknownTypes.incrementAndGet();
+                return new FieldInfo(sourceName, Object.class, sourceType);
+            }
         }
+    }
 
+    private int findField(Field[] ownFields, String name, String oldName, Class type) {
         // 1. Find exact match
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
@@ -176,10 +204,6 @@ public class GeneratedSerializer extends Serializer {
         return -1;
     }
 
-    private void logFieldMismatch(String msg, Class type, Class holder, String name) {
-        Repository.log.warn("[" + uid() + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
-    }
-
     private Field[] getSerializableFields() {
         ArrayList<Field> list = new ArrayList<Field>();
         getSerializableFields(cls, null, list);
@@ -194,12 +218,16 @@ public class GeneratedSerializer extends Serializer {
                     list.add(f);
                     list.add(parentField);
                 } else if ((f.getModifiers() & Modifier.STATIC) == 0
-                        && Repository.inlinedClasses.contains(f.getType())
+                        && Repository.hasOptions(f.getType(), Repository.INLINE)
                         && parentField == null) {
                     logFieldMismatch("Inlining field", f.getType(), cls, f.getName());
                     getSerializableFields(f.getType(), f, list);
                 }
             }
         }
+    }
+
+    private void logFieldMismatch(String msg, Class type, Class holder, String name) {
+        Repository.log.warn("[" + uid() + "] " + msg + ": " + type.getName() + ' ' + holder.getName() + '.' + name);
     }
 }

@@ -49,7 +49,7 @@ public final class Response implements Cloneable {
 
     public static final byte[] EMPTY = new byte[0];
 
-    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes("HTTP/1.0 ");
+    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes("HTTP/1.1 ");
     private static final int PROTOCOL_HEADER_LENGTH = 11;
 
     private int headerCount;
@@ -107,8 +107,26 @@ public final class Response implements Cloneable {
         return headers;
     }
 
+    public int getStatus() {
+        String s = headers[0];
+        return (s.charAt(0) * 100) + (s.charAt(1) * 10) + s.charAt(2) - ('0' * 111);
+    }
+
+    public String getHeader(String key) {
+        for (int i = 1; i < headerCount; i++) {
+            if (headers[i].startsWith(key)) {
+                return headers[i].substring(key.length());
+            }
+        }
+        return null;
+    }
+
     public byte[] getBody() {
         return body;
+    }
+
+    public void setBody(byte[] body) {
+        this.body = body;
     }
 
     public byte[] toBytes(boolean includeBody) {

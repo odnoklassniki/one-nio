@@ -1,5 +1,6 @@
 package one.nio.serial;
 
+import one.nio.util.Json;
 import one.nio.util.Utf8;
 
 import java.io.ObjectInput;
@@ -35,5 +36,10 @@ class StringSerializer extends Serializer<String> {
             length = (length & 0x7fff) << 16 | in.readUnsignedShort();
         }
         in.skipBytes(length);
+    }
+
+    @Override
+    public void toJson(String obj, StringBuilder builder) {
+        Json.appendString(builder, obj);
     }
 }

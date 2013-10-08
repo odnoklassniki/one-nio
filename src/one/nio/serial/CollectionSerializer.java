@@ -1,5 +1,8 @@
 package one.nio.serial;
 
+import one.nio.serial.gen.StubGenerator;
+import one.nio.util.Json;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
@@ -17,7 +20,12 @@ public class CollectionSerializer extends Serializer<Collection> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.readExternal(in);
+        String className = super.tryReadExternal(in, (Repository.stubOptions & Repository.COLLECTION_STUBS) == 0);
+        if (this.cls == null) {
+            this.cls = StubGenerator.generateRegular(className, "java.util.ArrayList", null);
+            this.original = true;
+        }
+
         this.constructor = findConstructor();
         this.constructor.setAccessible(true);
     }
@@ -62,6 +70,20 @@ public class CollectionSerializer extends Serializer<Collection> {
         for (int i = 0; i < length; i++) {
             in.readObject();
         }
+    }
+
+    @Override
+    public void toJson(Collection obj, StringBuilder builder) throws IOException {
+        builder.append('[');
+        Iterator iterator = obj.iterator();
+        if (iterator.hasNext()) {
+            Json.appendObject(builder, iterator.next());
+            while (iterator.hasNext()) {
+                builder.append(',');
+                Json.appendObject(builder, iterator.next());
+            }
+        }
+        builder.append(']');
     }
 
     @SuppressWarnings("unchecked")

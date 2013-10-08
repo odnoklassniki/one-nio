@@ -1,5 +1,7 @@
 package one.nio.serial;
 
+import one.nio.util.Base64;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
@@ -40,5 +42,10 @@ class ByteArraySerializer extends Serializer<byte[]> {
         if (length > 0) {
             in.skipBytes(length);
         }
+    }
+
+    @Override
+    public void toJson(byte[] obj, StringBuilder builder) {
+        builder.append('"').append(Base64.encodeToChars(obj)).append('"');
     }
 }

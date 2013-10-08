@@ -4,6 +4,9 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class ByteArrayBuilder {
+    protected static final byte[] TRUE = Utf8.toBytes("true");
+    protected static final byte[] FALSE = Utf8.toBytes("false");
+
     protected byte[] buf;
     protected int count;
 
@@ -84,6 +87,11 @@ public class ByteArrayBuilder {
         return this;
     }
 
+    public final ByteArrayBuilder append(boolean b) {
+        append(b ? TRUE : FALSE);
+        return this;
+    }
+
     public final ByteArrayBuilder append(char c) {
         ensureCapacity(1);
         buf[count++] = (byte) c;
@@ -107,12 +115,14 @@ public class ByteArrayBuilder {
         if (c <= 0x7f) {
             buf[count++] = (byte) c;
         } else if (c <= 0x7ff) {
-            buf[count++] = (byte) (0xc0 | ((c >>> 6) & 0x1f));
-            buf[count++] = (byte) (0x80 | (c & 0x3f));
+            buf[count]     = (byte) (0xc0 | ((c >>> 6) & 0x1f));
+            buf[count + 1] = (byte) (0x80 | (c & 0x3f));
+            count += 2;
         } else {
-            buf[count++] = (byte) (0xe0 | ((c >>> 12) & 0x0f));
-            buf[count++] = (byte) (0x80 | ((c >>> 6) & 0x3f));
-            buf[count++] = (byte) (0x80 | (c & 0x3f));
+            buf[count]     = (byte) (0xe0 | ((c >>> 12) & 0x0f));
+            buf[count + 1] = (byte) (0x80 | ((c >>> 6) & 0x3f));
+            buf[count + 2] = (byte) (0x80 | (c & 0x3f));
+            count += 3;
         }
         return this;
     }

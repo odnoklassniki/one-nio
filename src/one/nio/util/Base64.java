@@ -25,14 +25,12 @@ public final class Base64 {
         final byte[] table = TO_BASE_64;
 
         int p = 0;
-        for (int i = 0; i < len; ) {
-            int b1 = s[i++] & 0xff;
-            int b2 = s[i++] & 0xff;
-            int b3 = s[i++] & 0xff;
-            result[p++] = table[b1 >> 2];
-            result[p++] = table[(b1 & 0x03) << 4 | b2 >> 4];
-            result[p++] = table[(b2 & 0x0f) << 2 | b3 >> 6];
-            result[p++] = table[b3 & 0x3f];
+        for (int i = 0; i < len; i += 3, p += 4) {
+            int v = (s[i] & 0xff) << 16 | (s[i + 1] & 0xff) << 8 | (s[i + 2] & 0xff);
+            result[p]     = table[v >>> 18];
+            result[p + 1] = table[(v >>> 12) & 0x3f];
+            result[p + 2] = table[(v >>> 6) & 63];
+            result[p + 3] = table[v & 0x3f];
         }
 
         switch (s.length - len) {
@@ -53,9 +51,41 @@ public final class Base64 {
         return result;
     }
 
+    public static char[] encodeToChars(byte[] s) {
+        final int len = s.length / 3 * 3;
+        final char[] result = new char[(s.length + 2) / 3 << 2];
+        final byte[] table = TO_BASE_64;
+
+        int p = 0;
+        for (int i = 0; i < len; i += 3, p += 4) {
+            int v = (s[i] & 0xff) << 16 | (s[i + 1] & 0xff) << 8 | (s[i + 2] & 0xff);
+            result[p]     = (char) table[v >>> 18];
+            result[p + 1] = (char) table[(v >>> 12) & 0x3f];
+            result[p + 2] = (char) table[(v >>> 6) & 63];
+            result[p + 3] = (char) table[v & 0x3f];
+        }
+
+        switch (s.length - len) {
+            case 1:
+                result[p]     = (char) table[(s[len] & 0xff) >> 2];
+                result[p + 1] = (char) table[(s[len] & 0x03) << 4];
+                result[p + 2] = '=';
+                result[p + 3] = '=';
+                break;
+            case 2:
+                result[p]     = (char) table[(s[len] & 0xff) >> 2];
+                result[p + 1] = (char) table[(s[len] & 0x03) << 4 | (s[len + 1] & 0xff) >> 4];
+                result[p + 2] = (char) table[(s[len + 1] & 0x0f) << 2];
+                result[p + 3] = '=';
+                break;
+        }
+
+        return result;
+    }
+
     public static byte[] decode(byte[] s) {
         int len = s.length;
-        while (len > 0 && (s[len - 1] <= ' ' || s[len - 1] == '=')) {
+        while (len > 0 && s[len - 1] == '=') {
             len--;
         }
 
@@ -65,14 +95,40 @@ public final class Base64 {
         final byte[] table = FROM_BASE_64;
 
         int i = 0;
-        for (int p = 0; p < full; ) {
-            int b1 = table[s[i++]];
-            int b2 = table[s[i++]];
-            int b3 = table[s[i++]];
-            int b4 = table[s[i++]];
-            result[p++] = (byte) (b1 << 2 | b2 >> 4);
-            result[p++] = (byte) (b2 << 4 | b3 >> 2);
-            result[p++] = (byte) (b3 << 6 | b4);
+        for (int p = 0; p < full; p += 3, i += 4) {
+            int v = table[s[i]] << 18 | table[s[i + 1]] << 12 | table[s[i + 2]] << 6 | table[s[i + 3]];
+            result[p]     = (byte) (v >>> 16);
+            result[p + 1] = (byte) (v >>> 8);
+            result[p + 2] = (byte) v;
+        }
+
+        switch (pad) {
+            case 2:
+                result[full + 1] = (byte) (table[s[i + 1]] << 4 | table[s[i + 2]] >> 2);
+            case 1:
+                result[full] = (byte) (table[s[i]] << 2 | table[s[i + 1]] >> 4);
+        }
+
+        return result;
+    }
+
+    public static byte[] decodeFromChars(char[] s) {
+        int len = s.length;
+        while (len > 0 && s[len - 1] == '=') {
+            len--;
+        }
+
+        final int full = (len >> 2) * 3;
+        final int pad = (len & 3) * 3 >> 2;
+        final byte[] result = new byte[full + pad];
+        final byte[] table = FROM_BASE_64;
+
+        int i = 0;
+        for (int p = 0; p < full; p += 3, i += 4) {
+            int v = table[s[i]] << 18 | table[s[i + 1]] << 12 | table[s[i + 2]] << 6 | table[s[i + 3]];
+            result[p]     = (byte) (v >>> 16);
+            result[p + 1] = (byte) (v >>> 8);
+            result[p + 2] = (byte) v;
         }
 
         switch (pad) {

@@ -7,9 +7,6 @@ import java.io.ObjectOutput;
 import java.io.IOException;
 
 class ClassSerializer extends Serializer<Class<?>> {
-    private static final Class[] PRIMITIVE_CLASSES = {
-        int.class, long.class, boolean.class, byte.class, short.class, char.class, float.class, double.class, void.class
-    };
 
     ClassSerializer() {
         super(Class.class);
@@ -29,22 +26,17 @@ class ClassSerializer extends Serializer<Class<?>> {
     @Override
     public void write(Class<?> obj, ObjectOutput out) throws IOException {
         if (obj.isPrimitive()) {
-            for (int i = 0; i < PRIMITIVE_CLASSES.length; i++) {
-                if (obj == PRIMITIVE_CLASSES[i]) {
-                    out.writeByte(i);
-                    break;
-                }
-            }
+            out.writeByte(primitiveIndex(obj));
         } else {
             out.writeByte(-1);
-            writeInstanceClass(obj, out);
+            out.writeUTF(classDescriptor(obj));
         }
     }
 
     @Override
     public Class<?> read(ObjectInput in) throws IOException, ClassNotFoundException {
         int index = in.readByte();
-        return index >= 0 ? PRIMITIVE_CLASSES[index] : readInstanceClass(in);
+        return index >= 0 ? PRIMITIVE_CLASSES[index] : classByDescriptor(in.readUTF());
     }
 
     @Override
@@ -52,5 +44,10 @@ class ClassSerializer extends Serializer<Class<?>> {
         if (in.readByte() < 0) {
             in.skipBytes(in.readUnsignedShort());
         }
+    }
+
+    @Override
+    public void toJson(Class<?> obj, StringBuilder builder) {
+        builder.append('"').append(obj.getName()).append('"');
     }
 }

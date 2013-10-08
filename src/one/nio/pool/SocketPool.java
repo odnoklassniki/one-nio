@@ -12,12 +12,12 @@ public class SocketPool extends Pool<Socket> {
     protected int readTimeout;
     protected int connectTimeout;
 
-    public SocketPool(ConnectionString conn) throws IOException {
+    public SocketPool(ConnectionString conn, int defaultPort) throws IOException {
         super(conn.getIntParam("clientMinPoolSize", 0),
               conn.getIntParam("clientMaxPoolSize", 10),
               conn.getIntParam("timeout", 3000));
         this.address = InetAddress.getByName(conn.getHost());
-        this.port = conn.getPort();
+        this.port = conn.getPort() != 0 ? conn.getPort() : defaultPort;
         this.readTimeout = conn.getIntParam("readTimeout", timeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", readTimeout);
         initialize();

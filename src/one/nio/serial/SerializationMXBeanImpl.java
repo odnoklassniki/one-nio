@@ -1,9 +1,8 @@
 package one.nio.serial;
 
+import one.nio.serial.gen.StubGenerator;
 import one.nio.util.Hex;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 class SerializationMXBeanImpl implements SerializationMXBean {
@@ -13,13 +12,13 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public List<String> getClassSerializers() {
-        return getSerializerList(Repository.classMap);
+    public String[] getClassSerializers() {
+        return getSerializers(Repository.classMap);
     }
 
     @Override
-    public List<String> getUidSerializers() {
-        return getSerializerList(Repository.uidMap);
+    public String[] getUidSerializers() {
+        return getSerializers(Repository.uidMap);
     }
 
     @Override
@@ -32,18 +31,23 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public int getSerializersSent() {
-        return Serializer.serializersSent.get();
+    public int getStubOptions() {
+        return Repository.stubOptions;
     }
 
     @Override
-    public int getSerializersReceived() {
-        return Serializer.serializersReceived.get();
+    public void setStubOptions(int stubOptions) {
+        Repository.stubOptions = stubOptions;
+    }
+
+    @Override
+    public int getGeneratedStubs() {
+        return StubGenerator.getGeneratedStubs();
     }
 
     @Override
     public int getAnonymousClasses() {
-        return Repository.anonymousClasseses;
+        return Repository.anonymousClasses;
     }
 
     @Override
@@ -52,8 +56,8 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public int getNewTypes() {
-        return GeneratedSerializer.newTypes.get();
+    public int getUnknownTypes() {
+        return GeneratedSerializer.unknownTypes.get();
     }
 
     @Override
@@ -91,11 +95,12 @@ class SerializationMXBeanImpl implements SerializationMXBean {
         return EnumSerializer.enumMissedConstants.get();
     }
 
-    private List<String> getSerializerList(Map<?, Serializer> map) {
+    private String[] getSerializers(Map<?, Serializer> map) {
         synchronized (Repository.class) {
-            ArrayList<String> result = new ArrayList<String>(map.size());
+            String[] result = new String[map.size()];
+            int i = 0;
             for (Serializer serializer : map.values()) {
-                result.add(serializer.uid());
+                result[i++] = serializer.uid();
             }
             return result;
         }

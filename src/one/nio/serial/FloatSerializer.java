@@ -29,4 +29,9 @@ class FloatSerializer extends Serializer<Float> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(4);
     }
+
+    @Override
+    public void toJson(Float obj, StringBuilder builder) {
+        builder.append(obj.floatValue());
+    }
 }

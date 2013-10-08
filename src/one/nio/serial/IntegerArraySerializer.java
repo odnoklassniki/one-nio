@@ -45,4 +45,16 @@ class IntegerArraySerializer extends Serializer<int[]> {
             in.skipBytes(length * 4);
         }
     }
+
+    @Override
+    public void toJson(int[] obj, StringBuilder builder) {
+        builder.append('[');
+        if (obj.length > 0) {
+            builder.append(obj[0]);
+            for (int i = 1; i < obj.length; i++) {
+                builder.append(',').append(obj[i]);
+            }
+        }
+        builder.append(']');
+    }
 }

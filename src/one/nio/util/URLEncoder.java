@@ -35,15 +35,18 @@ public final class URLEncoder {
             char c = url.charAt(i);
             if (c >= 128) {
                 if (c <= 0xfff) {
-                    p = encodeByte(chars, p, 0xc0 | ((c >>> 6) & 0x1f));
-                    p = encodeByte(chars, p, 0x80 | (c & 0x3f));
+                    encodeByte(chars, p,     0xc0 | ((c >>> 6) & 0x1f));
+                    encodeByte(chars, p + 3, 0x80 | (c & 0x3f));
+                    p += 6;
                 } else {
-                    p = encodeByte(chars, p, 0xe0 | ((c >>> 12) & 0x0f));
-                    p = encodeByte(chars, p, 0x80 | ((c >>> 6) & 0x3f));
-                    p = encodeByte(chars, p, 0x80 | (c & 0x3f));
+                    encodeByte(chars, p,     0xe0 | ((c >>> 12) & 0x0f));
+                    encodeByte(chars, p + 3, 0x80 | ((c >>> 6) & 0x3f));
+                    encodeByte(chars, p + 6, 0x80 | (c & 0x3f));
+                    p += 9;
                 }
             } else if (!IS_SAFE_CHAR[c]) {
-                p = encodeByte(chars, p, c);
+                encodeByte(chars, p, c);
+                p += 3;
             } else {
                 chars[p++] = c;
             }
@@ -100,11 +103,10 @@ public final class URLEncoder {
         return new String(chars, 0, p);
     }
 
-    private static int encodeByte(char[] chars, int p, int value) {
-        chars[p++] = '%';
-        chars[p++] = Hex.CAPITAL[value >>> 4];
-        chars[p++] = Hex.CAPITAL[value & 15];
-        return p;
+    private static void encodeByte(char[] chars, int p, int value) {
+        chars[p] = '%';
+        chars[p + 1] = Hex.CAPITAL[value >>> 4];
+        chars[p + 2] = Hex.CAPITAL[value & 15];
     }
 
     private static int decodeByte(char[] chars, int p) {

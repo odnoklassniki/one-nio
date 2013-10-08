@@ -23,6 +23,10 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
         createdCount = 0;
     }
 
+    public boolean closed() {
+        return closed;
+    }
+
     public abstract T createObject() throws PoolException;
 
     public void destroyObject(T object) {

@@ -3,21 +3,58 @@ package one.nio.serial.gen;
 import java.lang.reflect.Field;
 
 public class FieldInfo {
-    final Field field;
-    final Field parent;
-    final Class sourceClass;
-    final FieldType sourceType;
-    final FieldType targetType;
+    private final String sourceName;
+    private final String oldName;
+    private final Class sourceClass;
+    private final String sourceClassName;
+    private Field field;
+    private Field parent;
 
-    public FieldInfo(Field field, Field parent) {
-        this(field, parent, field.getType());
+    public FieldInfo(String sourceName, Class sourceClass, String sourceClassName) {
+        int p = sourceName.indexOf('|');
+        if (p >= 0) {
+            this.sourceName = sourceName.substring(0, p);
+            this.oldName = sourceName.substring(p + 1);
+        } else {
+            this.sourceName = sourceName;
+            this.oldName = null;
+        }
+
+        this.sourceClass = sourceClass;
+        this.sourceClassName = sourceClassName;
     }
 
-    public FieldInfo(Field field, Field parent, Class sourceClass) {
+    public FieldInfo(Field field, Field parent) {
+        this(field.getName(), field.getType(), null);
+        assignField(field, parent);
+    }
+
+    public void assignField(Field field, Field parent) {
         this.field = field;
         this.parent = parent;
-        this.sourceClass = sourceClass;
-        this.sourceType = FieldType.valueOf(sourceClass);
-        this.targetType = field == null ? null : FieldType.valueOf(field.getType());
+    }
+
+    public String sourceName() {
+        return sourceName;
+    }
+
+    public String oldName() {
+        return oldName;
+    }
+
+    public Class sourceClass() {
+        return sourceClass;
+    }
+
+    public String sourceClassName() {
+        return sourceClassName;
+    }
+
+    public Field field() {
+        return field;
+    }
+
+    public Field parent() {
+        return parent;
     }
 }

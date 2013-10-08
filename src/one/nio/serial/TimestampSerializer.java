@@ -33,4 +33,9 @@ class TimestampSerializer extends Serializer<Timestamp> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(12);
     }
+
+    @Override
+    public void toJson(Timestamp obj, StringBuilder builder) {
+        builder.append(obj.getTime());
+    }
 }

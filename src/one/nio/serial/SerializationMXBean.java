@@ -1,18 +1,17 @@
 package one.nio.serial;
 
-import java.util.List;
-
 public interface SerializationMXBean {
-    List<String> getClassSerializers();
-    List<String> getUidSerializers();
+    String[] getClassSerializers();
+    String[] getUidSerializers();
     String getSerializer(String uid);
 
-    int getSerializersSent();
-    int getSerializersReceived();
+    int getStubOptions();
+    void setStubOptions(int stubOptions);
 
+    int getGeneratedStubs();
     int getAnonymousClasses();
     int getRenamedClasses();
-    int getNewTypes();
+    int getUnknownTypes();
     int getMissedLocalFields();
     int getMissedStreamFields();
     int getMigratedFields();

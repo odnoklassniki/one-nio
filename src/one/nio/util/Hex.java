@@ -23,8 +23,9 @@ public final class Hex {
         char[] result = new char[input.length * 2];
         int i = 0;
         for (byte b : input) {
-            result[i++] = digits[(b & 0xff) >>> 4];
-            result[i++] = digits[b & 0x0f];
+            result[i]     = digits[(b & 0xff) >>> 4];
+            result[i + 1] = digits[b & 0x0f];
+            i += 2;
         }
         return new String(result);
     }

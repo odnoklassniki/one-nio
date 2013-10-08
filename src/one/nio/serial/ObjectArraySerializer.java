@@ -1,5 +1,7 @@
 package one.nio.serial;
 
+import one.nio.util.Json;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
@@ -15,7 +17,10 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.readExternal(in);
+        super.tryReadExternal(in, (Repository.stubOptions & Repository.ARRAY_STUBS) == 0);
+        if (this.cls == null) {
+            this.cls = Object[].class;
+        }
         this.componentType = cls.getComponentType();
     }
 
@@ -53,5 +58,18 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
         for (int i = 0; i < length; i++) {
             in.readObject();
         }
+    }
+
+    @Override
+    public void toJson(Object[] obj, StringBuilder builder) throws IOException {
+        builder.append('[');
+        if (obj.length > 0) {
+            Json.appendObject(builder, obj[0]);
+            for (int i = 1; i < obj.length; i++) {
+                builder.append(',');
+                Json.appendObject(builder, obj[i]);
+            }
+        }
+        builder.append(']');
     }
 }

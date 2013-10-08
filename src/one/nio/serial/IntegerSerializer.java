@@ -29,4 +29,9 @@ class IntegerSerializer extends Serializer<Integer> {
     public void skip(ObjectInput in) throws IOException {
         in.skipBytes(4);
     }
+
+    @Override
+    public void toJson(Integer obj, StringBuilder builder) {
+        builder.append(obj.intValue());
+    }
 }

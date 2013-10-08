@@ -6,6 +6,7 @@ import sun.misc.Unsafe;
 
 import java.io.Externalizable;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
@@ -43,9 +44,14 @@ public class ExternalizableSerializer extends Serializer<Externalizable> {
     @Override
     public void skip(ObjectInput in) throws IOException {
         try {
-            ((ExternalizableSerializer) read(in)).readExternal(in);
+            ((Externalizable) read(in)).readExternal(in);
         } catch (ClassNotFoundException e) {
             throw new IOException(e);
         }
+    }
+
+    @Override
+    public void toJson(Externalizable obj, StringBuilder builder) throws NotSerializableException {
+        throw new NotSerializableException(cls.getName());
     }
 }

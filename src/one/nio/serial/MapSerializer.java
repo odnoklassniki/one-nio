@@ -1,5 +1,8 @@
 package one.nio.serial;
 
+import one.nio.serial.gen.StubGenerator;
+import one.nio.util.Json;
+
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
@@ -17,7 +20,12 @@ public class MapSerializer extends Serializer<Map> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.readExternal(in);
+        String className = super.tryReadExternal(in, (Repository.stubOptions & Repository.MAP_STUBS) == 0);
+        if (this.cls == null) {
+            this.cls = StubGenerator.generateRegular(className, "java.util.HashMap", null);
+            this.original = true;
+        }
+
         this.constructor = findConstructor();
         this.constructor.setAccessible(true);
     }
@@ -65,6 +73,19 @@ public class MapSerializer extends Serializer<Map> {
             in.readObject();
             in.readObject();
         }
+    }
+
+    @Override
+    public void toJson(Map obj, StringBuilder builder) throws IOException {
+        builder.append('{');
+        boolean firstWritten = false;
+        for (Map.Entry<?, ?> entry : ((Map<?, ?>) obj).entrySet()) {
+            if (firstWritten) builder.append(','); else firstWritten = true;
+            Json.appendString(builder, entry.getKey().toString());
+            builder.append(':');
+            Json.appendObject(builder, entry.getValue());
+        }
+        builder.append('}');
     }
 
     @SuppressWarnings("unchecked")

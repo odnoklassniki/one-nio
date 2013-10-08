@@ -45,4 +45,16 @@ class DoubleArraySerializer extends Serializer<double[]> {
             in.skipBytes(length * 8);
         }
     }
+
+    @Override
+    public void toJson(double[] obj, StringBuilder builder) {
+        builder.append('[');
+        if (obj.length > 0) {
+            builder.append(obj[0]);
+            for (int i = 1; i < obj.length; i++) {
+                builder.append(',').append(obj[i]);
+            }
+        }
+        builder.append(']');
+    }
 }

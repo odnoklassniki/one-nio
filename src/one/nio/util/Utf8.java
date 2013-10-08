@@ -38,12 +38,14 @@ public final class Utf8 {
             if (v <= 0x7f && v != 0) {
                 unsafe.putByte(obj, pos++, (byte) v);
             } else if (v > 0x7ff) {
-                unsafe.putByte(obj, pos++, (byte) (0xe0 | ((v >>> 12) & 0x0f)));
-                unsafe.putByte(obj, pos++, (byte) (0x80 | ((v >>> 6) & 0x3f)));
-                unsafe.putByte(obj, pos++, (byte) (0x80 | (v & 0x3f)));
+                unsafe.putByte(obj, pos,     (byte) (0xe0 | ((v >>> 12) & 0x0f)));
+                unsafe.putByte(obj, pos + 1, (byte) (0x80 | ((v >>> 6) & 0x3f)));
+                unsafe.putByte(obj, pos + 2, (byte) (0x80 | (v & 0x3f)));
+                pos += 3;
             } else {
-                unsafe.putByte(obj, pos++, (byte) (0xc0 | ((v >>> 6) & 0x1f)));
-                unsafe.putByte(obj, pos++, (byte) (0x80 | (v & 0x3f)));
+                unsafe.putByte(obj, pos,     (byte) (0xc0 | ((v >>> 6) & 0x1f)));
+                unsafe.putByte(obj, pos + 1, (byte) (0x80 | (v & 0x3f)));
+                pos += 2;
             }
         }
         return (int) (pos - start);
@@ -54,13 +56,16 @@ public final class Utf8 {
         int chars = 0;
         long end = start + length;
         for (long pos = start; pos < end; chars++) {
-            byte b = unsafe.getByte(obj, pos++);
+            byte b = unsafe.getByte(obj, pos);
             if (b >= 0) {
                 result[chars] = (char) b;
+                pos++;
             } else if ((b & 0xe0) == 0xc0) {
-                result[chars] = (char) ((b & 0x1f) << 6 | (unsafe.getByte(obj, pos++) & 0x3f));
+                result[chars] = (char) ((b & 0x1f) << 6 | (unsafe.getByte(obj, pos + 1) & 0x3f));
+                pos += 2;
             } else {
-                result[chars] = (char) ((b & 0x0f) << 12 | (unsafe.getByte(obj, pos++) & 0x3f) << 6 | (unsafe.getByte(obj, pos++) & 0x3f));
+                result[chars] = (char) ((b & 0x0f) << 12 | (unsafe.getByte(obj, pos + 1) & 0x3f) << 6 | (unsafe.getByte(obj, pos + 2) & 0x3f));
+                pos += 3;
             }
         }
         return new String(result, 0, chars);

@@ -23,7 +23,7 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
             JavaInternals.getMethod(Repository.class, "requestSerializer", long.class);
 
     public RpcClient(ConnectionString conn) throws IOException {
-        super(conn);
+        super(conn, 0);
     }
 
     @Override
@@ -62,13 +62,17 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
     protected void provideSerializer(long uid) throws Exception {
         Serializer serializer = Repository.requestSerializer(uid);
         Object remoteMethodCall = getInvocationObject(provideSerializerMethod, serializer);
-        invokeRaw(remoteMethodCall);
+        byte[] rawResponse = invokeRaw(remoteMethodCall);
+        Object response = new DeserializeStream(rawResponse).readObject();
+        if (response instanceof Exception) {
+            throw (Exception) response;
+        }
     }
 
     protected void requestSerializer(long uid) throws Exception {
         Object remoteMethodCall = getInvocationObject(requestSerializerMethod, uid);
-        byte[] response = invokeRaw(remoteMethodCall);
-        Serializer serializer = (Serializer) new DeserializeStream(response).readObject();
+        byte[] rawResponse = invokeRaw(remoteMethodCall);
+        Serializer serializer = (Serializer) new DeserializeStream(rawResponse).readObject();
         Repository.provideSerializer(serializer);
     }
 
