@@ -20,14 +20,14 @@ Java_one_nio_os_Proc_getppid(JNIEnv* env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_os_Proc_set_1affinity(JNIEnv* env, jclass cls, jint pid, jlong mask) {
+Java_one_nio_os_Proc_sched_1setaffinity(JNIEnv* env, jclass cls, jint pid, jlong mask) {
     int cpu;
     cpu_set_t set;
-    CPU_ZERO(set);
+    CPU_ZERO(&set);
 
     for (cpu = 0; cpu < 64; cpu++) {
         if (mask & (1LL << cpu)) {
-            CPU_SET(cpu, set);
+            CPU_SET(cpu, &set);
         }
     }
 
@@ -35,15 +35,15 @@ Java_one_nio_os_Proc_set_1affinity(JNIEnv* env, jclass cls, jint pid, jlong mask
 }
 
 JNIEXPORT jlong JNICALL
-Java_one_nio_os_Proc_get_1affinity(JNIEnv* env, jclass cls, jint pid) {
+Java_one_nio_os_Proc_sched_1getaffinity(JNIEnv* env, jclass cls, jint pid) {
     jlong mask = 0;
     int cpu;
     cpu_set_t set;
-    CPU_ZERO(set);
+    CPU_ZERO(&set);
 
     if (sched_getaffinity((pid_t)pid, sizeof(set), &set) == 0) {
         for (cpu = 0; cpu < 64; cpu++) {
-            if (CPU_ISSET(cpu, set)) {
+            if (CPU_ISSET(cpu, &set)) {
                 mask |= 1LL << cpu;
             }
         }

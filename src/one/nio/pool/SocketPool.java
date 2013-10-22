@@ -4,10 +4,9 @@ import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
 
 import java.io.IOException;
-import java.net.InetAddress;
 
 public class SocketPool extends Pool<Socket> {
-    protected InetAddress address;
+    protected String host;
     protected int port;
     protected int readTimeout;
     protected int connectTimeout;
@@ -16,7 +15,7 @@ public class SocketPool extends Pool<Socket> {
         super(conn.getIntParam("clientMinPoolSize", 0),
               conn.getIntParam("clientMaxPoolSize", 10),
               conn.getIntParam("timeout", 3000));
-        this.address = InetAddress.getByName(conn.getHost());
+        this.host = conn.getHost();
         this.port = conn.getPort() != 0 ? conn.getPort() : defaultPort;
         this.readTimeout = conn.getIntParam("readTimeout", timeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", readTimeout);
@@ -31,7 +30,7 @@ public class SocketPool extends Pool<Socket> {
             socket.setKeepAlive(true);
             socket.setNoDelay(true);
             socket.setTimeout(connectTimeout);
-            socket.connect(address, port);
+            socket.connect(host, port);
             socket.setTimeout(readTimeout);
             return socket;
         } catch (Exception e) {

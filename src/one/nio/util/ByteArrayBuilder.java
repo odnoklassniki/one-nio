@@ -47,6 +47,13 @@ public class ByteArrayBuilder {
         }
     }
 
+    public final byte[] trim() {
+        if (buf.length > count) {
+            buf = Arrays.copyOf(buf, count);
+        }
+        return buf;
+    }
+
     public final byte[] toBytes() {
         byte[] result = new byte[count];
         System.arraycopy(buf, 0, result, 0, count);

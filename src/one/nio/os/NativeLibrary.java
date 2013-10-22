@@ -12,7 +12,7 @@ import java.io.OutputStream;
 public final class NativeLibrary {
     private static final Log log = LogFactory.getLog(NativeLibrary.class);
 
-    public static final int VERSION = 6;
+    public static final int VERSION = 7;
     public static final boolean IS_SUPPORTED = isSupportedOs() && loadNativeLibrary();
 
     private static boolean isSupportedOs() {

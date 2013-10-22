@@ -2,6 +2,7 @@ package one.nio.server;
 
 import one.nio.net.Selector;
 import one.nio.net.Session;
+import one.nio.os.Proc;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -16,16 +17,18 @@ final class SelectorThread extends Thread {
 
     final Server server;
     final Selector selector;
+    final long affinity;
 
     long operations;
     long sessions;
     int maxReady;
 
-    SelectorThread(Server server, int num) throws IOException {
+    SelectorThread(Server server, int num, long affinity) throws IOException {
         super("NIO Selector #" + num);
         setUncaughtExceptionHandler(server);
         this.server = server;
         this.selector = Selector.create();
+        this.affinity = affinity;
     }
 
     void shutdown() {
@@ -39,6 +42,10 @@ final class SelectorThread extends Thread {
 
     @Override
     public void run() {
+        if (affinity != 0 && Proc.IS_SUPPORTED) {
+            Proc.sched_setaffinity(0, affinity);
+        }
+
         final byte[] buffer = new byte[BUFFER_SIZE];
 
         while (server.isRunning()) {

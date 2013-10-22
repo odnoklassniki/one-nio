@@ -47,15 +47,19 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
 
     @Override
     public void enableProvider(T provider) {
-        provider.enable();
-        rebuildProviderSelector();
+        if (provider.enable()) {
+            log.info("Enabled " + provider);
+            rebuildProviderSelector();
+        }
     }
 
     @Override
     public void disableProvider(T provider) {
-        provider.disable();
-        rebuildProviderSelector();
-        monitorTimer.schedule(new MonitoringTask(provider), monitorTimeout, monitorTimeout);
+        if (provider.disable()) {
+            log.info("Disabled " + provider);
+            rebuildProviderSelector();
+            monitorTimer.schedule(new MonitoringTask(provider), monitorTimeout, monitorTimeout);
+        }
     }
 
     public synchronized void addProvider(T provider, int weight) {
@@ -152,7 +156,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
                     cancel();
                 }
             } catch (Exception e) {
-                log.warn("Provider [" + provider + "] is not available", e);
+                log.warn(provider + " is not available because of " + e);
             }
         }
     }

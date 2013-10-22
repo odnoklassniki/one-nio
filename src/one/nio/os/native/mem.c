@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <jni.h>
 
-extern void* mremap(void* old_address, size_t old_size, size_t new_size, int flags);
-
 static inline void* cast(jlong value) {
     return (void*)(intptr_t)value;
 }

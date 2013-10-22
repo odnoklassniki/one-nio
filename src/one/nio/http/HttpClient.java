@@ -82,8 +82,12 @@ public class HttpClient extends SocketPool {
         }
 
         Response readResponse() throws IOException, HttpException {
-            String resultCode = readLine().substring(9);
-            Response response = new Response(resultCode);
+            String responseHeader = readLine();
+            if (responseHeader.length() <= 9) {
+                throw new HttpException("Invalid response header: " + responseHeader);
+            }
+
+            Response response = new Response(responseHeader.substring(9));
             for (String header; !(header = readLine()).isEmpty(); ) {
                 response.addHeader(header);
             }
@@ -132,6 +136,7 @@ public class HttpClient extends SocketPool {
             for (;;) {
                 int chunkSize = Integer.parseInt(readLine(), 16);
                 if (chunkSize == 0) {
+                    readLine();
                     break;
                 }
 

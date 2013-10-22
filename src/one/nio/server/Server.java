@@ -30,6 +30,8 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     protected boolean useWorkers;
 
     public Server(ConnectionString conn) throws IOException {
+        int processors = Runtime.getRuntime().availableProcessors();
+
         String[] hosts = conn.getHosts();
         int port = conn.getPort();
         int backlog = conn.getIntParam("backlog", 128);
@@ -37,7 +39,8 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         int recvBuf = conn.getIntParam("recvBuf", buffers);
         int sendBuf = conn.getIntParam("sendBuf", buffers);
         boolean defer = conn.getBooleanParam("defer", false);
-        int selectorCount = conn.getIntParam("selectors", 32);
+        int selectorCount = conn.getIntParam("selectors", processors);
+        boolean affinity = conn.getBooleanParam("affinity", false);
         int minWorkers = conn.getIntParam("minWorkers", 0);
         int maxWorkers = conn.getIntParam("maxWorkers", 1000);
         long queueTime = conn.getLongParam("queueTime", 0);
@@ -51,7 +54,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         this.selectors = new SelectorThread[selectorCount];
         for (int i = 0; i < selectorCount; i++) {
-            this.selectors[i] = new SelectorThread(this, i);
+            this.selectors[i] = new SelectorThread(this, i, affinity ? 1 << (i % processors) : 0);
         }
 
         this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
@@ -83,9 +86,11 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         int selectorCount = conn.getIntParam("selectors", 32);
         if (selectorCount > selectors.length) {
+            boolean affinity = conn.getBooleanParam("affinity", false);
+            int processors = Runtime.getRuntime().availableProcessors();
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, selectorCount);
             for (int i = selectors.length; i < selectorCount; i++) {
-                newSelectors[i] = new SelectorThread(this, i);
+                newSelectors[i] = new SelectorThread(this, i, affinity ? 1 << (i % processors) : 0);
                 newSelectors[i].start();
             }
             selectors = newSelectors;
