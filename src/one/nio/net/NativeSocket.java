@@ -1,6 +1,9 @@
 package one.nio.net;
 
+import one.nio.os.Mem;
+
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -91,6 +94,11 @@ final class NativeSocket extends Socket {
     public final native void readFully(byte[] data, int offset, int count) throws IOException;
 
     @Override
+    public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
+        return sendFile0(Mem.getFD(file.getFD()), offset, count);
+    }
+
+    @Override
     public final native void setBlocking(boolean blocking);
 
     @Override
@@ -118,6 +126,7 @@ final class NativeSocket extends Socket {
     private native int accept0() throws IOException;
     private native void connect0(byte[] address, int port) throws IOException;
     private native void bind0(byte[] address, int port, int backlog) throws IOException;
+    private native long sendFile0(int sourceFD, long offset, long count) throws IOException;
     private native int getsockname(byte[] buffer);
     private native int getpeername(byte[] buffer);
 }

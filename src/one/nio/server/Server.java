@@ -84,10 +84,10 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         workers.setQueueTime(conn.getLongParam("queueTime", 0));
         useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
 
-        int selectorCount = conn.getIntParam("selectors", 32);
+        int processors = Runtime.getRuntime().availableProcessors();
+        int selectorCount = conn.getIntParam("selectors", processors);
         if (selectorCount > selectors.length) {
             boolean affinity = conn.getBooleanParam("affinity", false);
-            int processors = Runtime.getRuntime().availableProcessors();
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, selectorCount);
             for (int i = selectors.length; i < selectorCount; i++) {
                 newSelectors[i] = new SelectorThread(this, i, affinity ? 1 << (i % processors) : 0);

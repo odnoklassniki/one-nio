@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class ByteSerializer extends Serializer<Byte> {
@@ -16,18 +14,15 @@ class ByteSerializer extends Serializer<Byte> {
     }
 
     @Override
-    public void write(Byte v, ObjectOutput out) throws IOException {
+    public void write(Byte v, DataStream out) throws IOException {
        out.writeByte(v);
     }
 
     @Override
-    public Byte read(ObjectInput in) throws IOException {
-        return in.readByte();
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(1);
+    public Byte read(DataStream in) throws IOException {
+        Byte result = in.readByte();
+        in.register(result);
+        return result;
     }
 
     @Override

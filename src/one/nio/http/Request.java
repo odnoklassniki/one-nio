@@ -95,7 +95,7 @@ public final class Request implements Cloneable {
         for (int i = 0; i < headerCount; i++) {
             builder.append(headers[i]).append('\r').append('\n');
         }
-        return builder.append('\r').append('\n').buffer();
+        return builder.append('\r').append('\n').trim();
     }
 
     @Override

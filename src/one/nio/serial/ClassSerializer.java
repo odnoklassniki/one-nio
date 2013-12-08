@@ -2,8 +2,6 @@ package one.nio.serial;
 
 import one.nio.util.Utf8;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class ClassSerializer extends Serializer<Class<?>> {
@@ -24,7 +22,7 @@ class ClassSerializer extends Serializer<Class<?>> {
     }
 
     @Override
-    public void write(Class<?> obj, ObjectOutput out) throws IOException {
+    public void write(Class<?> obj, DataStream out) throws IOException {
         if (obj.isPrimitive()) {
             out.writeByte(primitiveIndex(obj));
         } else {
@@ -34,16 +32,11 @@ class ClassSerializer extends Serializer<Class<?>> {
     }
 
     @Override
-    public Class<?> read(ObjectInput in) throws IOException, ClassNotFoundException {
+    public Class<?> read(DataStream in) throws IOException, ClassNotFoundException {
         int index = in.readByte();
-        return index >= 0 ? PRIMITIVE_CLASSES[index] : classByDescriptor(in.readUTF());
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        if (in.readByte() < 0) {
-            in.skipBytes(in.readUnsignedShort());
-        }
+        Class result = index >= 0 ? PRIMITIVE_CLASSES[index] : classByDescriptor(in.readUTF());
+        in.register(result);
+        return result;
     }
 
     @Override

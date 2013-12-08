@@ -13,7 +13,7 @@ public class HttpSession extends Session {
     private static final Log log = LogFactory.getLog(HttpSession.class);
 
     private static final int MAX_HEADERS = 32;
-    private static final int MAX_FRAGMENT_LENGTH = 512;
+    private static final int MAX_FRAGMENT_LENGTH = 2048;
 
     private static final byte[] GET = Utf8.toBytes("GET ");
     private static final byte[] POST = Utf8.toBytes("POST ");

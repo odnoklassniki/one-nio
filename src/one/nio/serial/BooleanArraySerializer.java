@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class BooleanArraySerializer extends Serializer<boolean[]> {
@@ -17,7 +15,7 @@ class BooleanArraySerializer extends Serializer<boolean[]> {
     }
 
     @Override
-    public void write(boolean[] obj, ObjectOutput out) throws IOException {
+    public void write(boolean[] obj, DataStream out) throws IOException {
         out.writeInt(obj.length);
         for (boolean v : obj) {
             out.writeBoolean(v);
@@ -25,25 +23,19 @@ class BooleanArraySerializer extends Serializer<boolean[]> {
     }
 
     @Override
-    public boolean[] read(ObjectInput in) throws IOException {
+    public boolean[] read(DataStream in) throws IOException {
+        boolean[] result;
         int length = in.readInt();
         if (length > 0) {
-            boolean[] result = new boolean[length];
+            result = new boolean[length];
             for (int i = 0; i < length; i++) {
                 result[i] = in.readBoolean();
             }
-            return result;
         } else {
-            return EMPTY_BOOLEAN_ARRAY;
+            result = EMPTY_BOOLEAN_ARRAY;
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        int length = in.readInt();
-        if (length > 0) {
-            in.skipBytes(length);
-        }
+        in.register(result);
+        return result;
     }
 
     @Override

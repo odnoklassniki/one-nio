@@ -7,8 +7,6 @@ import sun.misc.Unsafe;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.NotSerializableException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 
 public class ExternalizableSerializer extends Serializer<Externalizable> {
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
@@ -23,33 +21,24 @@ public class ExternalizableSerializer extends Serializer<Externalizable> {
     }
 
     @Override
-    public void write(Externalizable obj, ObjectOutput out) throws IOException {
+    public void write(Externalizable obj, DataStream out) throws IOException {
         obj.writeExternal(out);
     }
 
     @Override
-    public Object read(ObjectInput in) throws IOException, ClassNotFoundException {
+    public Externalizable read(DataStream in) throws IOException, ClassNotFoundException {
+        Externalizable result;
         try {
-            return unsafe.allocateInstance(cls);
+            result = (Externalizable) unsafe.allocateInstance(cls);
+            in.register(result);
         } catch (InstantiationException e) {
             throw new IOException(e);
         }
+
+        result.readExternal(in);
+        return result;
     }
     
-    @Override
-    public void fill(Externalizable obj, ObjectInput in) throws IOException, ClassNotFoundException {
-        obj.readExternal(in);
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        try {
-            ((Externalizable) read(in)).readExternal(in);
-        } catch (ClassNotFoundException e) {
-            throw new IOException(e);
-        }
-    }
-
     @Override
     public void toJson(Externalizable obj, StringBuilder builder) throws NotSerializableException {
         throw new NotSerializableException(cls.getName());

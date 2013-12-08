@@ -4,6 +4,7 @@ import one.nio.os.NativeLibrary;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
@@ -19,6 +20,7 @@ public abstract class Socket implements Closeable {
     public abstract int readRaw(long buf, int count) throws IOException;
     public abstract int read(byte[] data, int offset, int count) throws IOException;
     public abstract void readFully(byte[] data, int offset, int count) throws IOException;
+    public abstract long sendFile(RandomAccessFile file, long offset, long count) throws IOException;
     public abstract void setBlocking(boolean blocking);
     public abstract void setTimeout(int timeout);
     public abstract void setKeepAlive(boolean keepAlive);

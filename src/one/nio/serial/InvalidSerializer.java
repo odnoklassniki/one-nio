@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.NotSerializableException;
 
 class InvalidSerializer extends Serializer {
@@ -16,17 +14,12 @@ class InvalidSerializer extends Serializer {
     }
 
     @Override
-    public void write(Object obj, ObjectOutput out) throws NotSerializableException {
+    public void write(Object obj, DataStream out) throws NotSerializableException {
         throw new NotSerializableException(cls.getName());
     }
 
     @Override
-    public Object read(ObjectInput in) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws NotSerializableException {
+    public Object read(DataStream in) throws NotSerializableException {
         throw new NotSerializableException(cls.getName());
     }
 

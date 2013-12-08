@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class LongArraySerializer extends Serializer<long[]> {
@@ -17,7 +15,7 @@ class LongArraySerializer extends Serializer<long[]> {
     }
 
     @Override
-    public void write(long[] obj, ObjectOutput out) throws IOException {
+    public void write(long[] obj, DataStream out) throws IOException {
         out.writeInt(obj.length);
         for (long v : obj) {
             out.writeLong(v);
@@ -25,25 +23,19 @@ class LongArraySerializer extends Serializer<long[]> {
     }
 
     @Override
-    public long[] read(ObjectInput in) throws IOException {
+    public long[] read(DataStream in) throws IOException {
+        long[] result;
         int length = in.readInt();
         if (length > 0) {
-            long[] result = new long[length];
+            result = new long[length];
             for (int i = 0; i < length; i++) {
                 result[i] = in.readLong();
             }
-            return result;
         } else {
-            return EMPTY_LONG_ARRAY;
+            result = EMPTY_LONG_ARRAY;
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        int length = in.readInt();
-        if (length > 0) {
-            in.skipBytes(length * 8);
-        }
+        in.register(result);
+        return result;
     }
 
     @Override

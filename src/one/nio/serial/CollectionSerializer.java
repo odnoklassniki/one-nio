@@ -1,10 +1,8 @@
 package one.nio.serial;
 
 import one.nio.serial.gen.StubGenerator;
-import one.nio.util.Json;
 
 import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
@@ -39,7 +37,7 @@ public class CollectionSerializer extends Serializer<Collection> {
     }
 
     @Override
-    public void write(Collection obj, ObjectOutput out) throws IOException {
+    public void write(Collection obj, DataStream out) throws IOException {
         out.writeInt(obj.size());
         for (Object v : obj) {
             out.writeObject(v);
@@ -47,29 +45,21 @@ public class CollectionSerializer extends Serializer<Collection> {
     }
 
     @Override
-    public Object read(ObjectInput in) throws IOException, ClassNotFoundException {
+    @SuppressWarnings("unchecked")
+    public Collection read(DataStream in) throws IOException, ClassNotFoundException {
+        Collection result;
         try {
-            return constructor.newInstance();
+            result = (Collection) constructor.newInstance();
+            in.register(result);
         } catch (Exception e) {
             throw new IOException(e);
         }
-    }
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void fill(Collection obj, ObjectInput in) throws IOException, ClassNotFoundException {
         int length = in.readInt();
         for (int i = 0; i < length; i++) {
-            obj.add(in.readObject());
+            result.add(in.readObject());
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException, ClassNotFoundException {
-        int length = in.readInt();
-        for (int i = 0; i < length; i++) {
-            in.readObject();
-        }
+        return result;
     }
 
     @Override

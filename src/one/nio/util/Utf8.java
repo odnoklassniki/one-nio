@@ -22,8 +22,27 @@ public final class Utf8 {
         return result;
     }
 
+    public static int length(char[] c, int length) {
+        int result = 0;
+        for (int i = 0; i < length; i++) {
+            int v = c[i];
+            if (v <= 0x7f && v != 0) {
+                result++;
+            } else if (v > 0x7ff) {
+                result += 3;
+            } else {
+                result += 2;
+            }
+        }
+        return result;
+    }
+
     public static int write(String s, byte[] buf, int start) {
         return write(s, buf, byteArrayOffset + start);
+    }
+
+    public static int write(char[] c, int length, byte[] buf, int start) {
+        return write(c, length, buf, byteArrayOffset + start);
     }
 
     public static String read(byte[] buf, int start, int length) {
@@ -38,12 +57,32 @@ public final class Utf8 {
             if (v <= 0x7f && v != 0) {
                 unsafe.putByte(obj, pos++, (byte) v);
             } else if (v > 0x7ff) {
-                unsafe.putByte(obj, pos,     (byte) (0xe0 | ((v >>> 12) & 0x0f)));
+                unsafe.putByte(obj, pos,     (byte) (0xe0 | (v >>> 12)));
                 unsafe.putByte(obj, pos + 1, (byte) (0x80 | ((v >>> 6) & 0x3f)));
                 unsafe.putByte(obj, pos + 2, (byte) (0x80 | (v & 0x3f)));
                 pos += 3;
             } else {
-                unsafe.putByte(obj, pos,     (byte) (0xc0 | ((v >>> 6) & 0x1f)));
+                unsafe.putByte(obj, pos,     (byte) (0xc0 | (v >>> 6)));
+                unsafe.putByte(obj, pos + 1, (byte) (0x80 | (v & 0x3f)));
+                pos += 2;
+            }
+        }
+        return (int) (pos - start);
+    }
+
+    public static int write(char[] c, int length, Object obj, long start) {
+        long pos = start;
+        for (int i = 0; i < length; i++) {
+            int v = c[i];
+            if (v <= 0x7f && v != 0) {
+                unsafe.putByte(obj, pos++, (byte) v);
+            } else if (v > 0x7ff) {
+                unsafe.putByte(obj, pos,     (byte) (0xe0 | (v >>> 12)));
+                unsafe.putByte(obj, pos + 1, (byte) (0x80 | ((v >>> 6) & 0x3f)));
+                unsafe.putByte(obj, pos + 2, (byte) (0x80 | (v & 0x3f)));
+                pos += 3;
+            } else {
+                unsafe.putByte(obj, pos,     (byte) (0xc0 | (v >>> 6)));
                 unsafe.putByte(obj, pos + 1, (byte) (0x80 | (v & 0x3f)));
                 pos += 2;
             }
@@ -76,7 +115,7 @@ public final class Utf8 {
         write(s, result, byteArrayOffset);
         return result;
     }
-    
+
     public static String toString(byte[] buf) {
         return read(buf, byteArrayOffset, buf.length);
     }

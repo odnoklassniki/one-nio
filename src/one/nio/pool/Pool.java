@@ -27,6 +27,10 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
         return closed;
     }
 
+    public String name() {
+        return "Pool";
+    }
+
     public abstract T createObject() throws PoolException;
 
     public void destroyObject(T object) {
@@ -43,7 +47,7 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
                 }
 
                 if (closed) {
-                    throw new PoolException("Pool is closed");
+                    throw new PoolException(name() + " is closed");
                 }
 
                 // If capacity permits, create a new object out of the lock
@@ -57,7 +61,7 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
                 if (timeLimit == 0) {
                     timeLimit = currentTime + timeout;
                 } else if (currentTime >= timeLimit) {
-                    throw new PoolException("Borrow timed out");
+                    throw new PoolException(name() + " borrowObject timed out");
                 }
 
                 waitingThreads++;

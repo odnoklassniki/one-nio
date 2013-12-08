@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class FloatSerializer extends Serializer<Float> {
@@ -16,18 +14,15 @@ class FloatSerializer extends Serializer<Float> {
     }
 
     @Override
-    public void write(Float v, ObjectOutput out) throws IOException {
+    public void write(Float v, DataStream out) throws IOException {
         out.writeFloat(v);
     }
 
     @Override
-    public Float read(ObjectInput in) throws IOException {
-        return in.readFloat();
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(4);
+    public Float read(DataStream in) throws IOException {
+        Float result = in.readFloat();
+        in.register(result);
+        return result;
     }
 
     @Override

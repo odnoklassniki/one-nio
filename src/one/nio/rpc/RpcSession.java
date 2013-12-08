@@ -3,6 +3,7 @@ package one.nio.rpc;
 import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.serial.CalcSizeStream;
+import one.nio.serial.DataStream;
 import one.nio.serial.DeserializeStream;
 import one.nio.serial.SerializeStream;
 import one.nio.serial.SerializerNotFoundException;
@@ -103,9 +104,9 @@ public class RpcSession extends Session {
         int responseSize = css.count();
         byte[] buffer = new byte[responseSize + 4];
 
-        SerializeStream ss = new SerializeStream(buffer);
-        ss.writeInt(responseSize);
-        ss.writeObject(response);
+        DataStream ds = css.hasCycles() ? new SerializeStream(buffer) : new DataStream(buffer);
+        ds.writeInt(responseSize);
+        ds.writeObject(response);
 
         super.write(buffer, 0, buffer.length);
     }

@@ -99,25 +99,15 @@ public class GeneratedSerializer extends Serializer {
     }
 
     @Override
-    public void write(Object obj, ObjectOutput out) throws IOException {
+    public void write(Object obj, DataStream out) throws IOException {
         delegate.write(obj, out);
     }
 
     @Override
-    public Object read(ObjectInput in) throws IOException, ClassNotFoundException {
+    public Object read(DataStream in) throws IOException, ClassNotFoundException {
         return delegate.read(in);
     }
     
-    @Override
-    public void fill(Object obj, ObjectInput in) throws IOException, ClassNotFoundException {
-        delegate.fill(obj, in);
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        delegate.skip(in);
-    }
-
     @Override
     public void toJson(Object obj, StringBuilder builder) throws IOException {
         delegate.toJson(obj, builder);

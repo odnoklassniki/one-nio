@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class DoubleSerializer extends Serializer<Double> {
@@ -16,18 +14,15 @@ class DoubleSerializer extends Serializer<Double> {
     }
 
     @Override
-    public void write(Double v, ObjectOutput out) throws IOException {
+    public void write(Double v, DataStream out) throws IOException {
         out.writeDouble(v);
     }
 
     @Override
-    public Double read(ObjectInput in) throws IOException {
-        return in.readDouble();
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(8);
+    public Double read(DataStream in) throws IOException {
+        Double result = in.readDouble();
+        in.register(result);
+        return result;
     }
 
     @Override

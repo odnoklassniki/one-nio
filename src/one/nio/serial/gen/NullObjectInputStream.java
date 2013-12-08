@@ -130,6 +130,7 @@ public class NullObjectInputStream extends ObjectInputStream {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public String readLine() throws IOException {
         throw unsupported();
     }

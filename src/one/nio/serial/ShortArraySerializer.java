@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class ShortArraySerializer extends Serializer<short[]> {
@@ -17,7 +15,7 @@ class ShortArraySerializer extends Serializer<short[]> {
     }
 
     @Override
-    public void write(short[] obj, ObjectOutput out) throws IOException {
+    public void write(short[] obj, DataStream out) throws IOException {
         out.writeInt(obj.length);
         for (short v : obj) {
             out.writeShort(v);
@@ -25,25 +23,19 @@ class ShortArraySerializer extends Serializer<short[]> {
     }
 
     @Override
-    public short[] read(ObjectInput in) throws IOException {
+    public short[] read(DataStream in) throws IOException {
+        short[] result;
         int length = in.readInt();
         if (length > 0) {
-            short[] result = new short[length];
+            result = new short[length];
             for (int i = 0; i < length; i++) {
                 result[i] = in.readShort();
             }
-            return result;
         } else {
-            return EMPTY_SHORT_ARRAY;
+            result = EMPTY_SHORT_ARRAY;
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        int length = in.readInt();
-        if (length > 0) {
-            in.skipBytes(length * 2);
-        }
+        in.register(result);
+        return result;
     }
 
     @Override

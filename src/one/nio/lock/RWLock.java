@@ -23,6 +23,7 @@ public class RWLock extends Semaphore {
         try {
             return super.tryAcquire(timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return false;
         }
     }
@@ -40,6 +41,7 @@ public class RWLock extends Semaphore {
         try {
             return super.tryAcquire(WRITE_PERMITS, timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return false;
         }
     }
@@ -56,6 +58,7 @@ public class RWLock extends Semaphore {
         try {
             return super.tryAcquire(WRITE_PERMITS - 1, timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return false;
         }
     }

@@ -1,9 +1,5 @@
 package one.nio.serial;
 
-import one.nio.util.Json;
-
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class CharacterSerializer extends Serializer<Character> {
@@ -18,18 +14,15 @@ class CharacterSerializer extends Serializer<Character> {
     }
 
     @Override
-    public void write(Character v, ObjectOutput out) throws IOException {
+    public void write(Character v, DataStream out) throws IOException {
         out.writeChar(v);
     }
 
     @Override
-    public Character read(ObjectInput in) throws IOException {
-        return in.readChar();
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(2);
+    public Character read(DataStream in) throws IOException {
+        Character result = in.readChar();
+        in.register(result);
+        return result;
     }
 
     @Override

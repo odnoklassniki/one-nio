@@ -35,8 +35,6 @@ public class DelegateGenerator extends StubGenerator {
         generateCalcSize(cv, cls, fieldsInfo);
         generateWrite(cv, cls, fieldsInfo);
         generateRead(cv, cls, fieldsInfo);
-        generateFill(cv, cls, fieldsInfo);
-        generateSkip(cv, fieldsInfo);
         generateToJson(cv, fieldsInfo);
 
         cv.visitEnd();
@@ -102,7 +100,7 @@ public class DelegateGenerator extends StubGenerator {
     }
 
     private static void generateWrite(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
-        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Ljava/io/ObjectOutput;)V",
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
 
@@ -128,7 +126,7 @@ public class DelegateGenerator extends StubGenerator {
                 emitTypeCast(mv, f.getType(), fi.sourceClass());
             }
 
-            mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectOutput", srcType.writeMethod(), srcType.writeSignature());
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.writeMethod(), srcType.writeSignature());
         }
 
         mv.visitInsn(RETURN);
@@ -137,59 +135,50 @@ public class DelegateGenerator extends StubGenerator {
     }
 
     private static void generateRead(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
-        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "read", "(Ljava/io/ObjectInput;)Ljava/lang/Object;",
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "read", "(Lone/nio/serial/DataStream;)Ljava/lang/Object;",
                 null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
         mv.visitCode();
 
+        mv.visitVarInsn(ALOAD, 1);
         mv.visitTypeInsn(NEW, Type.getInternalName(cls));
+        mv.visitInsn(DUP);
+        mv.visitVarInsn(ASTORE, 2);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V");
 
         ArrayList<Field> parents = new ArrayList<Field>(1);
         for (FieldInfo fi : fieldsInfo) {
+            Field f = fi.field();
             Field parent = fi.parent();
+            FieldType srcType = FieldType.valueOf(fi.sourceClass());
+
             if (parent != null && !parents.contains(parent)) {
                 parents.add(parent);
-                mv.visitInsn(DUP);
                 mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
-                mv.visitInsn(SWAP);
+                mv.visitVarInsn(ALOAD, 2);
                 mv.visitLdcInsn(unsafe.objectFieldOffset(parent));
                 mv.visitTypeInsn(NEW, Type.getInternalName(parent.getType()));
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", "putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V");
             }
-        }
-
-        mv.visitInsn(ARETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void generateFill(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
-        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "fill", "(Ljava/lang/Object;Ljava/io/ObjectInput;)V",
-                null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
-        mv.visitCode();
-
-        for (FieldInfo fi : fieldsInfo) {
-            Field f = fi.field();
-            FieldType srcType = FieldType.valueOf(fi.sourceClass());
 
             if (f == null) {
-                mv.visitVarInsn(ALOAD, 2);
-                mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
+                mv.visitVarInsn(ALOAD, 1);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
                 mv.visitInsn(srcType.dataSize == 8 ? POP2 : POP);
             } else if (Modifier.isFinal(f.getModifiers())) {
                 FieldType dstType = FieldType.valueOf(f.getType());
                 mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
-                mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent() != null) emitGetField(mv, fi.parent());
-                mv.visitLdcInsn(unsafe.objectFieldOffset(f));
                 mv.visitVarInsn(ALOAD, 2);
-                mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
+                if (parent != null) emitGetField(mv, parent);
+                mv.visitLdcInsn(unsafe.objectFieldOffset(f));
+                mv.visitVarInsn(ALOAD, 1);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
                 emitTypeCast(mv, fi.sourceClass(), f.getType());
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
             } else {
-                mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent() != null) emitGetField(mv, fi.parent());
                 mv.visitVarInsn(ALOAD, 2);
-                mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", srcType.readMethod(), srcType.readSignature());
+                if (parent != null) emitGetField(mv, parent);
+                mv.visitVarInsn(ALOAD, 1);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
                 emitTypeCast(mv, fi.sourceClass(), f.getType());
                 emitPutField(mv, f);
             }
@@ -197,37 +186,13 @@ public class DelegateGenerator extends StubGenerator {
 
         Method readObjectMethod = JavaInternals.findMethodRecursively(cls, "readObject", ObjectInputStream.class);
         if (readObjectMethod != null && !Repository.hasOptions(readObjectMethod.getDeclaringClass(), Repository.SKIP_READ_OBJECT)) {
-            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
             mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/NullObjectInputStream", "INSTANCE", "Lone/nio/serial/gen/NullObjectInputStream;");
             emitInvoke(mv, readObjectMethod);
         }
 
-        mv.visitInsn(RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void generateSkip(ClassVisitor cv, FieldInfo[] fieldsInfo) {
-        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "skip", "(Ljava/io/ObjectInput;)V",
-                null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
-        mv.visitCode();
-
-        for (FieldInfo fi : fieldsInfo) {
-            FieldType srcType = FieldType.valueOf(fi.sourceClass());
-
-            if (srcType == FieldType.Object) {
-                mv.visitVarInsn(ALOAD, 1);
-                mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", "readObject", "()Ljava/lang/Object;");
-                mv.visitInsn(POP);
-            } else {
-                mv.visitVarInsn(ALOAD, 1);
-                emitInt(mv, srcType.dataSize);
-                mv.visitMethodInsn(INVOKEINTERFACE, "java/io/ObjectInput", "skipBytes", "(I)I");
-                mv.visitInsn(POP);
-            }
-        }
-
-        mv.visitInsn(RETURN);
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitInsn(ARETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
@@ -259,11 +224,11 @@ public class DelegateGenerator extends StubGenerator {
             FieldType srcType = FieldType.valueOf(fi.sourceClass());
             switch (srcType) {
                 case Object:
-                    mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Json", "appendObject", "(Ljava/lang/StringBuilder;Ljava/lang/Object;)V");
+                    mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendObject", "(Ljava/lang/StringBuilder;Ljava/lang/Object;)V");
                     mv.visitVarInsn(ALOAD, 2);
                     break;
                 case Char:
-                    mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Json", "appendChar", "(Ljava/lang/StringBuilder;C)V");
+                    mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendChar", "(Ljava/lang/StringBuilder;C)V");
                     mv.visitVarInsn(ALOAD, 2);
                     break;
                 default:

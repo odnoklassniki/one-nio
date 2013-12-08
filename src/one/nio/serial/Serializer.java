@@ -96,21 +96,10 @@ public abstract class Serializer<T> implements Externalizable {
         return ds.digest();
     }
 
-    public int getSize(T obj) throws IOException {
-        CalcSizeStream css = new CalcSizeStream();
-        calcSize(obj, css);
-        return css.count;
-    }
-
     public abstract void calcSize(T obj, CalcSizeStream css) throws IOException;
-    public abstract void write(T obj, ObjectOutput out) throws IOException;
-    public abstract Object read(ObjectInput in) throws IOException, ClassNotFoundException;
-    public abstract void skip(ObjectInput in) throws IOException, ClassNotFoundException;
+    public abstract void write(T obj, DataStream out) throws IOException;
+    public abstract T read(DataStream in) throws IOException, ClassNotFoundException;
     public abstract void toJson(T obj, StringBuilder builder) throws IOException;
-
-    public void fill(T obj, ObjectInput in) throws IOException, ClassNotFoundException {
-        // Nothing to do here if read() completes creation of an object
-    }
 
     protected static int primitiveIndex(Class<?> cls) {
         for (int i = 0; i < PRIMITIVE_CLASSES.length; i++) {
@@ -139,5 +128,18 @@ public abstract class Serializer<T> implements Externalizable {
 
         Class renamedClass = Repository.renamedClasses.get(name);
         return renamedClass != null ? renamedClass : Class.forName(name, true, StubGenerator.INSTANCE);
+    }
+
+    public static byte[] serialize(Object obj) throws IOException {
+        CalcSizeStream css = new CalcSizeStream();
+        css.writeObject(obj);
+        byte[] data = new byte[css.count];
+        DataStream ds = css.hasCycles ? new SerializeStream(data) : new DataStream(data);
+        ds.writeObject(obj);
+        return data;
+    }
+
+    public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
+        return new DeserializeStream(data).readObject();
     }
 }

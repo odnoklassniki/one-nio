@@ -7,9 +7,14 @@ import java.io.ObjectOutput;
 
 public class CalcSizeStream extends SerializationContext implements ObjectOutput {
     protected int count;
+    protected boolean hasCycles;
 
     public int count() {
         return count;
+    }
+
+    public boolean hasCycles() {
+        return hasCycles;
     }
 
     public void add(int constant) {
@@ -102,6 +107,7 @@ public class CalcSizeStream extends SerializationContext implements ObjectOutput
             } else {
                 // Duplicate reference is encoded with (REF_RECURSIVE + short index) or (REF_RECURSIVE2 + int index)
                 count += index <= 0xffff ? 3 : 5;
+                hasCycles = true;
             }
         }
     }

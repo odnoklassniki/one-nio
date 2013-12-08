@@ -9,12 +9,16 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.Externalizable;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class Repository {
-    static final Log log = LogFactory.getLog(Repository.class);
+    public static final Log log = LogFactory.getLog(Repository.class);
+
     static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
     static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
     static final Serializer[] bootstrapSerializers = new Serializer[128];
@@ -22,20 +26,21 @@ public class Repository {
     static final HashMap<String, Class> renamedClasses = new HashMap<String, Class>();
     static final int ENUM = 0x4000;
 
-    static long nextBootstrapUid = -10;
-    static int anonymousClasses = 0;
-    static int stubOptions = 0;
-
     public static final int SKIP_READ_OBJECT  = 1;
     public static final int SKIP_WRITE_OBJECT = 2;
     public static final int SKIP_CUSTOM_SERIALIZATION = SKIP_READ_OBJECT | SKIP_WRITE_OBJECT;
     public static final int INLINE = 4;
 
+    public static final int ALL_STUBS        = -1;
     public static final int ARRAY_STUBS      = 1;
     public static final int COLLECTION_STUBS = 2;
     public static final int MAP_STUBS        = 4;
     public static final int ENUM_STUBS       = 8;
     public static final int CUSTOM_STUBS     = 16;
+
+    static long nextBootstrapUid = -10;
+    static int anonymousClasses = 0;
+    static int stubOptions = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS;
 
     static {
         addBootstrap(new IntegerSerializer());
@@ -65,14 +70,14 @@ public class Repository {
         addBootstrap(new ObjectArraySerializer(Class[].class));
         addBootstrap(new ObjectArraySerializer(Long[].class));
 
-        addBootstrap(new CollectionSerializer(ArrayList.class));
+        addBootstrap(new ArrayListSerializer());
         addBootstrap(new CollectionSerializer(LinkedList.class));
         addBootstrap(new CollectionSerializer(Vector.class));
         addBootstrap(new CollectionSerializer(HashSet.class));
         addBootstrap(new CollectionSerializer(TreeSet.class));
         addBootstrap(new CollectionSerializer(LinkedHashSet.class));
 
-        addBootstrap(new MapSerializer(HashMap.class));
+        addBootstrap(new HashMapSerializer());
         addBootstrap(new MapSerializer(TreeMap.class));
         addBootstrap(new MapSerializer(LinkedHashMap.class));
         addBootstrap(new MapSerializer(Hashtable.class));
@@ -172,6 +177,70 @@ public class Repository {
     public static boolean hasOptions(Class cls, int options) {
         Integer value = serializationOptions.get(cls);
         return value != null && (value & options) == options;
+    }
+
+    public static void setStubOptions(int options) {
+        stubOptions = options;
+    }
+
+    public static int getStubOptions() {
+        return stubOptions;
+    }
+
+    public static byte[] saveSnapshot() throws IOException {
+        Serializer[] serializers = getSerializers(uidMap);
+
+        CalcSizeStream css = new CalcSizeStream();
+        for (Serializer serializer : serializers) {
+            if (serializer.uid >= 0) {
+                css.writeObject(serializer);
+            }
+        }
+
+        byte[] snapshot = new byte[css.count()];
+        SerializeStream ss = new SerializeStream(snapshot);
+        for (Serializer serializer : serializers) {
+            if (serializer.uid >= 0) {
+                ss.writeObject(serializer);
+            }
+        }
+
+        return snapshot;
+    }
+
+    public static void saveSnapshot(String fileName) throws IOException {
+        byte[] snapshot = saveSnapshot();
+        FileOutputStream fos = new FileOutputStream(fileName);
+        try {
+            fos.write(snapshot);
+        } finally {
+            fos.close();
+        }
+    }
+
+    public static int loadSnapshot(byte[] snapshot) throws IOException, ClassNotFoundException {
+        int count = 0;
+        DeserializeStream ds = new DeserializeStream(snapshot);
+        while (ds.available() > 0) {
+            provideSerializer((Serializer) ds.readObject());
+            count++;
+        }
+        return count;
+    }
+
+    public static int loadSnapshot(String fileName) throws IOException, ClassNotFoundException {
+        FileInputStream fis = new FileInputStream(fileName);
+        try {
+            byte[] snapshot = new byte[fis.available()];
+            fis.read(snapshot);
+            return loadSnapshot(snapshot);
+        } finally {
+            fis.close();
+        }
+    }
+
+    private static synchronized Serializer[] getSerializers(Map<?, Serializer> map) {
+        return map.values().toArray(new Serializer[map.size()]);
     }
 
     private static synchronized Serializer generateFor(Class<?> cls) {

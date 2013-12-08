@@ -1,5 +1,6 @@
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -360,6 +361,25 @@ Java_one_nio_net_NativeSocket_readFully(JNIEnv* env, jobject self, jbyteArray da
             }
         }
     }
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD, jlong offset, jlong count) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else {
+        jlong result = sendfile(fd, sourceFD, (off_t*)&offset, count);
+        if (result > 0) {
+            return result;
+        } else if (result == 0) {
+            throw_socket_closed(env);
+        } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+            throw_exception(env);
+        }
+    }
+    return 0;
 }
 
 JNIEXPORT jint JNICALL

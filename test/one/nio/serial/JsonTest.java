@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import one.nio.util.Json;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;

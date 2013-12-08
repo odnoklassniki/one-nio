@@ -32,12 +32,12 @@ class SerializationMXBeanImpl implements SerializationMXBean {
 
     @Override
     public int getStubOptions() {
-        return Repository.stubOptions;
+        return Repository.getStubOptions();
     }
 
     @Override
-    public void setStubOptions(int stubOptions) {
-        Repository.stubOptions = stubOptions;
+    public void setStubOptions(int options) {
+        Repository.setStubOptions(options);
     }
 
     @Override

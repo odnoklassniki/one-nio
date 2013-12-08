@@ -3,6 +3,7 @@ package one.nio.net;
 import one.nio.mem.DirectMemory;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -90,6 +91,11 @@ final class JavaSocket extends Socket {
                 throw new SocketException("Socket closed");
             }
         }
+    }
+
+    @Override
+    public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
+        return file.getChannel().transferTo(offset, count, ch);
     }
 
     @Override

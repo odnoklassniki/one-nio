@@ -78,18 +78,15 @@ public class EnumSerializer extends Serializer<Enum> {
     }
 
     @Override
-    public void write(Enum obj, ObjectOutput out) throws IOException {
+    public void write(Enum obj, DataStream out) throws IOException {
         out.writeShort(obj.ordinal());
     }
 
     @Override
-    public Enum read(ObjectInput in) throws IOException {
-        return values[in.readUnsignedShort()];
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(2);
+    public Enum read(DataStream in) throws IOException {
+        Enum result = values[in.readUnsignedShort()];
+        in.register(result);
+        return result;
     }
 
     @Override

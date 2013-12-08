@@ -23,6 +23,11 @@ public class SocketPool extends Pool<Socket> {
     }
 
     @Override
+    public String name() {
+        return "SocketPool[" + host + ':' + port + ']';
+    }
+
+    @Override
     public Socket createObject() throws PoolException {
         Socket socket = null;
         try {
@@ -35,7 +40,7 @@ public class SocketPool extends Pool<Socket> {
             return socket;
         } catch (Exception e) {
             if (socket != null) socket.close();
-            throw new PoolException(e);
+            throw new PoolException(name() + " createObject failed", e);
         }
     }
 

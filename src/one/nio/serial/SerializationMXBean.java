@@ -6,7 +6,7 @@ public interface SerializationMXBean {
     String getSerializer(String uid);
 
     int getStubOptions();
-    void setStubOptions(int stubOptions);
+    void setStubOptions(int options);
 
     int getGeneratedStubs();
     int getAnonymousClasses();

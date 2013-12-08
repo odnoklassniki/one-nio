@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class DoubleArraySerializer extends Serializer<double[]> {
@@ -17,7 +15,7 @@ class DoubleArraySerializer extends Serializer<double[]> {
     }
 
     @Override
-    public void write(double[] obj, ObjectOutput out) throws IOException {
+    public void write(double[] obj, DataStream out) throws IOException {
         out.writeInt(obj.length);
         for (double v : obj) {
             out.writeDouble(v);
@@ -25,25 +23,19 @@ class DoubleArraySerializer extends Serializer<double[]> {
     }
 
     @Override
-    public double[] read(ObjectInput in) throws IOException {
+    public double[] read(DataStream in) throws IOException {
+        double[] result;
         int length = in.readInt();
         if (length > 0) {
-            double[] result = new double[length];
+            result = new double[length];
             for (int i = 0; i < length; i++) {
                 result[i] = in.readDouble();
             }
-            return result;
         } else {
-            return EMPTY_DOUBLE_ARRAY;
+            result = EMPTY_DOUBLE_ARRAY;
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        int length = in.readInt();
-        if (length > 0) {
-            in.skipBytes(length * 8);
-        }
+        in.register(result);
+        return result;
     }
 
     @Override

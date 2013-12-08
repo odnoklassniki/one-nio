@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class FloatArraySerializer extends Serializer<float[]> {
@@ -17,7 +15,7 @@ class FloatArraySerializer extends Serializer<float[]> {
     }
 
     @Override
-    public void write(float[] obj, ObjectOutput out) throws IOException {
+    public void write(float[] obj, DataStream out) throws IOException {
         out.writeInt(obj.length);
         for (float v : obj) {
             out.writeFloat(v);
@@ -25,25 +23,19 @@ class FloatArraySerializer extends Serializer<float[]> {
     }
 
     @Override
-    public float[] read(ObjectInput in) throws IOException {
+    public float[] read(DataStream in) throws IOException {
+        float[] result;
         int length = in.readInt();
         if (length > 0) {
-            float[] result = new float[length];
+            result = new float[length];
             for (int i = 0; i < length; i++) {
                 result[i] = in.readFloat();
             }
-            return result;
         } else {
-            return EMPTY_FLOAT_ARRAY;
+            result = EMPTY_FLOAT_ARRAY;
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        int length = in.readInt();
-        if (length > 0) {
-            in.skipBytes(length * 4);
-        }
+        in.register(result);
+        return result;
     }
 
     @Override

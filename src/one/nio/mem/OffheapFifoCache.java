@@ -1,16 +1,15 @@
 package one.nio.mem;
 
+import one.nio.lock.RWLock;
 import one.nio.util.JavaInternals;
 
 import sun.misc.Unsafe;
 
 import java.io.IOException;
-import java.util.concurrent.Semaphore;
 
-public class OffheapCache {
+public class OffheapFifoCache {
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final int BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
-    private static final int WRITE_PERMITS = 1024;
 
     private static final int MAX_KEY_COUNT = 256;
     private static final int KEY_SIZE      = 8;
@@ -27,13 +26,13 @@ public class OffheapCache {
     private int segmentMask;
     private Segment[] segments;
 
-    static final class Segment extends Semaphore {
+    static final class Segment extends RWLock {
         final long start;
         int tail;
         int count;
 
         Segment(long start, int size) {
-            super(WRITE_PERMITS, true);
+            super(true);
             this.start = start;
             verify(start, size);
         }
@@ -67,7 +66,7 @@ public class OffheapCache {
         }
     }
 
-    public OffheapCache(long capacity, long segmentSize) {
+    public OffheapFifoCache(long capacity, long segmentSize) {
         int segmentCount = calculateSegmentCount(capacity, segmentSize);
         long actualSegmentSize = (capacity / segmentCount + 31) & ~31L;
 
@@ -75,7 +74,7 @@ public class OffheapCache {
         init(address, actualSegmentSize, segmentCount);
     }
 
-    public OffheapCache(long capacity, long segmentSize, String imageFile) throws IOException {
+    public OffheapFifoCache(long capacity, long segmentSize, String imageFile) throws IOException {
         int segmentCount = calculateSegmentCount(capacity, segmentSize);
         long actualSegmentSize = (capacity / segmentCount + 31) & ~31L;
 
@@ -136,7 +135,7 @@ public class OffheapCache {
 
     public byte[] get(long key) {
         Segment segment = segmentFor(key);
-        segment.acquireUninterruptibly();
+        segment.lockRead();
         try {
             long segmentStart = segment.start;
             long keysEnd = segmentStart + (segment.count << 3);
@@ -152,7 +151,7 @@ public class OffheapCache {
 
             return null;
         } finally {
-            segment.release();
+            segment.unlockRead();
         }
     }
 
@@ -163,7 +162,7 @@ public class OffheapCache {
         }
 
         Segment segment = segmentFor(key);
-        segment.acquireUninterruptibly(WRITE_PERMITS);
+        segment.lockWrite();
         try {
             long segmentStart = segment.start;
             int tail = segment.tail;
@@ -198,7 +197,7 @@ public class OffheapCache {
             segment.tail = newTail;
             return true;
         } finally {
-            segment.release(WRITE_PERMITS);
+            segment.unlockWrite();
         }
     }
 

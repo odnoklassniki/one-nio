@@ -1,6 +1,7 @@
 package one.nio.net;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -69,6 +70,11 @@ final class JavaServerSocket extends Socket {
 
     @Override
     public final void readFully(byte[] data, int offset, int count) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
         throw new UnsupportedOperationException();
     }
 

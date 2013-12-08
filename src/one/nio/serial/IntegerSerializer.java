@@ -1,7 +1,5 @@
 package one.nio.serial;
 
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 
 class IntegerSerializer extends Serializer<Integer> {
@@ -16,18 +14,15 @@ class IntegerSerializer extends Serializer<Integer> {
     }
 
     @Override
-    public void write(Integer v, ObjectOutput out) throws IOException {
+    public void write(Integer v, DataStream out) throws IOException {
         out.writeInt(v);
     }
 
     @Override
-    public Integer read(ObjectInput in) throws IOException {
-        return in.readInt();
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException {
-        in.skipBytes(4);
+    public Integer read(DataStream in) throws IOException {
+        Integer result = in.readInt();
+        in.register(result);
+        return result;
     }
 
     @Override

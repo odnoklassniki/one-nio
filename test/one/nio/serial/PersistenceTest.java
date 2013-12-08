@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
@@ -17,19 +16,12 @@ public class PersistenceTest {
         int length = raf.readInt();
         byte[] buf = new byte[length];
         raf.read(buf);
-        return new DeserializeStream(buf).readObject();
+        return Serializer.deserialize(buf);
     }
 
     private static void writeObject(Object obj) throws IOException {
-        CalcSizeStream css = new CalcSizeStream();
-        css.writeObject(obj);
-        int length = css.count();
-
-        byte[] buf = new byte[length];
-        SerializeStream out = new SerializeStream(buf);
-        out.writeObject(obj);
-
-        raf.writeInt(length);
+        byte[] buf = Serializer.serialize(obj);
+        raf.writeInt(buf.length);
         raf.write(buf);
     }
 
@@ -45,24 +37,15 @@ public class PersistenceTest {
     }
 
     public static void main(String[] args) throws Exception {
-        raf = new RandomAccessFile(args[0], "rw");
-        read = args.length > 1 && "read".equalsIgnoreCase(args[1]);
+        String fileName = args[0];
+        String snapshotFile = args[1];
+        read = args.length > 2 && "read".equalsIgnoreCase(args[2]);
 
         if (read) {
-            Repository.provideSerializer((Serializer) readObject());
-            Repository.provideSerializer((Serializer) readObject());
-            Repository.provideSerializer((Serializer) readObject());
-            Repository.provideSerializer((Serializer) readObject());
-            Repository.provideSerializer((Serializer) readObject());
-            Repository.provideSerializer((Serializer) readObject());
-        } else {
-            writeObject(Repository.get(Inet4Address.class));
-            writeObject(Repository.get(InetSocketAddress.class));
-            writeObject(Repository.get(BigInteger.class));
-            writeObject(Repository.get(BigDecimal.class));
-            writeObject(Repository.get(StringBuilder.class));
-            writeObject(Repository.get(StringBuffer.class));
+            Repository.loadSnapshot(snapshotFile);
         }
+
+        raf = new RandomAccessFile(fileName, "rw");
 
         check(InetAddress.getByName("123.45.67.89"));
         check(InetAddress.getByName("localhost"));
@@ -84,5 +67,9 @@ public class PersistenceTest {
         check(new StringBuffer(1000).append(new Object()).append("zzz").append(1234.56789));
 
         raf.close();
+
+        if (!read) {
+            Repository.saveSnapshot(snapshotFile);
+        }
     }
 }

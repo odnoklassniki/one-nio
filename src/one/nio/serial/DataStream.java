@@ -1,4 +1,7 @@
-package one.nio.util;
+package one.nio.serial;
+
+import one.nio.util.JavaInternals;
+import one.nio.util.Utf8;
 
 import sun.misc.Unsafe;
 
@@ -9,6 +12,10 @@ import java.io.ObjectOutput;
 public class DataStream implements ObjectInput, ObjectOutput {
     protected static final Unsafe unsafe = JavaInternals.getUnsafe();
     protected static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
+
+    protected static final byte REF_NULL       = -1;
+    protected static final byte REF_RECURSIVE  = -2;
+    protected static final byte REF_RECURSIVE2 = -3;
 
     protected final byte[] array;
     protected final long address;
@@ -117,8 +124,19 @@ public class DataStream implements ObjectInput, ObjectOutput {
         Utf8.write(s, array, alloc(utfLength));
     }
 
+    @SuppressWarnings("unchecked")
     public void writeObject(Object obj) throws IOException {
-        throw new UnsupportedOperationException();
+        if (obj == null) {
+            writeByte(REF_NULL);
+        } else {
+            Serializer serializer = Repository.get(obj.getClass());
+            if (serializer.uid < 0) {
+                writeByte((byte) serializer.uid);
+            } else {
+                writeLong(serializer.uid);
+            }
+            serializer.write(obj, this);
+        }
     }
 
     public int read() {
@@ -209,7 +227,17 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public Object readObject() throws IOException, ClassNotFoundException {
-        throw new UnsupportedOperationException();
+        Serializer serializer;
+        byte b = readByte();
+        if (b >= 0) {
+            offset--;
+            serializer = Repository.requestSerializer(readLong());
+        } else if (b == REF_NULL) {
+            return null;
+        } else {
+            serializer = Repository.requestBootstrapSerializer(b);
+        }
+        return serializer.read(this);
     }
 
     public int available() {
@@ -221,6 +249,10 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public void close() {
+        // Nothing to do
+    }
+
+    protected void register(Object obj) {
         // Nothing to do
     }
 

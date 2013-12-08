@@ -1,5 +1,6 @@
 package one.nio.cluster;
 
+import one.nio.http.Request;
 import one.nio.net.ConnectionString;
 
 import org.apache.commons.logging.Log;
@@ -38,11 +39,11 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
         }
     }
 
-    public String invoke(String uri) throws ServiceUnavailableException {
+    public String invoke(Request request) throws ServiceUnavailableException {
         for (int i = 0; i < RETRIES; i++) {
             HttpProvider provider = getProvider();
             try {
-                return provider.invoke(uri);
+                return provider.invoke(request);
             } catch (Exception e) {
                 disableProvider(provider);
                 log.warn(provider + " invocation failed", e);

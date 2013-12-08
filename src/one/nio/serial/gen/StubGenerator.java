@@ -1,8 +1,9 @@
 package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
-
 import one.nio.mgt.Management;
+import one.nio.serial.Repository;
+
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
@@ -21,6 +22,7 @@ public class StubGenerator extends BytecodeGenerator {
     private synchronized Class<?> defineClassIfNotExists(String className, byte[] classData) {
         Class<?> result = findLoadedClass(className);
         if (result == null) {
+            Repository.log.warn("Generating stub for class " + className);
             result = defineClass(classData);
             generatedStubs++;
         }
@@ -32,7 +34,8 @@ public class StubGenerator extends BytecodeGenerator {
         String internalSuperName = superName.replace('.', '/');
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, internalSuperName, null);
+        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, internalSuperName,
+                new String[] { "java/io/Serializable" });
 
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitCode();

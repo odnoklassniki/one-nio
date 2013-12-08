@@ -1,9 +1,6 @@
 package one.nio.serial;
 
-import one.nio.util.Json;
-
 import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.IOException;
 import java.lang.reflect.Array;
 
@@ -33,7 +30,7 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
     }
 
     @Override
-    public void write(Object[] obj, ObjectOutput out) throws IOException {
+    public void write(Object[] obj, DataStream out) throws IOException {
         out.writeInt(obj.length);
         for (Object v : obj) {
             out.writeObject(v);
@@ -41,23 +38,13 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
     }
 
     @Override
-    public Object read(ObjectInput in) throws IOException, ClassNotFoundException {
-        return Array.newInstance(componentType, in.readInt());
-    }
-
-    @Override
-    public void fill(Object[] obj, ObjectInput in) throws IOException, ClassNotFoundException {
-        for (int i = 0; i < obj.length; i++) {
-            obj[i] = in.readObject();
+    public Object[] read(DataStream in) throws IOException, ClassNotFoundException {
+        Object[] result = (Object[]) Array.newInstance(componentType, in.readInt());
+        in.register(result);
+        for (int i = 0; i < result.length; i++) {
+            result[i] = in.readObject();
         }
-    }
-
-    @Override
-    public void skip(ObjectInput in) throws IOException, ClassNotFoundException {
-        int length = in.readInt();
-        for (int i = 0; i < length; i++) {
-            in.readObject();
-        }
+        return result;
     }
 
     @Override

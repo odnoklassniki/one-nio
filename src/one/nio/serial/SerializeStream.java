@@ -1,14 +1,8 @@
 package one.nio.serial;
 
-import one.nio.util.DataStream;
-
 import java.io.IOException;
 
 public class SerializeStream extends DataStream {
-    static final byte REF_NULL       = -1;
-    static final byte REF_RECURSIVE  = -2;
-    static final byte REF_RECURSIVE2 = -3;
-
     protected SerializationContext context;
 
     public SerializeStream(byte[] array) {

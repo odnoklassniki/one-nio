@@ -4,6 +4,7 @@ import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
 import one.nio.pool.SocketPool;
 import one.nio.serial.CalcSizeStream;
+import one.nio.serial.DataStream;
 import one.nio.serial.DeserializeStream;
 import one.nio.serial.Repository;
 import one.nio.serial.SerializeStream;
@@ -105,9 +106,9 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
         int requestSize = css.count();
 
         byte[] buffer = new byte[requestSize + 4];
-        SerializeStream ss = new SerializeStream(buffer);
-        ss.writeInt(requestSize);
-        ss.writeObject(request);
+        DataStream ds = css.hasCycles() ? new SerializeStream(buffer) : new DataStream(buffer);
+        ds.writeInt(requestSize);
+        ds.writeObject(request);
         return buffer;
     }
 
