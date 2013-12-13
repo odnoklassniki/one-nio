@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<project name="one-nio" default="build" basedir=".">
+    <property name="build.dir"      value="build"/>
+    <property name="src.dir"        value="src"/>
+    <property name="test.dir"       value="test"/>
+    <property name="lib.dir"        value="lib"/>
+    <property name="target.jar"     value="${build.dir}/${ant.project.name}.jar"/>
+    <property name="download.repo"  value="http://repo1.maven.org/maven2"/>
+    <property name="gcc.extra.args" value=""/>
+
+    <target name="init">
+        <mkdir dir="${build.dir}"/>
+
+        <available file="${lib.dir}" type="dir" property="lib.dir.exists"/>
+        <path id="lib.ref">
+            <fileset dir="${lib.dir}" includes="*.jar"/>
+        </path>
+    </target>
+
+    <target name="retrieve-libs" unless="lib.dir.exists">
+        <echo message="Downloading external libraries..."/>
+        <mkdir dir="${lib.dir}"/>
+        <get src="${download.repo}/asm/asm/3.3/asm-3.3.jar" dest="${lib.dir}/asm-3.3.jar"/>
+        <get src="${download.repo}/commons-logging/commons-logging/1.0.3/commons-logging-1.0.3.jar" dest="${lib.dir}/commons-logging-1.0.3.jar"/>
+        <get src="${download.repo}/log4j/log4j/1.2.15/log4j-1.2.15.jar" dest="${lib.dir}/log4j-1.2.15.jar"/>
+    </target>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <target name="clean-all" depends="clean">
+        <delete dir="${lib.dir}"/>
+    </target>
+
+    <target name="build" depends="build-jar"/>
+
+    <target name="compile-classes" depends="init, retrieve-libs">
+        <echo message="Compiling classes..."/>
+        <mkdir dir="${build.dir}/classes"/>
+        <javac srcdir="${src.dir}" destdir="${build.dir}/classes" classpathref="lib.ref" includeantruntime="false"/>
+    </target>
+
+    <target name="compile-native" depends="init">
+        <echo message="Compiling native library..."/>
+        <mkdir dir="${build.dir}/native"/>
+        <exec os="Linux" executable="gcc">
+            <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args} -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so -I ${java.home}/../include -I ${java.home}/../include/linux ${src.dir}/one/nio/os/native/mem.c ${src.dir}/one/nio/os/native/proc.c ${src.dir}/one/nio/os/native/user.c ${src.dir}/one/nio/net/native/epoll.c ${src.dir}/one/nio/net/native/socket.c"/>
+        </exec>
+    </target>
+
+    <target name="build-jar" depends="compile-classes, compile-native">
+        <echo message="Building ${target.jar}..."/>
+        <jar destfile="${target.jar}">
+            <fileset dir="${build.dir}/classes" includes="**/*.class" />
+            <fileset dir="${build.dir}/native" includes="*.so" />
+        </jar>
+    </target>
+</project>

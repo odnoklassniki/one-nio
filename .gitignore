@@ -3,5 +3,8 @@
 *.war
 *.ear
 
+/build
+/lib
+
 .idea
 *.iml
