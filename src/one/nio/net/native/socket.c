@@ -151,7 +151,7 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
     // Check IPv6 support
     use_IPv6 = check_IPv6(env);
 
-    // Cache fields ID to access Socket.fd and InetAddress.addreess
+    // Cache field ID to access Socket.fd
     f_fd = cache_field(env, "one/nio/net/NativeSocket", "fd", "I");
 
     // Allocate table for thread pointer per file descriptor

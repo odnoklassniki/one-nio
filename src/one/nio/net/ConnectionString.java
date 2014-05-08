@@ -1,9 +1,12 @@
 package one.nio.net;
 
+import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.channels.DatagramChannel;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -92,7 +95,14 @@ public class ConnectionString {
         int lastPosition = 0;
 
         do {
-            String interfaceAddress = getInterfaceAddress(matcher.group(1));
+            String interfaceAddress;
+            String interfaceName = matcher.group(1);
+            if (interfaceName.startsWith("auto:")) {
+                interfaceAddress = getRoutingAddress(interfaceName.substring(5));
+            } else {
+                interfaceAddress = getInterfaceAddress(interfaceName);
+            }
+
             if (interfaceAddress != null) {
                 sb.append(url, lastPosition, matcher.start()).append(interfaceAddress);
             } else {
@@ -102,6 +112,20 @@ public class ConnectionString {
         } while (matcher.find(lastPosition));
 
         return sb.append(url, lastPosition, url.length()).toString();
+    }
+
+    public static String getRoutingAddress(String targetIP) {
+        try {
+            DatagramChannel ch = DatagramChannel.open();
+            try {
+                ch.connect(new InetSocketAddress(targetIP, 7));
+                return ch.socket().getLocalAddress().getHostAddress();
+            } finally {
+                ch.close();
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public static String getInterfaceAddress(String interfaceName) {
