@@ -27,14 +27,19 @@ public final class Base64 {
     };
 
     public static byte[] encode(byte[] s) {
-        return encode(s, DEFAULT_TABLE);
+        byte[] result = new byte[(s.length + 2) / 3 << 2];
+        encode(s, result, 0, DEFAULT_TABLE);
+        return result;
     }
 
-    public static byte[] encode(byte[] s, byte[] table) {
-        final int len = s.length / 3 * 3;
-        final byte[] result = new byte[(s.length + 2) / 3 << 2];
+    public static byte[] encodeUrl(byte[] s) {
+        byte[] result = new byte[((s.length << 2) + 2) / 3];
+        encode(s, result, 0, URL_TABLE);
+        return result;
+    }
 
-        int p = 0;
+    public static void encode(byte[] s, byte[] result, int p, byte[] table) {
+        final int len = s.length / 3 * 3;
         for (int i = 0; i < len; i += 3, p += 4) {
             int v = (s[i] & 0xff) << 16 | (s[i + 1] & 0xff) << 8 | (s[i + 2] & 0xff);
             result[p]     = table[v >>> 18];
@@ -47,29 +52,36 @@ public final class Base64 {
             case 1:
                 result[p]     = table[(s[len] & 0xff) >> 2];
                 result[p + 1] = table[(s[len] & 0x03) << 4];
-                result[p + 2] = '=';
-                result[p + 3] = '=';
+                if (p + 3 < result.length) {
+                    result[p + 2] = '=';
+                    result[p + 3] = '=';
+                }
                 break;
             case 2:
                 result[p]     = table[(s[len] & 0xff) >> 2];
                 result[p + 1] = table[(s[len] & 0x03) << 4 | (s[len + 1] & 0xff) >> 4];
                 result[p + 2] = table[(s[len + 1] & 0x0f) << 2];
-                result[p + 3] = '=';
+                if (p + 3 < result.length) {
+                    result[p + 3] = '=';
+                }
                 break;
         }
-
-        return result;
     }
 
     public static char[] encodeToChars(byte[] s) {
-        return encodeToChars(s, DEFAULT_TABLE);
+        char[] result = new char[(s.length + 2) / 3 << 2];
+        encodeToChars(s, result, 0, DEFAULT_TABLE);
+        return result;
     }
 
-    public static char[] encodeToChars(byte[] s, byte[] table) {
-        final int len = s.length / 3 * 3;
-        final char[] result = new char[(s.length + 2) / 3 << 2];
+    public static char[] encodeUrlToChars(byte[] s) {
+        char[] result = new char[((s.length << 2) + 2) / 3];
+        encodeToChars(s, result, 0, URL_TABLE);
+        return result;
+    }
 
-        int p = 0;
+    public static void encodeToChars(byte[] s, char[] result, int p, byte[] table) {
+        final int len = s.length / 3 * 3;
         for (int i = 0; i < len; i += 3, p += 4) {
             int v = (s[i] & 0xff) << 16 | (s[i + 1] & 0xff) << 8 | (s[i + 2] & 0xff);
             result[p]     = (char) table[v >>> 18];
@@ -82,18 +94,20 @@ public final class Base64 {
             case 1:
                 result[p]     = (char) table[(s[len] & 0xff) >> 2];
                 result[p + 1] = (char) table[(s[len] & 0x03) << 4];
-                result[p + 2] = '=';
-                result[p + 3] = '=';
+                if (p + 3 < result.length) {
+                    result[p + 2] = '=';
+                    result[p + 3] = '=';
+                }
                 break;
             case 2:
                 result[p]     = (char) table[(s[len] & 0xff) >> 2];
                 result[p + 1] = (char) table[(s[len] & 0x03) << 4 | (s[len + 1] & 0xff) >> 4];
                 result[p + 2] = (char) table[(s[len + 1] & 0x0f) << 2];
-                result[p + 3] = '=';
+                if (p + 3 < result.length) {
+                    result[p + 3] = '=';
+                }
                 break;
         }
-
-        return result;
     }
 
     public static byte[] decode(byte[] s) {
