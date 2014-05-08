@@ -27,6 +27,11 @@ class DateSerializer extends Serializer<Date> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(8);
+    }
+
+    @Override
     public void toJson(Date obj, StringBuilder builder) {
         builder.append(obj.getTime());
     }

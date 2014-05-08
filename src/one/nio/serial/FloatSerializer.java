@@ -26,6 +26,11 @@ class FloatSerializer extends Serializer<Float> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(4);
+    }
+
+    @Override
     public void toJson(Float obj, StringBuilder builder) {
         builder.append(obj.floatValue());
     }

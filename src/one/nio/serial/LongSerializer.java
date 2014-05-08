@@ -26,6 +26,11 @@ class LongSerializer extends Serializer<Long> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(8);
+    }
+
+    @Override
     public void toJson(Long obj, StringBuilder builder) {
         builder.append(obj.longValue());
     }

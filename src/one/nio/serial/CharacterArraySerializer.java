@@ -39,6 +39,11 @@ class CharacterArraySerializer extends Serializer<char[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt() * 2);
+    }
+
+    @Override
     public void toJson(char[] obj, StringBuilder builder) {
         Json.appendChars(builder, obj);
     }

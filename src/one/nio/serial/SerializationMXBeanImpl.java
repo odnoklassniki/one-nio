@@ -22,6 +22,11 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
+    public String[] getMethodSerializer() {
+        return getSerializers(Repository.methodMap);
+    }
+
+    @Override
     public String getSerializer(String uid) {
         try {
             return Repository.requestSerializer(Hex.parseLong(uid)).toString();
@@ -31,23 +36,38 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public int getStubOptions() {
-        return Repository.getStubOptions();
+    public String getClassSerializer(String className) {
+        try {
+            Serializer serializer = Repository.classMap.get(Class.forName(className, false, StubGenerator.INSTANCE));
+            return serializer == null ? null : serializer.toString();
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
     }
 
     @Override
-    public void setStubOptions(int options) {
-        Repository.setStubOptions(options);
+    public byte[] getCode(String uid) {
+        try {
+            Serializer serializer = Repository.requestSerializer(Hex.parseLong(uid));
+            return serializer instanceof GeneratedSerializer ? ((GeneratedSerializer) serializer).code() : null;
+        } catch (SerializerNotFoundException e) {
+            return null;
+        }
     }
 
     @Override
-    public int getGeneratedStubs() {
-        return StubGenerator.getGeneratedStubs();
+    public int getOptions() {
+        return Repository.getOptions();
+    }
+
+    @Override
+    public void setOptions(int options) {
+        Repository.setOptions(options);
     }
 
     @Override
     public int getAnonymousClasses() {
-        return Repository.anonymousClasses;
+        return Repository.anonymousClasses.get();
     }
 
     @Override
@@ -56,8 +76,13 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
+    public int getUnknownClasses() {
+        return Serializer.unknownClasses.get();
+    }
+
+    @Override
     public int getUnknownTypes() {
-        return GeneratedSerializer.unknownTypes.get();
+        return TypeDescriptor.unknownTypes.get();
     }
 
     @Override
@@ -81,11 +106,6 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public int getEnumOldSerializers() {
-        return EnumSerializer.enumOldSerializers.get();
-    }
-
-    @Override
     public int getEnumCountMismatches() {
         return EnumSerializer.enumCountMismatches.get();
     }
@@ -95,12 +115,17 @@ class SerializationMXBeanImpl implements SerializationMXBean {
         return EnumSerializer.enumMissedConstants.get();
     }
 
-    private String[] getSerializers(Map<?, Serializer> map) {
+    @Override
+    public int getRenamedMethods() {
+        return MethodSerializer.renamedMethods.get();
+    }
+
+    private String[] getSerializers(Map<?, ? extends Serializer> map) {
         synchronized (Repository.class) {
             String[] result = new String[map.size()];
             int i = 0;
             for (Serializer serializer : map.values()) {
-                result[i++] = serializer.uid();
+                result[i++] = Long.toHexString(serializer.uid);
             }
             return result;
         }

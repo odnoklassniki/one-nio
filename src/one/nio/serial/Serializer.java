@@ -1,63 +1,71 @@
 package one.nio.serial;
 
-import one.nio.serial.gen.StubGenerator;
 import one.nio.util.DigestStream;
 
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class Serializer<T> implements Externalizable {
-    protected static final Class[] PRIMITIVE_CLASSES = {
-            int.class,      // 0
-            long.class,     // 1
-            boolean.class,  // 2
-            byte.class,     // 3
-            short.class,    // 4
-            char.class,     // 5
-            float.class,    // 6
-            double.class,   // 7
-            void.class      // 8
-    };
+    static final AtomicInteger unknownClasses = new AtomicInteger();
 
-    protected Class cls;
+    protected String descriptor;
     protected long uid;
-    protected boolean original;
+    protected Class cls;
+    protected Origin origin;
 
     protected Serializer(Class cls) {
+        this.descriptor = TypeDescriptor.classDescriptor(cls);
         this.cls = cls;
-        this.uid = generateLongUid();
-        this.original = true;
+        this.origin = Origin.LOCAL;
     }
 
-    public String uid() {
-        return Long.toHexString(uid);
+    public long uid() {
+        return uid;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Class<T> cls() {
+        return cls;
     }
 
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
-        out.writeUTF(classDescriptor(cls));
+        out.writeUTF(descriptor);
         out.writeLong(uid);
     }
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        this.cls = classByDescriptor(in.readUTF());
-        this.uid = in.readLong();
+        tryReadExternal(in, true);
     }
 
-    protected String tryReadExternal(ObjectInput in, boolean throwClassNotFound) throws IOException, ClassNotFoundException {
-        String name = in.readUTF();
-        this.uid = in.readLong();
-
+    protected final void tryReadExternal(ObjectInput in, boolean throwException) throws IOException, ClassNotFoundException {
         try {
-            this.cls = classByDescriptor(name);
-            return cls.getName();
+            this.descriptor = in.readUTF();
+            this.uid = in.readLong();
+            this.cls = TypeDescriptor.resolve(descriptor);
+            this.origin = Origin.EXTERNAL;
         } catch (ClassNotFoundException e) {
-            if (throwClassNotFound) throw e;
-            int p = name.indexOf('|');
-            return p >= 0 ? name.substring(0, p) : name;
+            if (throwException) throw e;
+            Repository.log.warn("[" + Long.toHexString(uid) + "] Unknown local class: " + descriptor);
+            unknownClasses.incrementAndGet();
+            this.origin = Origin.GENERATED;
+        }
+    }
+
+    protected final void generateUid() {
+        if (this.uid == 0) {
+            DigestStream ds = new DigestStream("MD5");
+            try {
+                ds.writeUTF(getClass().getName());
+                writeExternal(ds);
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+            this.uid = ds.digest();
         }
     }
 
@@ -65,9 +73,9 @@ public abstract class Serializer<T> implements Externalizable {
     public String toString() {
         StringBuilder builder = new StringBuilder(100);
         builder.append("---\n");
-        builder.append("Class: ").append(cls.getName()).append('\n');
-        builder.append("UID: ").append(uid()).append('\n');
-        builder.append("Original: ").append(original).append('\n');
+        builder.append("Class: ").append(descriptor).append('\n');
+        builder.append("UID: ").append(Long.toHexString(uid)).append('\n');
+        builder.append("Origin: ").append(origin).append('\n');
         return builder.toString();
     }
 
@@ -75,60 +83,21 @@ public abstract class Serializer<T> implements Externalizable {
     public boolean equals(Object obj) {
         if (obj instanceof Serializer) {
             Serializer other = (Serializer) obj;
-            return cls == other.cls && uid == other.uid;
+            return uid == other.uid && descriptor.equals(other.descriptor);
         }
         return false;
     }
 
     @Override
     public int hashCode() {
-        return (int) uid ^ (int) (uid >>> 32) ^ cls.hashCode();
-    }
-
-    private long generateLongUid() {
-        DigestStream ds = new DigestStream("MD5");
-        try {
-            ds.writeUTF(getClass().getName());
-            writeExternal(ds);
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-        return ds.digest();
+        return (int) uid ^ (int) (uid >>> 32);
     }
 
     public abstract void calcSize(T obj, CalcSizeStream css) throws IOException;
     public abstract void write(T obj, DataStream out) throws IOException;
     public abstract T read(DataStream in) throws IOException, ClassNotFoundException;
+    public abstract void skip(DataStream in) throws IOException, ClassNotFoundException;
     public abstract void toJson(T obj, StringBuilder builder) throws IOException;
-
-    protected static int primitiveIndex(Class<?> cls) {
-        for (int i = 0; i < PRIMITIVE_CLASSES.length; i++) {
-            if (cls == PRIMITIVE_CLASSES[i]) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    protected static String classDescriptor(Class<?> cls) {
-        Renamed renamed = cls.getAnnotation(Renamed.class);
-        return renamed == null ? cls.getName() : cls.getName() + '|' + renamed.from();
-    }
-
-    protected static Class<?> classByDescriptor(String name) throws ClassNotFoundException {
-        int p = name.indexOf('|');
-        if (p >= 0) {
-            try {
-                return Class.forName(name.substring(0, p), true, StubGenerator.INSTANCE);
-            } catch (ClassNotFoundException e) {
-                // New class is missed, try old name
-                name = name.substring(p + 1);
-            }
-        }
-
-        Class renamedClass = Repository.renamedClasses.get(name);
-        return renamedClass != null ? renamedClass : Class.forName(name, true, StubGenerator.INSTANCE);
-    }
 
     public static byte[] serialize(Object obj) throws IOException {
         CalcSizeStream css = new CalcSizeStream();

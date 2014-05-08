@@ -39,6 +39,11 @@ class LongArraySerializer extends Serializer<long[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt() * 8);
+    }
+
+    @Override
     public void toJson(long[] obj, StringBuilder builder) {
         builder.append('[');
         if (obj.length > 0) {

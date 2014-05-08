@@ -37,6 +37,11 @@ class ByteArraySerializer extends Serializer<byte[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt());
+    }
+
+    @Override
     public void toJson(byte[] obj, StringBuilder builder) {
         builder.append('"').append(Base64.encodeToChars(obj)).append('"');
     }

@@ -2,6 +2,7 @@ package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
 import one.nio.mgt.Management;
+import one.nio.serial.FieldDescriptor;
 import one.nio.serial.Repository;
 
 import org.objectweb.asm.AnnotationVisitor;
@@ -12,50 +13,52 @@ import org.objectweb.asm.Type;
 
 public class StubGenerator extends BytecodeGenerator {
     public static final StubGenerator INSTANCE = new StubGenerator();
-
-    private int generatedStubs;
+    private static final String PACKAGE_PREFIX = "sun/reflect/Stub_";
 
     StubGenerator() {
         Management.registerMXBean(this, "one.nio.serial:type=BytecodeGenerator");
     }
 
-    private synchronized Class<?> defineClassIfNotExists(String className, byte[] classData) {
+    private synchronized Class<?> defineClassIfNotExists(String internalClassName, byte[] classData) {
+        String className = internalClassName.replace('/', '.');
         Class<?> result = findLoadedClass(className);
         if (result == null) {
             Repository.log.warn("Generating stub for class " + className);
             result = defineClass(classData);
-            generatedStubs++;
         }
         return result;
     }
 
-    public static Class generateRegular(String className, String superName, FieldInfo[] fieldsInfo) {
-        String internalClassName = className.replace('.', '/');
-        String internalSuperName = superName.replace('.', '/');
+    public static Class generateRegular(long uid, String superName, FieldDescriptor[] fds) {
+        String internalClassName = PACKAGE_PREFIX + Long.toHexString(uid);
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, internalSuperName,
+        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, superName,
                 new String[] { "java/io/Serializable" });
 
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESPECIAL, internalSuperName, "<init>", "()V");
+        mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V");
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
 
-        if (fieldsInfo != null) {
-            for (FieldInfo fi : fieldsInfo) {
-                FieldVisitor fv = cv.visitField(ACC_PRIVATE, fi.sourceName(), Type.getDescriptor(fi.sourceClass()), null, null);
-                if (fi.oldName() != null) {
-                    AnnotationVisitor av = fv.visitAnnotation("Lone/nio/serial/Renamed;", true);
-                    av.visit("from", fi.oldName());
-                    av.visitEnd();
+        if (fds != null) {
+            for (FieldDescriptor fd : fds) {
+                String name = fd.name();
+                String oldName = null;
+
+                int p = name.indexOf('|');
+                if (p >= 0) {
+                    oldName = name.substring(p + 1);
+                    name = name.substring(0, p);
                 }
-                if (fi.sourceClassName() != null) {
-                    AnnotationVisitor av = fv.visitAnnotation("Lone/nio/serial/OriginalType;", true);
-                    av.visit("value", fi.sourceClassName());
+
+                FieldVisitor fv = cv.visitField(ACC_PRIVATE, name, Type.getDescriptor(fd.type().resolve()), null, null);
+                if (oldName != null) {
+                    AnnotationVisitor av = fv.visitAnnotation("Lone/nio/serial/Renamed;", true);
+                    av.visit("from", oldName);
                     av.visitEnd();
                 }
                 fv.visitEnd();
@@ -63,12 +66,11 @@ public class StubGenerator extends BytecodeGenerator {
         }
 
         cv.visitEnd();
-
-        return INSTANCE.defineClassIfNotExists(className, cv.toByteArray());
+        return INSTANCE.defineClassIfNotExists(internalClassName, cv.toByteArray());
     }
 
-    public static Class generateEnum(String className, String[] constants) {
-        String internalClassName = className.replace('.', '/');
+    public static Class generateEnum(long uid, String[] constants) {
+        String internalClassName = PACKAGE_PREFIX + Long.toHexString(uid);
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL | ACC_ENUM, internalClassName, null, "java/lang/Enum", null);
@@ -132,10 +134,6 @@ public class StubGenerator extends BytecodeGenerator {
         mv.visitEnd();
 
         cv.visitEnd();
-        return INSTANCE.defineClassIfNotExists(className, cv.toByteArray());
-    }
-
-    public static int getGeneratedStubs() {
-        return INSTANCE.generatedStubs;
+        return INSTANCE.defineClassIfNotExists(internalClassName, cv.toByteArray());
     }
 }

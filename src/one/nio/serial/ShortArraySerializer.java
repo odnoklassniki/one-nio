@@ -39,6 +39,11 @@ class ShortArraySerializer extends Serializer<short[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt() * 2);
+    }
+
+    @Override
     public void toJson(short[] obj, StringBuilder builder) {
         builder.append('[');
         if (obj.length > 0) {

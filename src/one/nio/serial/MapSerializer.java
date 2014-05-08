@@ -18,10 +18,9 @@ public class MapSerializer extends Serializer<Map> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        String className = super.tryReadExternal(in, (Repository.stubOptions & Repository.MAP_STUBS) == 0);
+        super.tryReadExternal(in, (Repository.getOptions() & Repository.MAP_STUBS) == 0);
         if (this.cls == null) {
-            this.cls = StubGenerator.generateRegular(className, "java.util.HashMap", null);
-            this.original = true;
+            this.cls = StubGenerator.generateRegular(uid, "java/util/HashMap", null);
         }
 
         this.constructor = findConstructor();
@@ -62,6 +61,15 @@ public class MapSerializer extends Serializer<Map> {
             result.put(in.readObject(), in.readObject());
         }
         return result;
+    }
+
+    @Override
+    public void skip(DataStream in) throws IOException, ClassNotFoundException {
+        int length = in.readInt();
+        for (int i = 0; i < length; i++) {
+            in.readObject();
+            in.readObject();
+        }
     }
 
     @Override

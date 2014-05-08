@@ -26,15 +26,20 @@ public class DeserializeStream extends DataStream {
         if (b >= 0) {
             offset--;
             serializer = Repository.requestSerializer(readLong());
-        } else if (b == SerializeStream.REF_NULL) {
+        } else if (b == REF_NULL) {
             return null;
-        } else if (b == SerializeStream.REF_RECURSIVE) {
-            return context[readUnsignedShort()];
-        } else if (b == SerializeStream.REF_RECURSIVE2) {
-            return context[readInt()];
+        } else if (b == REF_RECURSIVE) {
+            return context[readUnsignedShort() + 1];
+        } else if (b == REF_RECURSIVE2) {
+            return context[readInt() + 1];
         } else {
             serializer = Repository.requestBootstrapSerializer(b);
         }
+
+        if (++contextSize >= context.length) {
+            context = Arrays.copyOf(context, context.length * 2);
+        }
+
         return serializer.read(this);
     }
 
@@ -45,9 +50,6 @@ public class DeserializeStream extends DataStream {
 
     @Override
     protected void register(Object obj) {
-        if (contextSize >= context.length) {
-            context = Arrays.copyOf(context, context.length * 2);
-        }
-        context[contextSize++] = obj;
+        context[contextSize] = obj;
     }
 }

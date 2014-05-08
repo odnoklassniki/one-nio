@@ -23,20 +23,21 @@ class ClassSerializer extends Serializer<Class<?>> {
 
     @Override
     public void write(Class<?> obj, DataStream out) throws IOException {
-        if (obj.isPrimitive()) {
-            out.writeByte(primitiveIndex(obj));
-        } else {
-            out.writeByte(-1);
-            out.writeUTF(classDescriptor(obj));
-        }
+        TypeDescriptor.writeClass(out, obj);
     }
 
     @Override
     public Class<?> read(DataStream in) throws IOException, ClassNotFoundException {
-        int index = in.readByte();
-        Class result = index >= 0 ? PRIMITIVE_CLASSES[index] : classByDescriptor(in.readUTF());
+        Class<?> result = TypeDescriptor.readClass(in);
         in.register(result);
         return result;
+    }
+
+    @Override
+    public void skip(DataStream in) throws IOException {
+        if (in.readByte() < 0) {
+            in.skipBytes(in.readUnsignedShort());
+        }
     }
 
     @Override

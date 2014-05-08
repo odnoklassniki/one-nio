@@ -29,6 +29,15 @@ class StringSerializer extends Serializer<String> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        int length = in.readUnsignedShort();
+        if (length > 0x7fff) {
+            length = (length & 0x7fff) << 16 | in.readUnsignedShort();
+        }
+        in.skipBytes(length);
+    }
+
+    @Override
     public void toJson(String obj, StringBuilder builder) {
         Json.appendString(builder, obj);
     }

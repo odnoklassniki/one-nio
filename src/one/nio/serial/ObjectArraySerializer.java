@@ -14,7 +14,7 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.tryReadExternal(in, (Repository.stubOptions & Repository.ARRAY_STUBS) == 0);
+        super.tryReadExternal(in, (Repository.getOptions() & Repository.ARRAY_STUBS) == 0);
         if (this.cls == null) {
             this.cls = Object[].class;
         }
@@ -45,6 +45,14 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
             result[i] = in.readObject();
         }
         return result;
+    }
+
+    @Override
+    public void skip(DataStream in) throws IOException, ClassNotFoundException {
+        int length = in.readInt();
+        for (int i = 0; i < length; i++) {
+            in.readObject();
+        }
     }
 
     @Override

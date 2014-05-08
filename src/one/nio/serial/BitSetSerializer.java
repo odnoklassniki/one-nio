@@ -56,6 +56,11 @@ class BitSetSerializer extends Serializer<BitSet> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt() * 8);
+    }
+
+    @Override
     public void toJson(BitSet obj, StringBuilder builder) throws NotSerializableException {
         throw new NotSerializableException(cls.getName());
     }

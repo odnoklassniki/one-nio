@@ -39,6 +39,11 @@ class IntegerArraySerializer extends Serializer<int[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt() * 4);
+    }
+
+    @Override
     public void toJson(int[] obj, StringBuilder builder) {
         builder.append('[');
         if (obj.length > 0) {

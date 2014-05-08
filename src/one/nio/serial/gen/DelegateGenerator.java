@@ -1,5 +1,8 @@
 package one.nio.serial.gen;
 
+import one.nio.gen.BytecodeGenerator;
+import one.nio.serial.Default;
+import one.nio.serial.FieldDescriptor;
 import one.nio.serial.Repository;
 import one.nio.util.JavaInternals;
 
@@ -16,29 +19,31 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DelegateGenerator extends StubGenerator {
+public class DelegateGenerator extends BytecodeGenerator {
     private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final String SUPER_CLASS = "sun/reflect/MagicAccessorImpl";
 
     private static AtomicInteger index = new AtomicInteger();
 
-    public static Delegate generate(Class cls, FieldInfo[] fieldsInfo) {
-        String className = "Gen" + index.getAndIncrement() + "_" + cls.getSimpleName();
+    public static byte[] generate(Class cls, FieldDescriptor[] fds, List<Field> defaultFields) {
+        String className = "sun/reflect/Delegate" + index.getAndIncrement() + "_" + cls.getSimpleName();
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, "sun/reflect/" + className, null, SUPER_CLASS,
+        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, className, null, SUPER_CLASS,
                 new String[] { "one/nio/serial/gen/Delegate" });
 
         generateConstructor(cv);
-        generateCalcSize(cv, cls, fieldsInfo);
-        generateWrite(cv, cls, fieldsInfo);
-        generateRead(cv, cls, fieldsInfo);
-        generateToJson(cv, fieldsInfo);
+        generateCalcSize(cv, cls, fds);
+        generateWrite(cv, cls, fds);
+        generateRead(cv, cls, fds, defaultFields);
+        generateSkip(cv, fds);
+        generateToJson(cv, fds);
 
         cv.visitEnd();
-        return INSTANCE.instantiate(cv.toByteArray(), Delegate.class);
+        return cv.toByteArray();
     }
 
     private static void generateConstructor(ClassVisitor cv) {
@@ -53,7 +58,7 @@ public class DelegateGenerator extends StubGenerator {
         mv.visitEnd();
     }
 
-    private static void generateCalcSize(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
+    private static void generateCalcSize(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
@@ -67,20 +72,21 @@ public class DelegateGenerator extends StubGenerator {
 
         int primitiveFieldsSize = 0;
 
-        for (FieldInfo fi : fieldsInfo) {
-            Field f = fi.field();
-            FieldType srcType = FieldType.valueOf(fi.sourceClass());
+        for (FieldDescriptor fd : fds) {
+            Field ownField = fd.ownField();
+            Class sourceClass = fd.type().resolve();
+            FieldType srcType = FieldType.valueOf(sourceClass);
 
             if (srcType != FieldType.Object) {
                 primitiveFieldsSize += srcType.dataSize;
-            } else if (f == null) {
+            } else if (ownField == null) {
                 primitiveFieldsSize++;  // 1 byte to encode null reference
             } else {
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent() != null) emitGetField(mv, fi.parent());
-                emitGetField(mv, f);
-                emitTypeCast(mv, f.getType(), fi.sourceClass());
+                if (fd.parentField() != null) emitGetField(mv, fd.parentField());
+                emitGetField(mv, ownField);
+                emitTypeCast(mv, ownField.getType(), sourceClass);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/CalcSizeStream", "writeObject", "(Ljava/lang/Object;)V");
             }
         }
@@ -99,7 +105,7 @@ public class DelegateGenerator extends StubGenerator {
         mv.visitEnd();
     }
 
-    private static void generateWrite(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
+    private static void generateWrite(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
@@ -111,19 +117,20 @@ public class DelegateGenerator extends StubGenerator {
             emitInvoke(mv, writeObjectMethod);
         }
 
-        for (FieldInfo fi : fieldsInfo) {
-            Field f = fi.field();
-            FieldType srcType = FieldType.valueOf(fi.sourceClass());
+        for (FieldDescriptor fd : fds) {
+            Field ownField = fd.ownField();
+            Class sourceClass = fd.type().resolve();
+            FieldType srcType = FieldType.valueOf(sourceClass);
 
             mv.visitVarInsn(ALOAD, 2);
 
-            if (f == null) {
-                mv.visitInsn(srcType.defaultOpcode);
+            if (ownField == null) {
+                mv.visitInsn(FieldType.Void.convertTo(srcType));
             } else {
                 mv.visitVarInsn(ALOAD, 1);
-                if (fi.parent() != null) emitGetField(mv, fi.parent());
-                emitGetField(mv, f);
-                emitTypeCast(mv, f.getType(), fi.sourceClass());
+                if (fd.parentField() != null) emitGetField(mv, fd.parentField());
+                emitGetField(mv, ownField);
+                emitTypeCast(mv, ownField.getType(), sourceClass);
             }
 
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.writeMethod(), srcType.writeSignature());
@@ -134,7 +141,7 @@ public class DelegateGenerator extends StubGenerator {
         mv.visitEnd();
     }
 
-    private static void generateRead(ClassVisitor cv, Class cls, FieldInfo[] fieldsInfo) {
+    private static void generateRead(ClassVisitor cv, Class cls, FieldDescriptor[] fds, List<Field> defaultFields) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "read", "(Lone/nio/serial/DataStream;)Ljava/lang/Object;",
                 null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
         mv.visitCode();
@@ -146,41 +153,51 @@ public class DelegateGenerator extends StubGenerator {
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V");
 
         ArrayList<Field> parents = new ArrayList<Field>(1);
-        for (FieldInfo fi : fieldsInfo) {
-            Field f = fi.field();
-            Field parent = fi.parent();
-            FieldType srcType = FieldType.valueOf(fi.sourceClass());
+        for (FieldDescriptor fd : fds) {
+            Field ownField = fd.ownField();
+            Field parentField = fd.parentField();
+            Class sourceClass = fd.type().resolve();
+            FieldType srcType = FieldType.valueOf(sourceClass);
 
-            if (parent != null && !parents.contains(parent)) {
-                parents.add(parent);
+            if (parentField != null && !parents.contains(parentField)) {
+                parents.add(parentField);
                 mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 2);
-                mv.visitLdcInsn(unsafe.objectFieldOffset(parent));
-                mv.visitTypeInsn(NEW, Type.getInternalName(parent.getType()));
+                mv.visitLdcInsn(unsafe.objectFieldOffset(parentField));
+                mv.visitTypeInsn(NEW, Type.getInternalName(parentField.getType()));
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", "putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V");
             }
 
-            if (f == null) {
+            if (ownField == null) {
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
-                mv.visitInsn(srcType.dataSize == 8 ? POP2 : POP);
-            } else if (Modifier.isFinal(f.getModifiers())) {
-                FieldType dstType = FieldType.valueOf(f.getType());
+                mv.visitInsn(srcType.convertTo(FieldType.Void));
+            } else if (Modifier.isFinal(ownField.getModifiers())) {
+                FieldType dstType = FieldType.valueOf(ownField.getType());
                 mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 2);
-                if (parent != null) emitGetField(mv, parent);
-                mv.visitLdcInsn(unsafe.objectFieldOffset(f));
+                if (parentField != null) emitGetField(mv, parentField);
+                mv.visitLdcInsn(unsafe.objectFieldOffset(ownField));
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
-                emitTypeCast(mv, fi.sourceClass(), f.getType());
+                checkFieldType(mv, sourceClass);
+                emitTypeCast(mv, sourceClass, ownField.getType());
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
             } else {
                 mv.visitVarInsn(ALOAD, 2);
-                if (parent != null) emitGetField(mv, parent);
+                if (parentField != null) emitGetField(mv, parentField);
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
-                emitTypeCast(mv, fi.sourceClass(), f.getType());
-                emitPutField(mv, f);
+                checkFieldType(mv, sourceClass);
+                emitTypeCast(mv, sourceClass, ownField.getType());
+                emitPutField(mv, ownField);
+            }
+        }
+
+        if (defaultFields != null && !defaultFields.isEmpty()) {
+            for (Field defaultField : defaultFields) {
+                String defaultValue = defaultField.getAnnotation(Default.class).value();
+                putFieldConstant(mv, defaultField, defaultValue);
             }
         }
 
@@ -197,7 +214,46 @@ public class DelegateGenerator extends StubGenerator {
         mv.visitEnd();
     }
 
-    private static void generateToJson(ClassVisitor cv, FieldInfo[] fieldsInfo) {
+    private static void generateSkip(ClassVisitor cv, FieldDescriptor[] fds) {
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "skip", "(Lone/nio/serial/DataStream;)V",
+                null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
+        mv.visitCode();
+
+        int skipSize = 0;
+
+        for (FieldDescriptor fd : fds) {
+            Class sourceClass = fd.type().resolve();
+            FieldType srcType = FieldType.valueOf(sourceClass);
+
+            if (srcType != FieldType.Object) {
+                skipSize += srcType.dataSize;
+            } else {
+                if (skipSize > 0) {
+                    mv.visitVarInsn(ALOAD, 1);
+                    emitInt(mv, skipSize);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "skipBytes", "(I)I");
+                    mv.visitInsn(POP);
+                    skipSize = 0;
+                }
+                mv.visitVarInsn(ALOAD, 1);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "readObject", "()Ljava/lang/Object;");
+                mv.visitInsn(POP);
+            }
+        }
+
+        if (skipSize > 0) {
+            mv.visitVarInsn(ALOAD, 1);
+            emitInt(mv, skipSize);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "skipBytes", "(I)I");
+            mv.visitInsn(POP);
+        }
+
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    private static void generateToJson(ClassVisitor cv, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "toJson", "(Ljava/lang/Object;Ljava/lang/StringBuilder;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
@@ -205,23 +261,25 @@ public class DelegateGenerator extends StubGenerator {
         boolean firstWritten = false;
         mv.visitVarInsn(ALOAD, 2);
 
-        for (FieldInfo fi : fieldsInfo) {
-            Field f = fi.field();
-            if (f == null) {
+        for (FieldDescriptor fd : fds) {
+            Field ownField = fd.ownField();
+            if (ownField == null) {
                 continue;
             }
 
-            String fieldName = "\"" + f.getName() + "\":";
+            String fieldName = "\"" + ownField.getName() + "\":";
             mv.visitLdcInsn(firstWritten ? ',' + fieldName : '{' + fieldName);
             mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;");
             firstWritten = true;
 
-            mv.visitVarInsn(ALOAD, 1);
-            if (fi.parent() != null) emitGetField(mv, fi.parent());
-            emitGetField(mv, f);
-            emitTypeCast(mv, f.getType(), fi.sourceClass());
+            Class sourceClass = fd.type().resolve();
+            FieldType srcType = FieldType.valueOf(sourceClass);
 
-            FieldType srcType = FieldType.valueOf(fi.sourceClass());
+            mv.visitVarInsn(ALOAD, 1);
+            if (fd.parentField() != null) emitGetField(mv, fd.parentField());
+            emitGetField(mv, ownField);
+            emitTypeCast(mv, ownField.getType(), sourceClass);
+
             switch (srcType) {
                 case Object:
                     mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendObject", "(Ljava/lang/StringBuilder;Ljava/lang/Object;)V");
@@ -247,6 +305,77 @@ public class DelegateGenerator extends StubGenerator {
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    private static void putFieldConstant(MethodVisitor mv, Field field, String value) {
+        if (Modifier.isFinal(field.getModifiers())) {
+            mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitLdcInsn(unsafe.objectFieldOffset(field));
+        } else {
+            mv.visitVarInsn(ALOAD, 2);
+        }
+
+        Class<?> fieldType = field.getType();
+        FieldType dstType = FieldType.valueOf(fieldType);
+        switch (dstType) {
+            case Int:
+            case Byte:
+            case Short:
+                emitInt(mv, Integer.decode(value));
+                break;
+            case Long:
+                emitLong(mv, Long.decode(value));
+                break;
+            case Boolean:
+                emitInt(mv, Boolean.parseBoolean(value) ? 1 : 0);
+                break;
+            case Char:
+                emitInt(mv, value.length() == 1 ? value.charAt(0) : Integer.decode(value));
+                break;
+            case Float:
+                emitFloat(mv, Float.parseFloat(value));
+                break;
+            case Double:
+                emitDouble(mv, Double.parseDouble(value));
+                break;
+            default:
+                if (fieldType == String.class) {
+                    mv.visitLdcInsn(value);
+                } else if (fieldType == Character.class) {
+                    emitInt(mv, value.length() == 1 ? value.charAt(0) : Integer.decode(value));
+                    mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;");
+                } else if (fieldType == Class.class) {
+                    try {
+                        mv.visitLdcInsn(Class.forName(value, false, StubGenerator.INSTANCE));
+                    } catch (ClassNotFoundException e) {
+                        throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
+                    }
+                } else {
+                    try {
+                        Method valueOf = fieldType.getMethod("valueOf", String.class);
+                        if (!Modifier.isStatic(valueOf.getModifiers()) || valueOf.getReturnType() != fieldType) {
+                            throw new NoSuchMethodException("valueOf(String) is not found in class " + fieldType.getName());
+                        }
+                        mv.visitLdcInsn(value);
+                        emitInvoke(mv, valueOf);
+                    } catch (NoSuchMethodException e) {
+                        throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
+                    }
+                }
+        }
+
+        if (Modifier.isFinal(field.getModifiers())) {
+            mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
+        } else {
+            emitPutField(mv, field);
+        }
+    }
+
+    private static void checkFieldType(MethodVisitor mv, Class fieldType) {
+        if ((Repository.getOptions() & Repository.CHECK_FIELD_TYPE) != 0 && !fieldType.isPrimitive()) {
+            emitTypeCast(mv, Object.class, fieldType);
+        }
     }
 
     private static void emitTypeCast(MethodVisitor mv, Class<?> src, Class<?> dst) {
@@ -292,7 +421,7 @@ public class DelegateGenerator extends StubGenerator {
         // Dst.valueOf(src)
         try {
             Method m = dst.getMethod("valueOf", src);
-            if (Modifier.isStatic(m.getModifiers())) {
+            if (Modifier.isStatic(m.getModifiers()) && m.getReturnType() == dst) {
                 emitInvoke(mv, m);
                 return;
             }
@@ -309,7 +438,7 @@ public class DelegateGenerator extends StubGenerator {
         }
 
         // The types are not convertible, just leave the default value
-        mv.visitInsn(FieldType.valueOf(src).dataSize == 8 ? POP2 : POP);
-        mv.visitInsn(FieldType.valueOf(dst).defaultOpcode);
+        mv.visitInsn(FieldType.valueOf(src).convertTo(FieldType.Void));
+        mv.visitInsn(FieldType.Void.convertTo(FieldType.valueOf(dst)));
     }
 }

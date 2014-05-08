@@ -34,7 +34,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
         this(null, address, capacity);
     }
 
-    private DataStream(byte[] array, long address, int length) {
+    protected DataStream(byte[] array, long address, long length) {
         this.array = array;
         this.address = address;
         this.limit = address + length;
@@ -139,6 +139,10 @@ public class DataStream implements ObjectInput, ObjectOutput {
         }
     }
 
+    public void writeFrom(long address, int len) {
+        unsafe.copyMemory(null, address, array, alloc(len), len);
+    }
+
     public int read() {
         return unsafe.getByte(array, alloc(1));
     }
@@ -238,6 +242,10 @@ public class DataStream implements ObjectInput, ObjectOutput {
             serializer = Repository.requestBootstrapSerializer(b);
         }
         return serializer.read(this);
+    }
+
+    public void readTo(long address, int len) {
+        unsafe.copyMemory(array, alloc(len), null, address, len);
     }
 
     public int available() {

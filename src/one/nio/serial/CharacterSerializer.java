@@ -26,6 +26,11 @@ class CharacterSerializer extends Serializer<Character> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(2);
+    }
+
+    @Override
     public void toJson(Character v, StringBuilder builder) {
         Json.appendChar(builder, v);
     }

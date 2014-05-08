@@ -39,6 +39,14 @@ class ArrayListSerializer extends Serializer<ArrayList> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException, ClassNotFoundException {
+        int length = in.readInt();
+        for (int i = 0; i < length; i++) {
+            in.readObject();
+        }
+    }
+
+    @Override
     public void toJson(ArrayList obj, StringBuilder builder) throws IOException {
         builder.append('[');
         int length = obj.size();

@@ -1,9 +1,8 @@
 package one.nio.serial;
 
-import one.nio.async.CompletedFuture;
-import one.nio.rpc.RemoteMethodCall;
 import one.nio.mgt.Management;
 import one.nio.serial.gen.StubGenerator;
+import one.nio.util.JavaInternals;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -13,34 +12,45 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.math.BigInteger;
+import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Repository {
     public static final Log log = LogFactory.getLog(Repository.class);
 
     static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
     static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
+    static final HashMap<Method, MethodSerializer> methodMap = new HashMap<Method, MethodSerializer>();
     static final Serializer[] bootstrapSerializers = new Serializer[128];
     static final IdentityHashMap<Class, Integer> serializationOptions = new IdentityHashMap<Class, Integer>();
     static final HashMap<String, Class> renamedClasses = new HashMap<String, Class>();
+    static final AtomicInteger anonymousClasses = new AtomicInteger();
     static final int ENUM = 0x4000;
+
+    public static final MethodSerializer provide =
+            registerMethod(JavaInternals.getMethod(Repository.class, "provideSerializer", Serializer.class));
+    public static final MethodSerializer request =
+            registerMethod(JavaInternals.getMethod(Repository.class, "requestSerializer", long.class));
 
     public static final int SKIP_READ_OBJECT  = 1;
     public static final int SKIP_WRITE_OBJECT = 2;
     public static final int SKIP_CUSTOM_SERIALIZATION = SKIP_READ_OBJECT | SKIP_WRITE_OBJECT;
     public static final int INLINE = 4;
+    public static final int FIELD_SERIALIZATION = 8;
 
-    public static final int ALL_STUBS        = -1;
     public static final int ARRAY_STUBS      = 1;
     public static final int COLLECTION_STUBS = 2;
     public static final int MAP_STUBS        = 4;
     public static final int ENUM_STUBS       = 8;
     public static final int CUSTOM_STUBS     = 16;
+    public static final int CHECK_FIELD_TYPE = 256;
 
-    static long nextBootstrapUid = -10;
-    static int anonymousClasses = 0;
-    static int stubOptions = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS;
+    private static long nextBootstrapUid = -10;
+    private static int options = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS | CUSTOM_STUBS;
 
     static {
         addBootstrap(new IntegerSerializer());
@@ -100,16 +110,16 @@ public class Repository {
         }
 
         addBootstrap(new TimestampSerializer());
-        addBootstrap(new GeneratedSerializer(RemoteMethodCall.class));
-        addBootstrap(new GeneratedSerializer(CompletedFuture.class));
+        addBootstrap(new RemoteCallSerializer());
+        addBootstrap(new ExternalizableSerializer(MethodSerializer.class));
 
         // Unable to run readObject/writeObject for the following classes.
         // Fortunately standard serialization works well for them.
-        setOptions("java.net.InetAddress", SKIP_CUSTOM_SERIALIZATION);
-        setOptions("java.net.InetSocketAddress", SKIP_CUSTOM_SERIALIZATION);
-        setOptions("java.lang.StringBuilder", SKIP_CUSTOM_SERIALIZATION);
-        setOptions("java.lang.StringBuffer", SKIP_CUSTOM_SERIALIZATION);
-        setOptions("java.math.BigInteger", SKIP_CUSTOM_SERIALIZATION);
+        setOptions(InetAddress.class, SKIP_CUSTOM_SERIALIZATION);
+        setOptions(InetSocketAddress.class, SKIP_CUSTOM_SERIALIZATION);
+        setOptions(StringBuilder.class, SKIP_CUSTOM_SERIALIZATION);
+        setOptions(StringBuffer.class, SKIP_CUSTOM_SERIALIZATION);
+        setOptions(BigInteger.class, SKIP_CUSTOM_SERIALIZATION);
 
         // At some moment InetAddress fields were moved to an auxilary holder class.
         // This resolves backward compatibility problem by inlining holder fields during serialization.
@@ -124,9 +134,23 @@ public class Repository {
         provideSerializer(serializer);
     }
 
-    public static Serializer get(Class cls) {
+    @SuppressWarnings("unchecked")
+    public static <T> Serializer<T> get(Class<T> cls) {
         Serializer result = classMap.get(cls);
         return result != null ? result : generateFor(cls);
+    }
+
+    public static MethodSerializer get(Method method) {
+        return methodMap.get(method);
+    }
+
+    public static MethodSerializer registerMethod(Method method) {
+        MethodSerializer result = methodMap.get(method);
+        if (result == null) {
+            result = new MethodSerializer(method);
+            provideSerializer(result);
+        }
+        return result;
     }
 
     public static boolean preload(Class... classes) {
@@ -153,25 +177,32 @@ public class Repository {
         if (oldSerializer != null && oldSerializer.cls != serializer.cls) {
             throw new IllegalStateException("UID collision: " + serializer.cls + " overwrites " + oldSerializer.cls);
         }
+
         if (serializer.uid < 0) {
             bootstrapSerializers[128 + (int) serializer.uid] = serializer;
         }
-        if (serializer.original) {
-            classMap.put(serializer.cls, serializer);
+
+        if (serializer.origin != Origin.EXTERNAL) {
+            if (serializer instanceof MethodSerializer) {
+                MethodSerializer methodSerializer = (MethodSerializer) serializer;
+                methodMap.put(methodSerializer.method, methodSerializer);
+            } else {
+                classMap.put(serializer.cls, serializer);
+            }
         }
     }
 
     public static void setOptions(String className, int options) {
-        Class cls;
         try {
-            cls = Class.forName(className, false, StubGenerator.INSTANCE);
+            Class cls = Class.forName(className, false, StubGenerator.INSTANCE);
+            setOptions(cls, options);
         } catch (ClassNotFoundException e) {
-            return;
+            // Ignore
         }
+    }
 
-        synchronized (Repository.class) {
-            serializationOptions.put(cls, options);
-        }
+    public static synchronized void setOptions(Class cls, int options) {
+        serializationOptions.put(cls, options);
     }
 
     public static boolean hasOptions(Class cls, int options) {
@@ -179,12 +210,12 @@ public class Repository {
         return value != null && (value & options) == options;
     }
 
-    public static void setStubOptions(int options) {
-        stubOptions = options;
+    public static void setOptions(int options) {
+        Repository.options = options;
     }
 
-    public static int getStubOptions() {
-        return stubOptions;
+    public static int getOptions() {
+        return options;
     }
 
     public static byte[] saveSnapshot() throws IOException {
@@ -239,7 +270,7 @@ public class Repository {
         }
     }
 
-    private static synchronized Serializer[] getSerializers(Map<?, Serializer> map) {
+    private static synchronized Serializer[] getSerializers(Map<?, ? extends Serializer> map) {
         return map.values().toArray(new Serializer[map.size()]);
     }
 
@@ -258,9 +289,9 @@ public class Repository {
                 serializer = new EnumSerializer(cls);
             } else if (Externalizable.class.isAssignableFrom(cls)) {
                 serializer = new ExternalizableSerializer(cls);
-            } else if (Collection.class.isAssignableFrom(cls)) {
+            } else if (Collection.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
                 serializer = new CollectionSerializer(cls);
-            } else if (Map.class.isAssignableFrom(cls)) {
+            } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
                 serializer = new MapSerializer(cls);
             } else if (Serializable.class.isAssignableFrom(cls)) {
                 serializer = new GeneratedSerializer(cls);
@@ -268,11 +299,12 @@ public class Repository {
                 serializer = new InvalidSerializer(cls);
             }
 
+            serializer.generateUid();
             provideSerializer(serializer);
 
             if (cls.isAnonymousClass()) {
                 log.warn("Trying to serialize anonymous class: " + cls.getName());
-                anonymousClasses++;
+                anonymousClasses.incrementAndGet();
             }
 
             Renamed renamed = cls.getAnnotation(Renamed.class);

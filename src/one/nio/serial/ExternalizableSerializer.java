@@ -38,7 +38,12 @@ public class ExternalizableSerializer extends Serializer<Externalizable> {
         result.readExternal(in);
         return result;
     }
-    
+
+    @Override
+    public void skip(DataStream in) throws IOException, ClassNotFoundException {
+        read(in);
+    }
+
     @Override
     public void toJson(Externalizable obj, StringBuilder builder) throws NotSerializableException {
         throw new NotSerializableException(cls.getName());

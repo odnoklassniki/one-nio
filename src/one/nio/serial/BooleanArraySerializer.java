@@ -39,6 +39,11 @@ class BooleanArraySerializer extends Serializer<boolean[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt());
+    }
+
+    @Override
     public void toJson(boolean[] obj, StringBuilder builder) {
         builder.append('[');
         if (obj.length > 0) {

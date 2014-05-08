@@ -39,6 +39,11 @@ class DoubleArraySerializer extends Serializer<double[]> {
     }
 
     @Override
+    public void skip(DataStream in) throws IOException {
+        in.skipBytes(in.readInt() * 8);
+    }
+
+    @Override
     public void toJson(double[] obj, StringBuilder builder) {
         builder.append('[');
         if (obj.length > 0) {

@@ -24,6 +24,11 @@ class InvalidSerializer extends Serializer {
     }
 
     @Override
+    public void skip(DataStream in) throws NotSerializableException {
+        throw new NotSerializableException(cls.getName());
+    }
+
+    @Override
     public void toJson(Object obj, StringBuilder builder) throws NotSerializableException {
         throw new NotSerializableException(cls.getName());
     }
