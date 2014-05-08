@@ -134,6 +134,52 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         }
     }
 
+    public static void emitBoxing(MethodVisitor mv, Class type) {
+        if (type == boolean.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;");
+        } else if (type == byte.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;");
+        } else if (type == char.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;");
+        } else if (type == short.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;");
+        } else if (type == int.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;");
+        } else if (type == float.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;");
+        } else if (type == long.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;");
+        } else if (type == double.class) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;");
+        } else if (type == void.class) {
+            mv.visitInsn(ACONST_NULL);
+        } else {
+            throw new IllegalArgumentException("Not a primitive type: " + type);
+        }
+    }
+
+    public static void emitUnboxing(MethodVisitor mv, Class type) {
+        if (type == Boolean.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z");
+        } else if (type == Byte.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B");
+        } else if (type == Character.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C");
+        } else if (type == Short.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S");
+        } else if (type == Integer.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I");
+        } else if (type == Float.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F");
+        } else if (type == Long.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J");
+        } else if (type == Double.class) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D");
+        } else {
+            throw new IllegalArgumentException("Not a wrapper type: " + type);
+        }
+    }
+
     @Override
     public String getDumpPath() {
         return dumpPath;
