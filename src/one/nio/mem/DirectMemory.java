@@ -30,6 +30,16 @@ public final class DirectMemory {
         return address;
     }
 
+    public static long allocateRaw(long size) {
+        long address = unsafe.allocateMemory(size);
+        unsafe.setMemory(address, size, (byte) 0);
+        return address;
+    }
+
+    public static void freeRaw(long address) {
+        unsafe.freeMemory(address);
+    }
+
     public static long getAddress(ByteBuffer buffer) {
         return unsafe.getLong(buffer, addressOffset);
     }
@@ -39,6 +49,25 @@ public final class DirectMemory {
         unsafe.putLong(result, addressOffset, address);
         result.limit(count);
         return result;
+    }
+
+    public static boolean compare(Object obj1, long offset1, Object obj2, long offset2, int count) {
+        for (; count >= 8; count -= 8) {
+            if (unsafe.getLong(obj1, offset1) != unsafe.getLong(obj2, offset2)) return false;
+            offset1 += 8;
+            offset2 += 8;
+        }
+        if ((count & 4) != 0) {
+            if (unsafe.getInt(obj1, offset1) != unsafe.getInt(obj2, offset2)) return false;
+            offset1 += 4;
+            offset2 += 4;
+        }
+        if ((count & 2) != 0) {
+            if (unsafe.getShort(obj1, offset1) != unsafe.getShort(obj2, offset2)) return false;
+            offset1 += 2;
+            offset2 += 2;
+        }
+        return (count & 1) == 0 || unsafe.getByte(obj1, offset1) == unsafe.getByte(obj2, offset2);
     }
 
     private static ByteBuffer createPrototype() {

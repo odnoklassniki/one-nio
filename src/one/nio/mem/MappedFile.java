@@ -12,15 +12,26 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public class MappedFile implements Closeable {
-    private static Method map0 = JavaInternals.getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
-    private static Method unmap0 = JavaInternals.getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
+    private static final Method map0 = JavaInternals.getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
+    private static final Method unmap0 = JavaInternals.getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
+
+    private static final int STATE_CLOSED = 0;
+    private static final int STATE_MALLOC = 1;
+    private static final int STATE_MMAP   = 2;
 
     public static final int MAP_RO = 0;
     public static final int MAP_RW = 1;
     public static final int MAP_PV = 2;
 
-    private long addr;
-    private long size;
+    private final long addr;
+    private final long size;
+    private int state;
+
+    public MappedFile(long size) {
+        this.addr = DirectMemory.allocateRaw(size);
+        this.size = size;
+        this.state = STATE_MALLOC;
+    }
 
     public MappedFile(String name, long size) throws IOException {
         this(name, size, MAP_RW);
@@ -40,16 +51,19 @@ public class MappedFile implements Closeable {
 
             this.addr = map(f, mode, 0, size);
             this.size = size;
+            this.state = STATE_MMAP;
         } finally {
             f.close();
         }
     }
 
     public void close() {
-        if (addr != 0) {
+        if (state == STATE_MALLOC) {
+            DirectMemory.freeRaw(addr);
+        } else if (state == STATE_MMAP) {
             unmap(addr, size);
-            addr = 0;
         }
+        state = STATE_CLOSED;
     }
 
     public final long getAddr() {

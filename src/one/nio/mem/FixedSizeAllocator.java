@@ -28,6 +28,19 @@ public class FixedSizeAllocator {
         requestMoreMemory();
     }
 
+    public FixedSizeAllocator(long startAddress, long totalMemory, long entrySize) {
+        this.entrySize = entrySize;
+        this.chunkSize = 0;
+        this.totalMemory = totalMemory;
+        this.head = startAddress;
+
+        // Create linked list of free entries
+        long lastEntry = startAddress + (totalMemory / entrySize - 1) * entrySize;
+        for (long entry = startAddress; entry < lastEntry; ) {
+            unsafe.putAddress(entry, entry += entrySize);
+        }
+    }
+
     public long entrySize() {
         return entrySize;
     }
@@ -90,6 +103,9 @@ public class FixedSizeAllocator {
     // Override this with a custom way to get a large chunk of the off-heap memory
     // Note that this memory becomes the allocator's property and is never returned back
     protected long getMemoryFromSystem(long size) {
+        if (size == 0) {
+            throw new OutOfMemoryException("FixedSizeAllocator has reached its limit");
+        }
         return unsafe.allocateMemory(size);
     }
 }
