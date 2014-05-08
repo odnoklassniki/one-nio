@@ -4,6 +4,8 @@ import junit.framework.Assert;
 import junit.framework.TestCase;
 
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -12,6 +14,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
@@ -174,5 +177,57 @@ public class SerializationTest extends TestCase {
         checkSerializeToString(new StringBuilder("asdasd").append(123).append(true));
         checkSerializeToString(new StringBuffer());
         checkSerializeToString(new StringBuffer(1000).append(new Object()).append("zzz").append(1234.56789));
+    }
+
+    private static class ReadObject1 implements Serializable {
+        private Object[] array = new String[] {"regular", "array"};
+
+        private void readObject(ObjectInputStream in) {
+            for (Object o : array) {
+                o.toString();
+            }
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof ReadObject1)) {
+                return false;
+            }
+            ReadObject1 other = (ReadObject1) obj;
+            return Arrays.equals(array, other.array);
+        }
+    }
+
+    private static class ReadObject2 implements Serializable {
+        private final Object[] array = new String[] {"final", "field"};
+
+        private void readObject(ObjectInputStream in) {
+            for (Object o : array) {
+                o.toString();
+            }
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof ReadObject2)) {
+                return false;
+            }
+            ReadObject2 other = (ReadObject2) obj;
+            return Arrays.equals(array, other.array);
+        }
+    }
+
+    public void testCompiledReadObject() throws IOException, ClassNotFoundException {
+        int rememberedOptions = Repository.getOptions();
+        Repository.setOptions(rememberedOptions | Repository.CHECK_FIELD_TYPE);
+
+        for (int i = 0; i < 20000; i++) {
+            checkSerialize(new ReadObject1());
+        }
+        for (int i = 0; i < 20000; i++) {
+            checkSerialize(new ReadObject2());
+        }
+
+        Repository.setOptions(rememberedOptions);
     }
 }

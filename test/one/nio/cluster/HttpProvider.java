@@ -51,7 +51,7 @@ public class HttpProvider implements ServiceProvider {
 
     @Override
     public boolean check() throws Exception {
-        Response response = client.get("/");
+        Response response = client.head("/");
         if (response.getStatus() >= 500) {
             throw new IOException(this + " check failed with status " + response.getHeaders()[0]);
         }

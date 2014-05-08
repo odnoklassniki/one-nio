@@ -35,8 +35,8 @@ public class RemoteCacheClient {
 
     @SuppressWarnings("unchecked")
     private static CacheService<Entity> getCacheService(String host) throws IOException {
-        String url = host + ':' + CacheService.DEFAULT_PORT;
-        RpcClient client = new RpcClient(new ConnectionString(url));
+        ConnectionString conn = new ConnectionString(host + ':' + CacheService.DEFAULT_PORT);
+        RpcClient client = new RpcClient(conn);
         return (CacheService<Entity>) Proxy.newProxyInstance(
                 CacheService.class.getClassLoader(), new Class[] { CacheService.class }, client);
     }
