@@ -9,7 +9,7 @@ import java.util.concurrent.TimeoutException;
 public class CombinedFuture<V> implements Future<V[]>, Serializable {
     private Future<V>[] futures;
 
-    public CombinedFuture(Future<V>[] futures) {
+    public CombinedFuture(Future<V>... futures) {
         this.futures = futures;
     }
 
