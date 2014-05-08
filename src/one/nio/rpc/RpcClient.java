@@ -10,24 +10,18 @@ import one.nio.serial.Repository;
 import one.nio.serial.SerializeStream;
 import one.nio.serial.Serializer;
 import one.nio.serial.SerializerNotFoundException;
-import one.nio.util.JavaInternals;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.net.SocketException;
 
-public class RpcClient extends SocketPool implements RpcService, InvocationHandler {
-    public static final Method provideSerializerMethod =
-            JavaInternals.getMethod(Repository.class, "provideSerializer", Serializer.class);
-    public static final Method requestSerializerMethod =
-            JavaInternals.getMethod(Repository.class, "requestSerializer", long.class);
+public class RpcClient extends SocketPool implements InvocationHandler {
 
     public RpcClient(ConnectionString conn) throws IOException {
         super(conn, 0);
     }
 
-    @Override
     public Object invoke(Object request) throws Exception {
         byte[] buffer = invokeRaw(request);
 
@@ -36,14 +30,16 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
             try {
                 response = new DeserializeStream(buffer).readObject();
             } catch (SerializerNotFoundException e) {
-                requestSerializer(e.getUid());
+                long uid = e.getUid();
+                Repository.provideSerializer(requestSerializer(uid));
                 continue;
             }
 
             if (!(response instanceof Exception)) {
                 return response;
             } else if (response instanceof SerializerNotFoundException) {
-                provideSerializer(((SerializerNotFoundException) response).getUid());
+                long uid = ((SerializerNotFoundException) response).getUid();
+                provideSerializer(Repository.requestSerializer(uid));
                 buffer = invokeRaw(request);
             } else {
                 throw (Exception) response;
@@ -52,29 +48,25 @@ public class RpcClient extends SocketPool implements RpcService, InvocationHandl
     }
 
     @Override
-    public Object invoke(Object proxy, Method m, Object... args) throws Exception {
-        return invoke(getInvocationObject(m, args));
+    public Object invoke(Object proxy, Method method, Object... args) throws Exception {
+        return invoke(new RemoteCall(method, args));
     }
 
-    protected Object getInvocationObject(Method m, Object... args) throws Exception {
-        return new RemoteMethodCall(m, args);
+    protected void provideSerializer(Serializer serializer) throws Exception {
+        invokeServiceRequest(new RemoteCall(Repository.provide, serializer));
     }
 
-    protected void provideSerializer(long uid) throws Exception {
-        Serializer serializer = Repository.requestSerializer(uid);
-        Object remoteMethodCall = getInvocationObject(provideSerializerMethod, serializer);
-        byte[] rawResponse = invokeRaw(remoteMethodCall);
+    protected Serializer requestSerializer(long uid) throws Exception {
+        return (Serializer) invokeServiceRequest(new RemoteCall(Repository.request, uid));
+    }
+
+    protected Object invokeServiceRequest(Object request) throws Exception {
+        byte[] rawResponse = invokeRaw(request);
         Object response = new DeserializeStream(rawResponse).readObject();
         if (response instanceof Exception) {
             throw (Exception) response;
         }
-    }
-
-    protected void requestSerializer(long uid) throws Exception {
-        Object remoteMethodCall = getInvocationObject(requestSerializerMethod, uid);
-        byte[] rawResponse = invokeRaw(remoteMethodCall);
-        Serializer serializer = (Serializer) new DeserializeStream(rawResponse).readObject();
-        Repository.provideSerializer(serializer);
+        return response;
     }
 
     private byte[] invokeRaw(Object request) throws Exception {

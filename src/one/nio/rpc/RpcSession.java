@@ -31,7 +31,6 @@ public class RpcSession extends Session {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     protected void processRead(byte[] unusedBuffer) throws Exception {
         byte[] buffer = this.buffer;
         int bytesRead = this.bytesRead;
@@ -129,7 +128,6 @@ public class RpcSession extends Session {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public void run() {
             try {
                 writeResponse(server.invoke(request));
