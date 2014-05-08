@@ -1,11 +1,12 @@
 package one.nio.pool;
 
+import one.nio.mgt.Management;
 import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
 
 import java.io.IOException;
 
-public class SocketPool extends Pool<Socket> {
+public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected String host;
     protected int port;
     protected int readTimeout;
@@ -19,12 +20,77 @@ public class SocketPool extends Pool<Socket> {
         this.port = conn.getPort() != 0 ? conn.getPort() : defaultPort;
         this.readTimeout = conn.getIntParam("readTimeout", timeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", readTimeout);
+
+        if (conn.getBooleanParam("jmx", false)) {
+            Management.registerMXBean(this, "one.nio.pool:type=SocketPool,host=" + host + ",port=" + port);
+        }
+
         initialize();
     }
 
     @Override
     public String name() {
         return "SocketPool[" + host + ':' + port + ']';
+    }
+
+    @Override
+    public int getTimeouts() {
+        return timeouts;
+    }
+
+    @Override
+    public int getWaitingThreads() {
+        return waitingThreads;
+    }
+
+    @Override
+    public int getBusyCount() {
+        return createdCount - size();
+    }
+
+    @Override
+    public int getIdleCount() {
+        return size();
+    }
+
+    @Override
+    public int getMaxCount() {
+        return maxCount;
+    }
+
+    @Override
+    public void setMaxCount(int maxCount) {
+        this.maxCount = maxCount;
+    }
+
+    @Override
+    public int getTimeout() {
+        return timeout;
+    }
+
+    @Override
+    public void setTimeout(int timeout) {
+        this.timeout = timeout;
+    }
+
+    @Override
+    public int getReadTimeout() {
+        return readTimeout;
+    }
+
+    @Override
+    public void setReadTimeout(int readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    @Override
+    public int getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    @Override
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
     @Override
