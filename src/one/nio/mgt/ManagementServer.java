@@ -6,9 +6,12 @@ import one.nio.http.HttpSession;
 import one.nio.http.Request;
 import one.nio.http.Response;
 import one.nio.net.ConnectionString;
+import one.nio.util.Utf8;
 
 import javax.management.JMException;
+import javax.management.ObjectName;
 import java.io.IOException;
+import java.util.Set;
 
 public class ManagementServer extends HttpServer {
 
@@ -36,6 +39,11 @@ public class ManagementServer extends HttpServer {
         return getJmxResponse(request, "one.nio.mem:type=MallocMT,*", "TotalMemory,UsedMemory,FreeMemory", true);
     }
 
+    @HttpHandler("/monitor/shm")
+    public Response getMonitorShmResponse(Request request) {
+        return getJmxResponse(request, "one.nio.mem:type=SharedMemoryMap,*", "TotalMemory,UsedMemory,FreeMemory,Capacity,Count", true);
+    }
+
     @HttpHandler("/monitor/server")
     public Response getMonitorServerResponse(Request request) {
         return getJmxResponse(request, "one.nio.server:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady", true);
@@ -58,27 +66,24 @@ public class ManagementServer extends HttpServer {
             }
         }
 
-        String result;
         try {
-            if (attr.indexOf(',') < 0) {
-                result = toString(Management.getAttribute(name, attr));
-            } else {
-                result = toString(Management.getAttributes(name, attr.split(",")));
+            Set<ObjectName> objNames = Management.resolvePattern(name);
+            String[] attributes = attr.split(",");
+            StringBuilder result = new StringBuilder();
+
+            for (ObjectName objName : objNames) {
+                result.append(objName.toString());
+                Object[] values = Management.getAttributes(objName, attributes);
+                for (int i = 0; i < values.length; i++) {
+                    result.append(i == 0 ? '\t' : ' ').append(values[i]);
+                }
+                result.append("\r\n");
             }
+
+            return Response.ok(result.toString());
         } catch (JMException e) {
-            result = e + "\r\n";
+            String errorMessage = e.toString() + "\r\n";
+            return new Response(Response.INTERNAL_ERROR, Utf8.toBytes(errorMessage));
         }
-
-        return Response.ok(result);
-    }
-
-    protected static String toString(Object... values) {
-        StringBuilder builder = new StringBuilder();
-        for (Object value : values) {
-            if (builder.length() != 0) builder.append(' ');
-            builder.append(value);
-        }
-        builder.append("\r\n");
-        return builder.toString();
     }
 }

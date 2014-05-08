@@ -11,10 +11,20 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 import java.lang.management.ManagementFactory;
+import java.util.Collections;
 import java.util.Set;
 
 public class Management {
     private static final Log log = LogFactory.getLog(Management.class);
+
+    static {
+        try {
+            Object hotspotInternal = Class.forName("sun.management.HotspotInternal").newInstance();
+            ManagementFactory.getPlatformMBeanServer().registerMBean(hotspotInternal, null);
+        } catch (Exception e) {
+            log.warn("Cannot register HotspotInternal: " + e);
+        }
+    }
 
     public static void registerMXBean(Object object, String name) {
         try {
@@ -44,31 +54,36 @@ public class Management {
     }
 
     public static Object getAttribute(String name, String attribute) throws JMException {
-        ObjectName objName = resolveName(name);
+        return getAttribute(new ObjectName(name), attribute);
+    }
+
+    public static Object getAttribute(ObjectName objName, String attribute) throws JMException {
         return ManagementFactory.getPlatformMBeanServer().getAttribute(objName, attribute);
     }
 
-    public static Object[] getAttributes(String name, String[] attributes) throws JMException {
-        ObjectName objName = resolveName(name);
-        AttributeList list = ManagementFactory.getPlatformMBeanServer().getAttributes(objName, attributes);
+    public static Object getAttributes(String name, String... attributes) throws JMException {
+        return getAttributes(new ObjectName(name), attributes);
+    }
 
-        Object[] values = new Object[attributes.length];
+    public static Object[] getAttributes(ObjectName objName, String... attributes) throws JMException {
+        AttributeList list = ManagementFactory.getPlatformMBeanServer().getAttributes(objName, attributes);
+        Object[] values = new Object[list.size()];
         for (int i = 0; i < values.length; i++) {
             values[i] = ((Attribute) list.get(i)).getValue();
         }
-        return  values;
+        return values;
     }
 
-    private static ObjectName resolveName(String name) throws JMException {
+    public static Set<ObjectName> resolvePattern(String name) throws JMException {
         ObjectName objName = new ObjectName(name);
         if (name.indexOf('*') < 0 && name.indexOf('?') < 0) {
-            return objName;
+            return Collections.singleton(objName);
         }
 
         Set<ObjectName> objNames = ManagementFactory.getPlatformMBeanServer().queryNames(objName, null);
         if (objNames.isEmpty()) {
             throw new InstanceNotFoundException(name);
         }
-        return objNames.iterator().next();
+        return objNames;
     }
 }
