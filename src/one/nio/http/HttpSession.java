@@ -15,10 +15,6 @@ public class HttpSession extends Session {
     private static final int MAX_HEADERS = 32;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
 
-    private static final byte[] GET = Utf8.toBytes("GET ");
-    private static final byte[] POST = Utf8.toBytes("POST ");
-    private static final byte[] HEAD = Utf8.toBytes("HEAD ");
-
     protected final HttpServer server;
     private byte[] fragment;
     private int fragmentLength;
@@ -75,20 +71,22 @@ public class HttpSession extends Session {
         return lineStart;
     }
 
-    private Request parseRequest(byte[] buffer, int start, int length) throws HttpException {
-        if (length > 13 && Utf8.startsWith(GET, buffer, start)) {
+    protected Request parseRequest(byte[] buffer, int start, int length) throws HttpException {
+        if (length > 13 && Utf8.startsWith(Request.VERB_GET, buffer, start)) {
             return new Request(Request.METHOD_GET, Utf8.read(buffer, start + 4, length - 13), MAX_HEADERS);
-        } else if (length > 14 && Utf8.startsWith(POST, buffer, start)) {
+        } else if (length > 14 && Utf8.startsWith(Request.VERB_POST, buffer, start)) {
             return new Request(Request.METHOD_POST, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS);
-        } else if (length > 14 && Utf8.startsWith(HEAD, buffer, start)) {
+        } else if (length > 14 && Utf8.startsWith(Request.VERB_HEAD, buffer, start)) {
             return new Request(Request.METHOD_HEAD, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS);
+        } else if (length > 17 && Utf8.startsWith(Request.VERB_OPTIONS, buffer, start)) {
+            return new Request(Request.METHOD_OPTIONS, Utf8.read(buffer, start + 8, length - 17), MAX_HEADERS);
         }
         throw new HttpException("Invalid request");
     }
 
     public void writeResponse(Request request, Response response) throws IOException {
         server.incRequestsProcessed();
-        boolean close = !"Keep-Alive".equalsIgnoreCase(request.getHeader("Connection: "));
+        boolean close = "close".equalsIgnoreCase(request.getHeader("Connection: "));
         response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
         byte[] bytes = response.toBytes(request.getMethod() != Request.METHOD_HEAD);
         super.write(bytes, 0, bytes.length);

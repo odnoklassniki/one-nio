@@ -22,6 +22,7 @@ public class HttpClient extends SocketPool {
     }
 
     public Response invoke(Request request) throws Exception {
+        int method = request.getMethod();
         byte[] rawRequest = request.toBytes();
         ResponseReader responseReader;
 
@@ -39,7 +40,7 @@ public class HttpClient extends SocketPool {
                 responseReader = new ResponseReader(socket, BUFFER_SIZE);
             }
 
-            Response response = responseReader.readResponse();
+            Response response = responseReader.readResponse(method);
             keepAlive = "Keep-Alive".equalsIgnoreCase(response.getHeader("Connection: "));
             return response;
         } finally {
@@ -57,6 +58,10 @@ public class HttpClient extends SocketPool {
 
     public Response post(String uri, String... headers) throws Exception {
         return invoke(createRequest(Request.METHOD_POST, uri, headers));
+    }
+
+    public Response head(String uri, String... headers) throws Exception {
+        return invoke(createRequest(Request.METHOD_HEAD, uri, headers));
     }
 
     private Request createRequest(int method, String uri, String... headers) {
@@ -81,7 +86,7 @@ public class HttpClient extends SocketPool {
             this.length = socket.read(buf, 0, bufferSize);
         }
 
-        Response readResponse() throws IOException, HttpException {
+        Response readResponse(int method) throws IOException, HttpException {
             String responseHeader = readLine();
             if (responseHeader.length() <= 9) {
                 throw new HttpException("Invalid response header: " + responseHeader);
@@ -92,20 +97,21 @@ public class HttpClient extends SocketPool {
                 response.addHeader(header);
             }
 
-            String contentLength = response.getHeader("Content-Length: ");
-
-            if (contentLength != null) {
-                byte[] body = new byte[Integer.parseInt(contentLength)];
-                int contentBytes = length - pos;
-                System.arraycopy(buf, pos, body, 0, contentBytes);
-                if (contentBytes < body.length) {
-                    socket.readFully(body, contentBytes, body.length - contentBytes);
+            if (method != Request.METHOD_HEAD) {
+                String contentLength = response.getHeader("Content-Length: ");
+                if (contentLength != null) {
+                    byte[] body = new byte[Integer.parseInt(contentLength)];
+                    int contentBytes = length - pos;
+                    System.arraycopy(buf, pos, body, 0, contentBytes);
+                    if (contentBytes < body.length) {
+                        socket.readFully(body, contentBytes, body.length - contentBytes);
+                    }
+                    response.setBody(body);
+                } else if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding: "))) {
+                    response.setBody(readChunkedBody());
+                } else {
+                    throw new HttpException("Content-Length unspecified");
                 }
-                response.setBody(body);
-            } else if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding: "))) {
-                response.setBody(readChunkedBody());
-            } else {
-                throw new HttpException("Content-Length unspecified");
             }
 
             return response;

@@ -5,7 +5,7 @@ import one.nio.util.Utf8;
 
 import java.util.Arrays;
 
-public final class Response implements Cloneable {
+public final class Response {
     public static final String CONTINUE                        = "100 Continue";
     public static final String SWITCHING_PROTOCOLS             = "101 Switching Protocols";
     public static final String OK                              = "200 OK";
@@ -70,7 +70,7 @@ public final class Response implements Cloneable {
         this.body = body;
     }
     
-    private Response(Response prototype) {
+    public Response(Response prototype) {
         this.headerCount = prototype.headerCount;
         this.headers = Arrays.copyOf(prototype.headers, prototype.headerCount + 4);
         this.body = prototype.body;
@@ -153,10 +153,5 @@ public final class Response implements Cloneable {
     @Override
     public String toString() {
         return Utf8.toString(toBytes(true));
-    }
-
-    @Override
-    public Response clone() {
-        return new Response(this);
     }
 }

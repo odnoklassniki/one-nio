@@ -4,16 +4,23 @@ import one.nio.util.ByteArrayBuilder;
 import one.nio.util.URLEncoder;
 import one.nio.util.Utf8;
 
-public final class Request implements Cloneable {
-    public static final int METHOD_GET  = 1;
-    public static final int METHOD_POST = 2;
-    public static final int METHOD_HEAD = 3;
+public final class Request {
+    public static final int METHOD_GET     = 1;
+    public static final int METHOD_POST    = 2;
+    public static final int METHOD_HEAD    = 3;
+    public static final int METHOD_OPTIONS = 4;
 
-    private static final byte[][] METHOD_PREFIX = {
+    public static final byte[] VERB_GET     = Utf8.toBytes("GET ");
+    public static final byte[] VERB_POST    = Utf8.toBytes("POST ");
+    public static final byte[] VERB_HEAD    = Utf8.toBytes("HEAD ");
+    public static final byte[] VERB_OPTIONS = Utf8.toBytes("OPTIONS ");
+
+    private static final byte[][] VERBS = {
             new byte[0],
-            Utf8.toBytes("GET "),
-            Utf8.toBytes("POST "),
-            Utf8.toBytes("HEAD " )
+            VERB_GET,
+            VERB_POST,
+            VERB_HEAD,
+            VERB_OPTIONS
     };
 
     private static final byte[] PROTOCOL_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
@@ -31,7 +38,7 @@ public final class Request implements Cloneable {
         this.headers = new String[maxHeaderCount];
     }
 
-    private Request(Request prototype) {
+    public Request(Request prototype) {
         this.method = prototype.method;
         this.uri = prototype.uri;
         this.headerCount = prototype.headerCount;
@@ -85,13 +92,13 @@ public final class Request implements Cloneable {
     }
 
     public byte[] toBytes() {
-        int estimatedSize = METHOD_PREFIX[method].length + Utf8.length(uri) + PROTOCOL_HEADER_LENGTH + headerCount * 2;
+        int estimatedSize = VERBS[method].length + Utf8.length(uri) + PROTOCOL_HEADER_LENGTH + headerCount * 2;
         for (int i = 0; i < headerCount; i++) {
             estimatedSize += headers[i].length();
         }
 
         ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
-        builder.append(METHOD_PREFIX[method]).append(uri).append(PROTOCOL_HEADER);
+        builder.append(VERBS[method]).append(uri).append(PROTOCOL_HEADER);
         for (int i = 0; i < headerCount; i++) {
             builder.append(headers[i]).append('\r').append('\n');
         }
@@ -101,10 +108,5 @@ public final class Request implements Cloneable {
     @Override
     public String toString() {
         return Utf8.toString(toBytes());
-    }
-
-    @Override
-    public Request clone() {
-        return new Request(this);
     }
 }
