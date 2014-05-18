@@ -218,16 +218,11 @@ public class SerializationTest extends TestCase {
     }
 
     public void testCompiledReadObject() throws IOException, ClassNotFoundException {
-        int rememberedOptions = Repository.getOptions();
-        Repository.setOptions(rememberedOptions | Repository.CHECK_FIELD_TYPE);
-
         for (int i = 0; i < 20000; i++) {
             checkSerialize(new ReadObject1());
         }
         for (int i = 0; i < 20000; i++) {
             checkSerialize(new ReadObject2());
         }
-
-        Repository.setOptions(rememberedOptions);
     }
 }

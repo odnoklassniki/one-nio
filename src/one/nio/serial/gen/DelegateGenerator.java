@@ -375,6 +375,10 @@ public class DelegateGenerator extends BytecodeGenerator {
     private static void checkFieldType(MethodVisitor mv, Class fieldType) {
         if ((Repository.getOptions() & Repository.CHECK_FIELD_TYPE) != 0 && !fieldType.isPrimitive()) {
             emitTypeCast(mv, Object.class, fieldType);
+        } else if (fieldType.isArray()) {
+            // Always cast arrays or otherwise JIT compiler may crash
+            Class targetType = Object[].class.isAssignableFrom(fieldType) ? Object[].class : fieldType;
+            emitTypeCast(mv, Object.class, targetType);
         }
     }
 
