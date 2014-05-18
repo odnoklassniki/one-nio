@@ -1,5 +1,7 @@
 package one.nio.mem;
 
+import java.util.Arrays;
+
 public class OffheapBlobMap extends OffheapMap<byte[], byte[]> {
     protected static final int KEY_OFFSET = HEADER_SIZE + 4;
 
@@ -17,11 +19,8 @@ public class OffheapBlobMap extends OffheapMap<byte[], byte[]> {
 
     @Override
     protected long hashCode(byte[] key) {
-        int result = 0;
-        for (byte b : key) {
-            result = ((result << 3) | (result >>> 29)) ^ (b & 0xff);
-        }
-        return (long) key.length << 32 | (result & 0xffffffffL);
+        int arrayHashCode = Arrays.hashCode(key);
+        return (long) key.length << 32 | (arrayHashCode & 0xffffffffL);
     }
 
     @Override

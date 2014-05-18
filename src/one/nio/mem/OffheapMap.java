@@ -86,6 +86,16 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     @Override
+    public double getCleanupThreshold() {
+        return cleanupThreshold;
+    }
+
+    @Override
+    public void setCleanupThreshold(double cleanupThreshold) {
+        this.cleanupThreshold = cleanupThreshold;
+    }
+
+    @Override
     public int getCapacity() {
         return capacity;
     }
@@ -126,7 +136,6 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     public void put(K key, V value) {
         long hashCode = hashCode(key);
         long currentPtr = bucketFor(hashCode);
-        long nextEntry = 0;
         int newSize = sizeOf(value);
 
         RWLock lock = lockFor(hashCode).lockWrite();
@@ -140,7 +149,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                         return;
                     }
 
-                    nextEntry = unsafe.getAddress(entry + NEXT_OFFSET);
+                    unsafe.putAddress(currentPtr, unsafe.getAddress(entry + NEXT_OFFSET));
                     destroyEntry(entry);
                     count.decrementAndGet();
                     break;
@@ -149,7 +158,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
             long entry = allocateEntry(key, hashCode, newSize);
             unsafe.putLong(entry + HASH_OFFSET, hashCode);
-            unsafe.putAddress(entry + NEXT_OFFSET, nextEntry);
+            unsafe.putAddress(entry + NEXT_OFFSET, unsafe.getAddress(currentPtr));
             setTimeAt(entry);
             setValueAt(entry, value);
 
@@ -268,7 +277,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     public boolean shouldCleanup() {
-        return getCapacity() - getCount() <= capacity * cleanupThreshold;
+        return getCapacity() - getCount() <= getCapacity() * cleanupThreshold;
     }
 
     public int cleanup() {
@@ -497,7 +506,6 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         public void setValue(V value) {
             int newSize = map.sizeOf(value);
-            long nextEntry = 0;
 
             if (entry != 0) {
                 int oldSize = map.sizeOf(entry);
@@ -507,7 +515,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     return;
                 }
 
-                nextEntry = unsafe.getAddress(entry + NEXT_OFFSET);
+                unsafe.putAddress(currentPtr, unsafe.getAddress(entry + NEXT_OFFSET));
                 map.destroyEntry(entry);
                 map.count.decrementAndGet();
             }
@@ -515,7 +523,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             long hash = map.hashCode(key);
             entry = map.allocateEntry(key, hash, newSize);
             unsafe.putLong(entry + HASH_OFFSET, hash);
-            unsafe.putAddress(entry + NEXT_OFFSET, nextEntry);
+            unsafe.putAddress(entry + NEXT_OFFSET, unsafe.getAddress(currentPtr));
             map.setTimeAt(entry);
             map.setValueAt(entry, value);
 
@@ -560,17 +568,17 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         public void run() {
             while (!isInterrupted()) {
                 try {
-                    sleep(cleanupInterval);
+                    sleep(getCleanupInterval());
 
                     long startTime = System.currentTimeMillis();
                     int expired = cleanup();
                     long elapsed = System.currentTimeMillis() - startTime;
 
-                    log.info("Cleaned " + expired + " entries in " + elapsed + " ms");
+                    log.info(getName() + " cleaned " + expired + " entries in " + elapsed + " ms");
                 } catch (InterruptedException e) {
                     break;
                 } catch (Throwable e) {
-                    log.error("Exception in CleanupThread", e);
+                    log.error("Exception in " + getName(), e);
                 }
             }
         }

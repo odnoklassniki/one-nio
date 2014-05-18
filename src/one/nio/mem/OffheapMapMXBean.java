@@ -9,4 +9,6 @@ public interface OffheapMapMXBean {
     void setTimeToLive(long timeToLive);
     long getCleanupInterval();
     void setCleanupInterval(long cleanupInterval);
+    double getCleanupThreshold();
+    void setCleanupThreshold(double cleanupThreshold);
 }

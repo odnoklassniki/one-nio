@@ -31,8 +31,8 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected static final int MAX_CUSTOM_DATA_SIZE = (int) (MAP_OFFSET - CUSTOM_DATA_OFFSET);
 
     protected final Serializer<V> serializer;
-    protected final String fileName;
     protected final MappedFile mmap;
+    protected final String name;
     protected MallocMT allocator;
 
     protected SharedMemoryMap(int capacity, String fileName, long fileSize) throws IOException {
@@ -46,21 +46,32 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected SharedMemoryMap(int capacity, Serializer<V> serializer, String fileName, long fileSize) throws IOException {
         super(capacity);
         this.serializer = serializer;
-        this.fileName = fileName;
-        this.mmap = fileName == null ? new MappedFile(fileSize) : new MappedFile(fileName, fileSize);
-        init();
+        if (fileName == null) {
+            this.mmap = new MappedFile(fileSize);
+            this.name = "anon." + Long.toHexString(mmap.getAddr());
+        } else {
+            this.mmap = new MappedFile(fileName, fileSize);
+            this.name = fileName;
+        }
 
         long mallocOffset = MAP_OFFSET + (long) this.capacity * 8;
+        if (mmap.getSize() <= mallocOffset) {
+            long minSize = (mallocOffset + (MB - 1)) / MB;
+            throw new IllegalArgumentException("Minimum SharedMemoryMap size is " + minSize + " MB");
+        }
+
+        init();
         createAllocator(mmap.getAddr() + mallocOffset, mmap.getSize() - mallocOffset);
         loadSchema();
 
-        Management.registerMXBean(this, "one.nio.mem:type=SharedMemoryMap,name=" + fileName);
+        Management.registerMXBean(this, "one.nio.mem:type=SharedMemoryMap,name=" + name);
     }
 
     @Override
     public void close() {
+        Management.unregisterMXBean("one.nio.mem:type=SharedMemoryMap,name=" + name);
+
         super.close();
-        Management.unregisterMXBean("one.nio.mem:type=SharedMemoryMap,name=" + fileName);
 
         storeSchema();
         setHeader(TIMESTAMP_OFFSET, System.currentTimeMillis());
@@ -70,12 +81,18 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     }
 
     private void init() {
+        boolean needCleanup = false;
         if (getHeader(SIGNATURE_OFFSET) != SIGNATURE_CLEAR) {
             log.info("Initial cleanup of SharedMemoryMap...");
+            needCleanup = true;
+        } else if (getHeader(CAPACITY_OFFSET) != capacity) {
+            log.info("SharedMemoryMap capacity has changed, performing cleanup...");
+            needCleanup = true;
+        }
+
+        if (needCleanup) {
             unsafe.setMemory(mmap.getAddr(), mmap.getSize(), (byte) 0);
             setHeader(CAPACITY_OFFSET, capacity);
-        } else if (getHeader(CAPACITY_OFFSET) != capacity) {
-            throw new IllegalArgumentException("SharedMemoryMap capacity has changed");
         }
 
         setHeader(SIGNATURE_OFFSET, SIGNATURE_DIRTY);
@@ -86,6 +103,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
             log.info("Relocating SharedMemoryMap...");
             relocate(mmap.getAddr() - oldBase);
         }
+        setHeader(BASE_OFFSET, mmap.getAddr());
     }
 
     private void relocate(long delta) {
@@ -189,16 +207,6 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     @Override
     public long getUsedMemory() {
         return allocator.getUsedMemory();
-    }
-
-    @Override
-    public double getCleanupThreshold() {
-        return cleanupThreshold;
-    }
-
-    @Override
-    public void setCleanupThreshold(double cleanupThreshold) {
-        this.cleanupThreshold = cleanupThreshold;
     }
 
     @Override
@@ -308,10 +316,10 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
                         int headerSize = headerSize(entry);
                         V value = oldSerializer.read(new DeserializeStream(entry + headerSize, Integer.MAX_VALUE));
 
-                        int oldSize = allocator.allocatedSize(entry);
-                        int newSize = headerSize + sizeOf(value);
+                        int oldSize = sizeOf(entry);
+                        int newSize = sizeOf(value);
                         if (newSize > oldSize) {
-                            long newEntry = localAllocator.malloc(newSize);
+                            long newEntry = localAllocator.malloc(headerSize + newSize);
                             unsafe.copyMemory(null, entry, null, newEntry, headerSize);
                             unsafe.putAddress(currentPtr, newEntry);
                             allocator.free(entry);

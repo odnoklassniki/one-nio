@@ -33,6 +33,11 @@ public class LongLongHashMap extends LongHashSet {
         return replaceValueAt(index, newValue);
     }
 
+    public long adjustOrPut(long key, long delta) {
+        int index = putKey(key);
+        return adjustValueAt(index, delta);
+    }
+
     public long remove(long key) {
         int index = getKey(key);
         return index >= 0 ? replaceValueAt(index, 0) : 0;
@@ -52,6 +57,17 @@ public class LongLongHashMap extends LongHashSet {
             long oldValue = unsafe.getLong(address);
             if (unsafe.compareAndSwapLong(null, address, oldValue, newValue)) {
                 return oldValue;
+            }
+        }
+    }
+
+    public final long adjustValueAt(int index, long delta) {
+        long address = values + (long) index * 8;
+        for (;;) {
+            long oldValue = unsafe.getLong(address);
+            long newValue = oldValue + delta;
+            if (unsafe.compareAndSwapLong(null, address, oldValue, newValue)) {
+                return newValue;
             }
         }
     }

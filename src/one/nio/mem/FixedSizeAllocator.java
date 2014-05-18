@@ -1,7 +1,6 @@
 package one.nio.mem;
 
 import one.nio.util.JavaInternals;
-
 import sun.misc.Unsafe;
 
 // Fast lock-free allocator that manages entries of the fixed size in a linked list
@@ -15,12 +14,12 @@ public class FixedSizeAllocator {
     private static final long COUNTER_INC  = ADDR_MASK + 1;
 
     private volatile long p1, p2, p3, p4, p5, p6, p7 = 0;  // padding against false sharing
-    private volatile long head;
+    protected volatile long head;
     private volatile long q1, q2, q3, q4, q5, q6, q7 = 0;  // padding against false sharing
 
-    private long entrySize;
-    private long chunkSize;
-    private long totalMemory;
+    protected long entrySize;
+    protected long chunkSize;
+    protected long totalMemory;
 
     public FixedSizeAllocator(long entrySize, long chunkSize) {
         this.entrySize = entrySize;
@@ -39,6 +38,21 @@ public class FixedSizeAllocator {
         for (long entry = startAddress; entry < lastEntry; ) {
             unsafe.putAddress(entry, entry += entrySize);
         }
+    }
+    
+    public FixedSizeAllocator(long startAddress, long totalMemory, long entrySize, long head) {
+        this.entrySize = entrySize;
+        this.chunkSize = 0;
+        this.totalMemory = totalMemory;
+        this.head = head;
+    }
+    
+    public int countFreePages() {
+        int count = 0;
+        for (long entry = head & ADDR_MASK; entry != 0; entry = unsafe.getAddress(entry)) {
+            count++;
+        }
+        return count;
     }
 
     public long entrySize() {
