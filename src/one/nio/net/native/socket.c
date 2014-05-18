@@ -234,12 +234,12 @@ Java_one_nio_net_NativeSocket_bind0(JNIEnv* env, jobject self, jbyteArray addres
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jint count) {
+Java_one_nio_net_NativeSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
     } else {
-        int result = send(fd, (void*)(intptr_t)buf, count, MSG_NOSIGNAL);
+        int result = send(fd, (void*)(intptr_t)buf, count, flags | MSG_NOSIGNAL);
         if (result > 0) {
             return result;
         } else if (result == 0) {
@@ -300,12 +300,12 @@ Java_one_nio_net_NativeSocket_writeFully(JNIEnv* env, jobject self, jbyteArray d
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint count) {
+Java_one_nio_net_NativeSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
     } else {
-        int result = recv(fd, (void*)(intptr_t)buf, count, 0);
+        int result = recv(fd, (void*)(intptr_t)buf, count, flags);
         if (result > 0) {
             return result;
         } else if (result == 0) {

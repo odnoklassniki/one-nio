@@ -51,7 +51,7 @@ final class JavaSocket extends Socket {
     }
 
     @Override
-    public final int writeRaw(long buf, int count) throws IOException {
+    public final int writeRaw(long buf, int count, int flags) throws IOException {
         return ch.write(DirectMemory.wrap(buf, count));
     }
 
@@ -66,7 +66,7 @@ final class JavaSocket extends Socket {
     }
 
     @Override
-    public final int readRaw(long buf, int count) throws IOException {
+    public final int readRaw(long buf, int count, int flags) throws IOException {
         int result = ch.read(DirectMemory.wrap(buf, count));
         if (result < 0) {
             throw new SocketException("Socket closed");

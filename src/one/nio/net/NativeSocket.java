@@ -76,7 +76,7 @@ final class NativeSocket extends Socket {
     public final native void close();
 
     @Override
-    public final native int writeRaw(long buf, int count) throws IOException;
+    public final native int writeRaw(long buf, int count, int flags) throws IOException;
 
     @Override
     public final native int write(byte[] data, int offset, int count) throws IOException;
@@ -85,7 +85,7 @@ final class NativeSocket extends Socket {
     public final native void writeFully(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public final native int readRaw(long buf, int count) throws IOException;
+    public final native int readRaw(long buf, int count, int flags) throws IOException;
 
     @Override
     public final native int read(byte[] data, int offset, int count) throws IOException;

@@ -44,7 +44,7 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
-    public final int writeRaw(long buf, int count) throws IOException {
+    public final int writeRaw(long buf, int count, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -59,7 +59,7 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
-    public final int readRaw(long buf, int count) throws IOException {
+    public final int readRaw(long buf, int count, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 
