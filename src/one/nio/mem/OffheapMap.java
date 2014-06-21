@@ -4,11 +4,13 @@ import one.nio.async.AsyncExecutor;
 import one.nio.async.ParallelTask;
 import one.nio.lock.RWLock;
 import one.nio.util.JavaInternals;
+import one.nio.util.QuickSelect;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import sun.misc.Unsafe;
 
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -276,33 +278,11 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return null;
     }
 
-    public boolean shouldCleanup() {
-        return getCapacity() - getCount() <= getCapacity() * cleanupThreshold;
+    public int entriesToClean() {
+        return getCount() - (int) (getCapacity() * (1.0 - cleanupThreshold));
     }
 
-    public int cleanup() {
-        if (cleanupThreshold > 0) {
-            if (!shouldCleanup()) {
-                return 0;
-            }
-
-            int entriesToFree = (int) (getCount() * cleanupThreshold);
-            int entriesExpected = 0;
-            for (int age = 1; age < ageHistogram.length; age++) {
-                entriesExpected += ageHistogram[age];
-                if (entriesExpected >= entriesToFree) {
-                    long expirationAge = Long.MIN_VALUE >>> age;
-                    log.info("Need to clean " + entriesToFree + " entries. Expected count = " + entriesExpected
-                            + ", age = " + expirationAge + " (" + age + ")");
-                    return cleanup(expirationAge);
-                }
-            }
-        }
-
-        return cleanup(timeToLive);
-    }
-
-    public int cleanup(long expirationAge) {
+    public int removeExpired(long expirationAge) {
         int expired = 0;
         int[] newHistogram = new int[Long.SIZE + 1];
         long startTime = System.currentTimeMillis();
@@ -557,9 +537,9 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         void visit(WritableRecord<K, V> record);
     }
 
-    public class CleanupThread extends Thread {
+    public class BasicCleanup extends Thread {
 
-        public CleanupThread(String name) {
+        public BasicCleanup(String name) {
             super(name);
             cleanupThread = this;
         }
@@ -581,6 +561,91 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     log.error("Exception in " + getName(), e);
                 }
             }
+        }
+
+        protected int cleanup() {
+            return removeExpired(timeToLive);
+        }
+    }
+
+    public class HistogramCleanup extends BasicCleanup {
+
+        public HistogramCleanup(String name) {
+            super(name);
+        }
+
+        @Override
+        protected int cleanup() {
+            int entriesToClean = entriesToClean();
+            if (entriesToClean <= 0) {
+                return 0;
+            }
+
+            int entriesExpected = 0;
+            for (int age = 1; age < ageHistogram.length; age++) {
+                entriesExpected += ageHistogram[age];
+                if (entriesExpected >= entriesToClean) {
+                    long expirationAge = Long.MIN_VALUE >>> age;
+                    log.info(getName() + " needs to clean " + entriesToClean + " entries. Expected count = "
+                            + entriesExpected + ", age = " + expirationAge + " (" + age + ")");
+                    return removeExpired(expirationAge);
+                }
+            }
+
+            return super.cleanup();
+        }
+    }
+
+    public class SamplingCleanup extends BasicCleanup {
+        private final Random random = new Random();
+
+        public SamplingCleanup(String name) {
+            super(name);
+        }
+
+        @Override
+        protected int cleanup() {
+            int entriesToClean = entriesToClean();
+            if (entriesToClean <= 0) {
+                return 0;
+            }
+
+            long[] timestamps = new long[1000];
+            int samples = collectSamples(timestamps);
+            if (samples == 0) {
+                return 0;
+            }
+
+            int count = getCount();
+            int k = entriesToClean < count ? (int) ((long) samples * entriesToClean / count) : 0;
+            long expirationAge = System.currentTimeMillis() - QuickSelect.select(timestamps, k, 0, samples - 1);
+
+            log.info(getName() + " needs to clean " + entriesToClean + " entries. Samples collected = "
+                    + samples + ", age = " + expirationAge);
+            return removeExpired(expirationAge);
+        }
+
+        private int collectSamples(long[] timestamps) {
+            int samples = 0;
+            int startBucket = random.nextInt(CONCURRENCY_LEVEL);
+            int bucket = startBucket;
+
+            do {
+                RWLock lock = locks[bucket].lockRead();
+                try {
+                    for (int i = bucket; i < capacity; i += CONCURRENCY_LEVEL) {
+                        long currentPtr = mapBase + (long) i * 8;
+                        for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
+                            if (samples >= timestamps.length) return samples;
+                            timestamps[samples++] = unsafe.getLong(entry + TIME_OFFSET);
+                        }
+                    }
+                } finally {
+                    lock.unlockRead();
+                }
+            } while (samples < 50 && (++bucket & (CONCURRENCY_LEVEL - 1)) != startBucket);
+
+            return samples;
         }
     }
 }

@@ -1,6 +1,7 @@
 package one.nio.mem;
 
 import one.nio.serial.Serializer;
+import one.nio.util.Hash;
 
 import java.io.IOException;
 
@@ -20,16 +21,19 @@ public class SharedMemoryLongMap<V> extends SharedMemoryMap<Long, V> {
 
     @Override
     protected Long keyAt(long entry) {
-        return unsafe.getLong(entry + HASH_OFFSET);
+        // Recover original key from a hashCode
+        return Hash.twang_unmix(unsafe.getLong(entry + HASH_OFFSET));
     }
 
     @Override
     protected long hashCode(Long key) {
-        return key;
+        // Shuffle bits in order to randomize buckets for close keys
+        return Hash.twang_mix(key);
     }
 
     @Override
     protected boolean equalsAt(long entry, Long key) {
-        return true;  // hashCode is the key; no additional check required
+        // Equal hashCodes <=> equal keys
+        return true;
     }
 }

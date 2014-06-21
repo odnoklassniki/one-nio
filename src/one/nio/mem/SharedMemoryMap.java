@@ -210,8 +210,14 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     }
 
     @Override
-    public boolean shouldCleanup() {
-        return getFreeMemory() <= getTotalMemory() * cleanupThreshold;
+    public int entriesToClean() {
+        long totalMemory = getTotalMemory();
+        long freeMemory = getFreeMemory();
+        if (totalMemory > freeMemory) {
+            long exceededMemory = (long) (totalMemory * cleanupThreshold) - freeMemory;
+            return (int) (getCount() * exceededMemory / (totalMemory - freeMemory));
+        }
+        return 0;
     }
 
     protected void createAllocator(long startAddress, long totalMemory) {
