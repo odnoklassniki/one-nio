@@ -44,6 +44,10 @@ public class FieldDescriptor {
         return parentField;
     }
 
+    public boolean is(String nameDescriptor, String typeDescriptor) {
+        return nameDescriptor.equals(this.nameDescriptor) && typeDescriptor.equals(this.typeDescriptor.toString());
+    }
+
     public void assignField(Field ownField, Field parentField) {
         this.ownField = ownField;
         this.parentField = parentField;

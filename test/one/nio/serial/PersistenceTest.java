@@ -8,7 +8,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 public class PersistenceTest {
-
     static RandomAccessFile raf;
     static boolean read;
 
@@ -20,7 +19,7 @@ public class PersistenceTest {
     }
 
     private static void writeObject(Object obj) throws IOException {
-        byte[] buf = Serializer.serialize(obj);
+        byte[] buf = Serializer.persist(obj);
         raf.writeInt(buf.length);
         raf.write(buf);
     }
@@ -37,15 +36,8 @@ public class PersistenceTest {
     }
 
     public static void main(String[] args) throws Exception {
-        String fileName = args[0];
-        String snapshotFile = args[1];
-        read = args.length > 2 && "read".equalsIgnoreCase(args[2]);
-
-        if (read) {
-            Repository.loadSnapshot(snapshotFile);
-        }
-
-        raf = new RandomAccessFile(fileName, "rw");
+        raf = new RandomAccessFile(args[0], "rw");
+        read = args.length > 1 && "read".equalsIgnoreCase(args[1]);
 
         check(InetAddress.getByName("123.45.67.89"));
         check(InetAddress.getByName("localhost"));
@@ -67,9 +59,5 @@ public class PersistenceTest {
         check(new StringBuffer(1000).append(new Object()).append("zzz").append(1234.56789));
 
         raf.close();
-
-        if (!read) {
-            Repository.saveSnapshot(snapshotFile);
-        }
     }
 }

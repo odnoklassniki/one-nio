@@ -13,7 +13,7 @@ import org.objectweb.asm.Type;
 
 public class StubGenerator extends BytecodeGenerator {
     public static final StubGenerator INSTANCE = new StubGenerator();
-    private static final String PACKAGE_PREFIX = "sun/reflect/Stub_";
+    private static final String PACKAGE_PREFIX = "sun/reflect/";
 
     StubGenerator() {
         Management.registerMXBean(this, "one.nio.serial:type=BytecodeGenerator");
@@ -29,8 +29,8 @@ public class StubGenerator extends BytecodeGenerator {
         return result;
     }
 
-    public static Class generateRegular(long uid, String superName, FieldDescriptor[] fds) {
-        String internalClassName = PACKAGE_PREFIX + Long.toHexString(uid);
+    public static Class generateRegular(String className, String superName, FieldDescriptor[] fds) {
+        String internalClassName = PACKAGE_PREFIX + className;
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, superName,
@@ -69,8 +69,8 @@ public class StubGenerator extends BytecodeGenerator {
         return INSTANCE.defineClassIfNotExists(internalClassName, cv.toByteArray());
     }
 
-    public static Class generateEnum(long uid, String[] constants) {
-        String internalClassName = PACKAGE_PREFIX + Long.toHexString(uid);
+    public static Class generateEnum(String className, String[] constants) {
+        String internalClassName = PACKAGE_PREFIX + className;
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL | ACC_ENUM, internalClassName, null, "java/lang/Enum", null);

@@ -58,7 +58,11 @@ public class GeneratedSerializer extends Serializer {
         }
 
         if (this.cls == null) {
-            this.cls = StubGenerator.generateRegular(uid, "java/lang/Object", fds);
+            if (isException()) {
+                this.cls = StubGenerator.generateRegular(uniqueName("Ex"), "java/lang/Exception", fds);
+            } else {
+                this.cls = StubGenerator.generateRegular(uniqueName("Stub"), "java/lang/Object", fds);
+            }
         }
 
         Field[] ownFields = getSerializableFields();
@@ -124,6 +128,13 @@ public class GeneratedSerializer extends Serializer {
         }
 
         return builder.toString();
+    }
+
+    private boolean isException() {
+        return fds.length >= 3
+                && fds[0].is("detailMessage", "java.lang.String")
+                && fds[1].is("cause",         "java.lang.Throwable")
+                && fds[2].is("stackTrace",    "[Ljava.lang.StackTraceElement;");
     }
 
     private int findField(Field[] ownFields, FieldDescriptor fd) {

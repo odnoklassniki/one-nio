@@ -38,7 +38,7 @@ public class EnumSerializer extends Serializer<Enum> {
         }
 
         if (this.cls == null) {
-            this.cls = StubGenerator.generateEnum(uid, constants);
+            this.cls = StubGenerator.generateEnum(uniqueName("Enum"), constants);
         }
 
         Enum[] ownValues = cls().getEnumConstants();

@@ -16,10 +16,11 @@ public class DataStream implements ObjectInput, ObjectOutput {
     protected static final byte REF_NULL       = -1;
     protected static final byte REF_RECURSIVE  = -2;
     protected static final byte REF_RECURSIVE2 = -3;
+    protected static final byte REF_EMBEDDED   = -4;
 
-    protected final byte[] array;
-    protected final long address;
-    protected final long limit;
+    protected byte[] array;
+    protected long address;
+    protected long limit;
     protected long offset;
 
     public DataStream(int capacity) {
@@ -54,39 +55,48 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public void write(int b) {
-        unsafe.putByte(array, alloc(1), (byte) b);
+        long offset = alloc(1);
+        unsafe.putByte(array, offset, (byte) b);
     }
 
     public void write(byte[] b) {
-        unsafe.copyMemory(b, byteArrayOffset, array, alloc(b.length), b.length);
+        long offset = alloc(b.length);
+        unsafe.copyMemory(b, byteArrayOffset, array, offset, b.length);
     }
 
     public void write(byte[] b, int off, int len) {
-        unsafe.copyMemory(b, byteArrayOffset + off, array, alloc(len), len);
+        long offset = alloc(len);
+        unsafe.copyMemory(b, byteArrayOffset + off, array, offset, len);
     }
 
     public void writeBoolean(boolean v) {
-        unsafe.putBoolean(array, alloc(1), v);
+        long offset = alloc(1);
+        unsafe.putBoolean(array, offset, v);
     }
 
     public void writeByte(int v) {
-        unsafe.putByte(array, alloc(1), (byte) v);
+        long offset = alloc(1);
+        unsafe.putByte(array, offset, (byte) v);
     }
 
     public void writeShort(int v) {
-        unsafe.putShort(array, alloc(2), Short.reverseBytes((short) v));
+        long offset = alloc(2);
+        unsafe.putShort(array, offset, Short.reverseBytes((short) v));
     }
 
     public void writeChar(int v) {
-        unsafe.putChar(array, alloc(2), Character.reverseBytes((char) v));
+        long offset = alloc(2);
+        unsafe.putChar(array, offset, Character.reverseBytes((char) v));
     }
 
     public void writeInt(int v) {
-        unsafe.putInt(array, alloc(4), Integer.reverseBytes(v));
+        long offset = alloc(4);
+        unsafe.putInt(array, offset, Integer.reverseBytes(v));
     }
 
     public void writeLong(long v) {
-        unsafe.putLong(array, alloc(8), Long.reverseBytes(v));
+        long offset = alloc(8);
+        unsafe.putLong(array, offset, Long.reverseBytes(v));
     }
 
     public void writeFloat(float v) {
@@ -121,7 +131,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
         } else {
             writeInt(utfLength | 0x80000000);
         }
-        Utf8.write(s, array, alloc(utfLength));
+        long offset = alloc(utfLength);
+        Utf8.write(s, array, offset);
     }
 
     @SuppressWarnings("unchecked")
@@ -140,7 +151,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public void writeFrom(long address, int len) {
-        unsafe.copyMemory(null, address, array, alloc(len), len);
+        long offset = alloc(len);
+        unsafe.copyMemory(null, address, array, offset, len);
     }
 
     public int read() {

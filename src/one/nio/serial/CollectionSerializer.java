@@ -20,7 +20,7 @@ public class CollectionSerializer extends Serializer<Collection> {
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         super.tryReadExternal(in, (Repository.getOptions() & Repository.COLLECTION_STUBS) == 0);
         if (this.cls == null) {
-            this.cls = StubGenerator.generateRegular(uid, "java/util/ArrayList", null);
+            this.cls = StubGenerator.generateRegular(uniqueName("List"), "java/util/ArrayList", null);
         }
 
         this.constructor = findConstructor();
@@ -98,7 +98,11 @@ public class CollectionSerializer extends Serializer<Collection> {
             } else {
                 implementation = ArrayList.class;
             }
-            
+
+            generateUid();
+            Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
+                    ", changed type to " + implementation.getName());
+
             try {
                 return implementation.getDeclaredConstructor();
             } catch (NoSuchMethodException e1) {

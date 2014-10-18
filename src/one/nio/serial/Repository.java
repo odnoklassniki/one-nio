@@ -2,6 +2,7 @@ package one.nio.serial;
 
 import one.nio.mgt.Management;
 import one.nio.serial.gen.StubGenerator;
+import one.nio.util.Base64;
 import one.nio.util.JavaInternals;
 
 import org.apache.commons.logging.Log;
@@ -50,7 +51,7 @@ public class Repository {
     public static final int CHECK_FIELD_TYPE = 256;
 
     private static long nextBootstrapUid = -10;
-    private static int options = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS | CUSTOM_STUBS;
+    private static int options = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS;
 
     static {
         addBootstrap(new IntegerSerializer());
@@ -103,8 +104,8 @@ public class Repository {
         addBootstrap(new ExternalizableSerializer(SerializerNotFoundException.class));
 
         try {
-            addBootstrap(new GeneratedSerializer(Class.forName("one.app.remote.reflect.MethodId")));
-            addBootstrap(new GeneratedSerializer(Class.forName("one.app.remote.comp.RemoteMethodCallRequest")));
+            addBootstrap(generateFor(Class.forName("one.app.remote.reflect.MethodId")));
+            addBootstrap(generateFor(Class.forName("one.app.remote.comp.RemoteMethodCallRequest")));
         } catch (ClassNotFoundException e) {
             // Could not find additional bootstrap classes
         }
@@ -189,6 +190,15 @@ public class Repository {
             } else {
                 classMap.put(serializer.cls, serializer);
             }
+        }
+    }
+
+    public static void provideSerializer(String base64) {
+        try {
+            byte[] serialForm = Base64.decodeFromChars(base64.toCharArray());
+            provideSerializer((Serializer) Serializer.deserialize(serialForm));
+        } catch (Exception e) {
+            throw new IllegalArgumentException(e);
         }
     }
 

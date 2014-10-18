@@ -12,7 +12,7 @@ import java.util.List;
 public class StubGeneratorTest extends TestCase {
 
     public void testRegular() throws Exception {
-        Object o1 = StubGenerator.generateRegular(0, "java/lang/Object", new FieldDescriptor[]{
+        Object o1 = StubGenerator.generateRegular("Stub_o1", "java/lang/Object", new FieldDescriptor[]{
                 new FieldDescriptor("intField", new TypeDescriptor(int.class)),
                 new FieldDescriptor("renamedField|oldField", new TypeDescriptor(double.class)),
                 new FieldDescriptor("listField", new TypeDescriptor(List.class)),
@@ -28,18 +28,18 @@ public class StubGeneratorTest extends TestCase {
         Assert.assertEquals(Object.class, f2.getType());
         Assert.assertEquals("oldField", f1.getAnnotation(Renamed.class).from());
 
-        Object o2 = StubGenerator.generateRegular(1, "java/util/ArrayList", null).newInstance();
+        Object o2 = StubGenerator.generateRegular("Stub_o2", "java/util/ArrayList", null).newInstance();
 
         Class<?> c2 = o2.getClass();
         Assert.assertTrue(List.class.isAssignableFrom(c2));
 
-        Class c3 = StubGenerator.generateRegular(1, "java/util/ArrayList", null);
+        Class c3 = StubGenerator.generateRegular("Stub_o2", "java/util/ArrayList", null);
         Assert.assertEquals(c2, c3);
     }
 
     @SuppressWarnings("unchecked")
     public void testEnum() throws Exception {
-        Class enumCls = StubGenerator.generateEnum(2, new String[] {
+        Class enumCls = StubGenerator.generateEnum("Enum_test", new String[] {
                 "ZERO",
                 "FIRST",
                 "SECOND",

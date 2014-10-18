@@ -56,6 +56,13 @@ public abstract class Serializer<T> implements Externalizable {
         }
     }
 
+    protected final String uniqueName(String prefix) {
+        int p = descriptor.indexOf('|');
+        String className = p < 0 ? descriptor : descriptor.substring(0, p);
+        String simpleName = className.substring(className.lastIndexOf('.') + 1);
+        return prefix + '$' + Long.toHexString(uid) + '$' + simpleName;
+    }
+
     protected final void generateUid() {
         if (this.uid == 0) {
             DigestStream ds = new DigestStream("MD5");
@@ -106,6 +113,12 @@ public abstract class Serializer<T> implements Externalizable {
         DataStream ds = css.hasCycles ? new SerializeStream(data) : new DataStream(data);
         ds.writeObject(obj);
         return data;
+    }
+
+    public static byte[] persist(Object obj) throws IOException {
+        PersistStream ps = new PersistStream();
+        ps.writeObject(obj);
+        return ps.toByteArray();
     }
 
     public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {

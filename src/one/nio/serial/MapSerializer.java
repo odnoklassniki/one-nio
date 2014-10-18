@@ -20,7 +20,7 @@ public class MapSerializer extends Serializer<Map> {
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         super.tryReadExternal(in, (Repository.getOptions() & Repository.MAP_STUBS) == 0);
         if (this.cls == null) {
-            this.cls = StubGenerator.generateRegular(uid, "java/util/HashMap", null);
+            this.cls = StubGenerator.generateRegular(uniqueName("Map"), "java/util/HashMap", null);
         }
 
         this.constructor = findConstructor();
@@ -91,6 +91,11 @@ public class MapSerializer extends Serializer<Map> {
             return cls.getConstructor();
         } catch (NoSuchMethodException e) {
             Class implementation = SortedMap.class.isAssignableFrom(cls) ? TreeMap.class : HashMap.class;
+
+            generateUid();
+            Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
+                    ", changed type to " + implementation.getName());
+
             try {
                 return implementation.getDeclaredConstructor();
             } catch (NoSuchMethodException e1) {
