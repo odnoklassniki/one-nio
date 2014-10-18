@@ -38,6 +38,7 @@ public abstract class Socket implements Closeable {
     public abstract void setSendBuffer(int sendBuf);
     public abstract InetSocketAddress getLocalAddress();
     public abstract InetSocketAddress getRemoteAddress();
+    public abstract Socket ssl(boolean serverMode) throws IOException;
 
     public void connect(String host, int port) throws IOException {
         connect(InetAddress.getByName(host), port);

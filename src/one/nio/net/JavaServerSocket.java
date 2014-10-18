@@ -143,4 +143,9 @@ final class JavaServerSocket extends Socket {
     public final InetSocketAddress getRemoteAddress() {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public Socket ssl(boolean serverMode) {
+        throw new UnsupportedOperationException();
+    }
 }

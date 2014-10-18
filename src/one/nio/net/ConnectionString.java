@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
 
+    private String protocol;
     private String host;
     private int port;
     private Map<String, String> params;
@@ -26,7 +27,11 @@ public class ConnectionString {
         connectionString = expand(connectionString);
 
         int p = connectionString.indexOf("://");
-        int addrStart = p >= 0 ? p + 3 : 0;
+        int addrStart = 0;
+        if (p >= 0) {
+            this.protocol = connectionString.substring(0, p);
+            addrStart = p + 3;
+        }
 
         int queryString = connectionString.indexOf('?', addrStart);
         if (queryString >= 0) {
@@ -47,6 +52,10 @@ public class ConnectionString {
             this.host = connectionString.substring(addrStart, addrEnd);
             this.port = 0;
         }
+    }
+
+    public String getProtocol() {
+        return protocol;
     }
 
     public String getHost() {

@@ -175,4 +175,9 @@ final class JavaSocket extends Socket {
     public final InetSocketAddress getRemoteAddress() {
         return (InetSocketAddress) ch.socket().getRemoteSocketAddress();
     }
+
+    @Override
+    public Socket ssl(boolean serverMode) {
+        throw new UnsupportedOperationException();
+    }
 }

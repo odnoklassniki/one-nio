@@ -8,7 +8,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
-final class NativeSocket extends Socket {
+class NativeSocket extends Socket {
     int fd;
 
     NativeSocket() throws IOException {
@@ -63,6 +63,11 @@ final class NativeSocket extends Socket {
     }
 
     @Override
+    public final Socket ssl(boolean serverMode) throws IOException {
+        return new NativeSslSocket(fd, serverMode);
+    }
+
+    @Override
     public final void connect(InetAddress address, int port) throws IOException {
         connect0(address.getAddress(), port);
     }
@@ -73,28 +78,28 @@ final class NativeSocket extends Socket {
     }
 
     @Override
-    public final native void close();
+    public native void close();
 
     @Override
-    public final native int writeRaw(long buf, int count, int flags) throws IOException;
+    public native int writeRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public final native int write(byte[] data, int offset, int count) throws IOException;
+    public native int write(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public final native void writeFully(byte[] data, int offset, int count) throws IOException;
+    public native void writeFully(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public final native int readRaw(long buf, int count, int flags) throws IOException;
+    public native int readRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public final native int read(byte[] data, int offset, int count) throws IOException;
+    public native int read(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public final native void readFully(byte[] data, int offset, int count) throws IOException;
+    public native void readFully(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
+    public long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
         return sendFile0(Mem.getFD(file.getFD()), offset, count);
     }
 

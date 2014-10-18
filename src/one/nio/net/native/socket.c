@@ -4,6 +4,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -17,6 +19,7 @@
 #define SIG_WAKEUP (__SIGRTMAX - 2)
 
 static jfieldID f_fd;
+static jfieldID f_ssl;
 static pthread_t* fd_table;
 static int use_IPv6;
 
@@ -26,6 +29,16 @@ static void throw_by_name(JNIEnv* env, const char* exception, const char* msg) {
     if (cls != NULL) {
         (*env)->ThrowNew(env, cls, msg);
     }
+}
+
+static void throw_socket_closed(JNIEnv* env) {
+    throw_by_name(env, "java/net/SocketException", "Socket closed");
+}
+
+static void throw_ssl_exception(JNIEnv* env) {
+    char buf[256];
+    char* message = ERR_error_string(ERR_get_error(), buf);
+    throw_by_name(env, "javax/net/ssl/SSLException", message);
 }
 
 static void throw_exception(JNIEnv* env) {
@@ -64,8 +77,37 @@ static void throw_exception(JNIEnv* env) {
     }
 }
 
-static void throw_socket_closed(JNIEnv* env) {
-    throw_by_name(env, "java/net/SocketException", "Socket closed");
+static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
+    char buf[64];
+    int err = SSL_get_error(ssl, ret);
+    switch (err) {
+        case SSL_ERROR_NONE:
+            return 0;
+        case SSL_ERROR_ZERO_RETURN:
+            throw_socket_closed(env);
+            return 0;
+        case SSL_ERROR_SYSCALL:
+            if (ret == 0) {
+                throw_socket_closed(env);
+            } else {
+                throw_exception(env);
+            }
+            return 0;
+        case SSL_ERROR_SSL:
+            throw_ssl_exception(env);
+            return 0;
+        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_WRITE:
+            if ((fcntl(SSL_get_fd(ssl), F_GETFL) & O_NONBLOCK) == 0) {
+                throw_by_name(env, "java/net/SocketTimeoutException", "Connection timed out");
+                return 0;
+            }
+            return -err;
+        default:
+            sprintf(buf, "Unexpected SSL error code (%d)", err);
+            throw_by_name(env, "javax/net/ssl/SSLException", buf);
+            return 0;
+    }
 }
 
 static jfieldID cache_field(JNIEnv* env, const char* holder, const char* field, const char* signature) {
@@ -151,7 +193,7 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
     // Check IPv6 support
     use_IPv6 = check_IPv6(env);
 
-    // Cache field ID to access Socket.fd
+    // Cache field ID to access NativeSocket.fd
     f_fd = cache_field(env, "one/nio/net/NativeSocket", "fd", "I");
 
     // Allocate table for thread pointer per file descriptor
@@ -363,6 +405,109 @@ Java_one_nio_net_NativeSocket_readFully(JNIEnv* env, jobject self, jbyteArray da
     }
 }
 
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+        return 0;
+    } else {
+        int result = SSL_write(ssl, (void*)(intptr_t)buf, count);
+        return result > 0 ? result : check_ssl_error(env, ssl, result);
+    }
+}
+
+JNIEXPORT int JNICALL
+Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    jbyte buf[MAX_STACK_BUF];
+
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+        return 0;
+    } else {
+        int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
+        (*env)->GetByteArrayRegion(env, data, offset, result, buf);
+        result = SSL_write(ssl, (void*)(intptr_t)buf, count);
+        return result > 0 ? result : check_ssl_error(env, ssl, result);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslSocket_writeFully(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    jbyte buf[MAX_STACK_BUF];
+
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+    } else {
+        while (count > 0) {
+            int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
+            (*env)->GetByteArrayRegion(env, data, offset, result, buf);
+            result = SSL_write(ssl, (void*)(intptr_t)buf, count);
+            if (result > 0) {
+                offset += result;
+                count -= result;
+            } else {
+                check_ssl_error(env, ssl, result);
+                break;
+            }
+        }
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSslSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+        return 0;
+    } else {
+        int result = SSL_read(ssl, (void*)(intptr_t)buf, count);
+        return result > 0 ? result : check_ssl_error(env, ssl, result);
+    }
+}
+
+JNIEXPORT int JNICALL
+Java_one_nio_net_NativeSslSocket_read(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    jbyte buf[MAX_STACK_BUF];
+
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+        return 0;
+    } else {
+        int result = SSL_read(ssl, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF);
+        if (result > 0) {
+            (*env)->SetByteArrayRegion(env, data, offset, result, buf);
+            return result;
+        }
+        return check_ssl_error(env, ssl, result);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslSocket_readFully(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    jbyte buf[MAX_STACK_BUF];
+
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+    } else {
+        while (count > 0) {
+            int result = SSL_read(ssl, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF);
+            if (result > 0) {
+                (*env)->SetByteArrayRegion(env, data, offset, result, buf);
+                offset += result;
+                count -= result;
+            } else {
+                check_ssl_error(env, ssl, result);
+                break;
+            }
+        }
+    }
+}
+
 JNIEXPORT jlong JNICALL
 Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD, jlong offset, jlong count) {
     int fd = (*env)->GetIntField(env, self, f_fd);
@@ -458,4 +603,37 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setSendBuffer(JNIEnv* env, jobject self, jint sendBuf) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendBuf, sizeof(sendBuf));
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_net_NativeSslSocket_sslInit(JNIEnv* env, jclass cls) {
+    SSL_CTX* ctx;
+    f_ssl = cache_field(env, "one/nio/net/NativeSslSocket", "ssl", "J");
+
+    SSL_load_error_strings();
+    SSL_library_init();
+
+    ctx = SSL_CTX_new(SSLv23_method());
+    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
+    return (jlong)(intptr_t)ctx;
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_net_NativeSslSocket_sslNew(JNIEnv* env, jclass cls, jint fd, jboolean serverMode, jlong ctx) {
+    SSL* ssl = SSL_new((SSL_CTX*)(intptr_t)ctx);
+    if (ssl != NULL && SSL_set_fd(ssl, fd)) {
+        if (serverMode) SSL_set_accept_state(ssl); else SSL_set_connect_state(ssl);
+        return (jlong)(intptr_t)ssl;
+    }
+
+    throw_ssl_exception(env);
+    if (ssl != NULL) SSL_free(ssl);
+    return 0;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) {
+    SSL* ssl = (SSL*)(intptr_t)sslptr;
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
 }

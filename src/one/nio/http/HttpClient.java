@@ -2,6 +2,7 @@ package one.nio.http;
 
 import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
+import one.nio.pool.PoolException;
 import one.nio.pool.SocketPool;
 import one.nio.util.Utf8;
 
@@ -12,13 +13,28 @@ import java.util.ArrayList;
 public class HttpClient extends SocketPool {
     private static final int BUFFER_SIZE = 8000;
 
+    protected boolean useSsl;
     protected String hostHeader;
     protected String connectionHeader;
 
     public HttpClient(ConnectionString conn) throws IOException {
-        super(conn, 80);
+        super(conn, "https".equals(conn.getProtocol()) ? 443 : 80);
+        this.useSsl = "https".equals(conn.getProtocol());
         this.hostHeader = "Host: " + conn.getHost();
         this.connectionHeader = conn.getBooleanParam("keepalive", true) ? "Connection: Keep-Alive" : "Connection: close";
+    }
+
+    @Override
+    public Socket createObject() throws PoolException {
+        Socket s = super.createObject();
+        if (!useSsl) return s;
+
+        try {
+            return s.ssl(false);
+        } catch (IOException e) {
+            s.close();
+            throw new PoolException(name() + " failed to create SSL socket", e);
+        }
     }
 
     public Response invoke(Request request) throws Exception {

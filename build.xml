@@ -45,7 +45,7 @@
         <echo message="Compiling native library..."/>
         <mkdir dir="${build.dir}/native"/>
         <exec os="Linux" executable="gcc">
-            <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args} -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so -I ${java.home}/../include -I ${java.home}/../include/linux ${src.dir}/one/nio/os/native/mem.c ${src.dir}/one/nio/os/native/proc.c ${src.dir}/one/nio/os/native/user.c ${src.dir}/one/nio/net/native/epoll.c ${src.dir}/one/nio/net/native/socket.c"/>
+            <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args} -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so -I ${java.home}/../include -I ${java.home}/../include/linux ${src.dir}/one/nio/os/native/mem.c ${src.dir}/one/nio/os/native/proc.c ${src.dir}/one/nio/os/native/user.c ${src.dir}/one/nio/net/native/epoll.c ${src.dir}/one/nio/net/native/socket.c -lssl"/>
         </exec>
     </target>
 
