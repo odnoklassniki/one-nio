@@ -46,7 +46,14 @@ public class FixedSizeAllocator {
         this.totalMemory = totalMemory;
         this.head = head;
     }
-    
+
+    public static void relocate(long currentPtr, long delta) {
+        for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry) {
+            entry = (entry & ADDR_MASK) + delta;
+            unsafe.putAddress(currentPtr, entry);
+        }
+    }
+
     public int countFreePages() {
         int count = 0;
         for (long entry = head & ADDR_MASK; entry != 0; entry = unsafe.getAddress(entry)) {

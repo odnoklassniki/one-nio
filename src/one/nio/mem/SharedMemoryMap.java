@@ -68,10 +68,8 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     }
 
     @Override
-    public void close() {
+    protected void closeInternal() {
         Management.unregisterMXBean("one.nio.mem:type=SharedMemoryMap,name=" + name);
-
-        super.close();
 
         storeSchema();
         setHeader(TIMESTAMP_OFFSET, System.currentTimeMillis());
@@ -106,7 +104,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
         setHeader(BASE_OFFSET, mmap.getAddr());
     }
 
-    private void relocate(long delta) {
+    protected void relocate(long delta) {
         int count = 0;
 
         for (int i = 0; i < capacity; i++) {
@@ -213,8 +211,8 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     public int entriesToClean() {
         long totalMemory = getTotalMemory();
         long freeMemory = getFreeMemory();
-        if (totalMemory > freeMemory) {
-            long exceededMemory = (long) (totalMemory * cleanupThreshold) - freeMemory;
+        long exceededMemory = (long) (totalMemory * cleanupThreshold) - freeMemory;
+        if (exceededMemory > 0 && totalMemory > freeMemory) {
             return (int) (getCount() * exceededMemory / (totalMemory - freeMemory));
         }
         return 0;
@@ -237,7 +235,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
             serializers.add(serializer);
         }
 
-        AsyncExecutor.fork(Runtime.getRuntime().availableProcessors(), new ParallelTask() {
+        AsyncExecutor.fork(new ParallelTask() {
             @Override
             public void execute(int taskNum, int taskCount) throws IOException, ClassNotFoundException {
                 SerializerCollector collector = new SerializerCollector(mmap.getAddr(), mmap.getSize());

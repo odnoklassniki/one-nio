@@ -1,6 +1,7 @@
 package one.nio.mem;
 
 import one.nio.serial.Serializer;
+import one.nio.util.Hash;
 
 import java.io.IOException;
 
@@ -31,7 +32,8 @@ public class SharedMemoryStringMap<V> extends SharedMemoryMap<String, V> {
 
     @Override
     protected long hashCode(String key) {
-        return (long) key.length() << 33 | key.hashCode();
+        int stringHashCode = Hash.murmur3(key);
+        return (long) key.length() << 33 | (stringHashCode & 0xffffffffL);
     }
 
     @Override

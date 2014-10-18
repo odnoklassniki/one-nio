@@ -23,6 +23,29 @@ public class LongLongHashMap extends LongHashSet {
         setValueAt(index, value);
     }
 
+    public long putIfAbsent(long key, long value) {
+        int step = 1;
+        int index = hash(key) % capacity;
+
+        do {
+            long cur = keyAt(index);
+            if (cur == EMPTY) {
+                if (!unsafe.compareAndSwapLong(null, keys + (long) index * 8, cur, key)) {
+                    continue;
+                }
+                setValueAt(index, value);
+                incrementSize();
+                return 0;
+            } else if (cur == key) {
+                return valueAt(index);
+            }
+
+            if ((index += step) >= capacity) index -= capacity;
+        } while (++step <= maxSteps);
+
+        throw new OutOfMemoryException("No room for a new key");
+    }
+
     public boolean replace(long key, long oldValue, long newValue) {
         int index = getKey(key);
         return index >= 0 && unsafe.compareAndSwapLong(null, values + (long) index * 8, oldValue, newValue);

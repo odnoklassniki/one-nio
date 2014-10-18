@@ -4,9 +4,10 @@ public interface OffheapMapMXBean {
     int getCapacity();
     int getCount();
     long getExpirations();
-    int[] getAgeHistogram();
     long getTimeToLive();
     void setTimeToLive(long timeToLive);
+    long getLockWaitTime();
+    void setLockWaitTime(long lockWaitTime);
     long getCleanupInterval();
     void setCleanupInterval(long cleanupInterval);
     double getCleanupThreshold();

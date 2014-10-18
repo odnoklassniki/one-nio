@@ -24,6 +24,10 @@ public class AsyncExecutor {
         return new CombinedFuture<T>(futures);
     }
 
+    public static void fork(final ParallelTask task) throws AsyncException {
+        fork(Runtime.getRuntime().availableProcessors(), task);
+    }
+
     public static void fork(final int workers, final ParallelTask task) throws AsyncException {
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         Thread[] threads = new Thread[workers];

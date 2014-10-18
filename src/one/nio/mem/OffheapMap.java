@@ -10,6 +10,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import sun.misc.Unsafe;
 
+import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,11 +34,11 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected final RWLock[] locks = createLocks();
 
     protected long mapBase;
-    protected int[] ageHistogram = new int[Long.SIZE + 1];
     protected long timeToLive = Long.MAX_VALUE;
+    protected long lockWaitTime = 10;
     protected long cleanupInterval = 60000;
     protected double cleanupThreshold;
-    protected Thread cleanupThread;
+    protected BasicCleanup cleanupThread;
 
     protected OffheapMap(int capacity) {
         this.capacity = (capacity + (CONCURRENCY_LEVEL - 1)) & ~(CONCURRENCY_LEVEL - 1);
@@ -56,7 +57,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return locks;
     }
 
-    public void close() {
+    public final void close() {
         if (cleanupThread != null) {
             try {
                 cleanupThread.interrupt();
@@ -65,6 +66,11 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                 Thread.currentThread().interrupt();
             }
         }
+        closeInternal();
+    }
+
+    protected void closeInternal() {
+        // To be overriden
     }
 
     @Override
@@ -75,6 +81,16 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     @Override
     public void setTimeToLive(long timeToLive) {
         this.timeToLive = timeToLive;
+    }
+
+    @Override
+    public long getLockWaitTime() {
+        return lockWaitTime;
+    }
+
+    @Override
+    public void setLockWaitTime(long lockWaitTime) {
+        this.lockWaitTime = lockWaitTime;
     }
 
     @Override
@@ -110,11 +126,6 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     @Override
     public long getExpirations() {
         return expirations.get();
-    }
-
-    @Override
-    public int[] getAgeHistogram() {
-        return ageHistogram;
     }
 
     public V get(K key) {
@@ -284,22 +295,24 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
     public int removeExpired(long expirationAge) {
         int expired = 0;
-        int[] newHistogram = new int[Long.SIZE + 1];
-        long startTime = System.currentTimeMillis();
+        long expirationTime = System.currentTimeMillis() - expirationAge;
 
         for (int i = 0; i < CONCURRENCY_LEVEL; i++) {
-            RWLock lock = locks[i].lockWrite();
+            RWLock lock = locks[i];
+            if (!lock.lockWrite(lockWaitTime)) {
+                log.debug("Could not lock segment " + i + " for cleanup");
+                continue;
+            }
+
             try {
                 for (int j = i; j < capacity; j += CONCURRENCY_LEVEL) {
                     long currentPtr = mapBase + (long) j * 8;
                     long nextEntry;
                     for (long entry = unsafe.getAddress(currentPtr); entry != 0; entry = nextEntry) {
                         nextEntry = unsafe.getAddress(entry + NEXT_OFFSET);
-                        long age = startTime - unsafe.getLong(entry + TIME_OFFSET);
-                        newHistogram[Long.numberOfLeadingZeros(age)]++;
-
-                        if (age >= expirationAge) {
+                        if (unsafe.getLong(entry + TIME_OFFSET) <= expirationTime) {
                             unsafe.putAddress(currentPtr, nextEntry);
+                            evicted(entry);
                             destroyEntry(entry);
                             expired++;
                         } else {
@@ -312,7 +325,6 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             }
         }
 
-        ageHistogram = newHistogram;
         count.addAndGet(-expired);
         expirations.addAndGet(expired);
         return expired;
@@ -408,6 +420,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return locks[(int) hashCode & (CONCURRENCY_LEVEL - 1)];
     }
 
+    protected long timeAt(long entry) {
+        return unsafe.getLong(entry + TIME_OFFSET);
+    }
+
     protected void setTimeAt(long entry) {
         unsafe.putLong(entry + TIME_OFFSET, System.currentTimeMillis());
     }
@@ -423,6 +439,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
     protected K keyAt(long entry) {
         return null;  // override it in child classes if needed
+    }
+
+    protected void evicted(long entry) {
+        // Called from cleanup thread
     }
 
     protected abstract long hashCode(K key);
@@ -463,6 +483,14 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         public V value() {
             return map.valueAt(entry);
+        }
+
+        public long time() {
+            return map.timeAt(entry);
+        }
+
+        public void touch() {
+            map.setTimeAt(entry);
         }
 
         public int size() {
@@ -538,6 +566,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     public class BasicCleanup extends Thread {
+        protected final Object waitLock = new Object();
 
         public BasicCleanup(String name) {
             super(name);
@@ -548,13 +577,17 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         public void run() {
             while (!isInterrupted()) {
                 try {
-                    sleep(getCleanupInterval());
+                    synchronized (waitLock) {
+                        waitLock.wait(getCleanupInterval());
+                    }
 
                     long startTime = System.currentTimeMillis();
                     int expired = cleanup();
                     long elapsed = System.currentTimeMillis() - startTime;
 
-                    log.info(getName() + " cleaned " + expired + " entries in " + elapsed + " ms");
+                    if (expired != 0) {
+                        log.info(getName() + " cleaned " + expired + " entries in " + elapsed + " ms");
+                    }
                 } catch (InterruptedException e) {
                     break;
                 } catch (Throwable e) {
@@ -563,36 +596,14 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             }
         }
 
+        public void force() {
+            synchronized (waitLock) {
+                waitLock.notify();
+            }
+        }
+
         protected int cleanup() {
             return removeExpired(timeToLive);
-        }
-    }
-
-    public class HistogramCleanup extends BasicCleanup {
-
-        public HistogramCleanup(String name) {
-            super(name);
-        }
-
-        @Override
-        protected int cleanup() {
-            int entriesToClean = entriesToClean();
-            if (entriesToClean <= 0) {
-                return 0;
-            }
-
-            int entriesExpected = 0;
-            for (int age = 1; age < ageHistogram.length; age++) {
-                entriesExpected += ageHistogram[age];
-                if (entriesExpected >= entriesToClean) {
-                    long expirationAge = Long.MIN_VALUE >>> age;
-                    log.info(getName() + " needs to clean " + entriesToClean + " entries. Expected count = "
-                            + entriesExpected + ", age = " + expirationAge + " (" + age + ")");
-                    return removeExpired(expirationAge);
-                }
-            }
-
-            return super.cleanup();
         }
     }
 
@@ -622,6 +633,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
             log.info(getName() + " needs to clean " + entriesToClean + " entries. Samples collected = "
                     + samples + ", age = " + expirationAge);
+            if (log.isDebugEnabled()) {
+                log.debug(Arrays.toString(timestamps));
+            }
+
             return removeExpired(expirationAge);
         }
 
@@ -636,14 +651,15 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     for (int i = bucket; i < capacity; i += CONCURRENCY_LEVEL) {
                         long currentPtr = mapBase + (long) i * 8;
                         for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
-                            if (samples >= timestamps.length) return samples;
                             timestamps[samples++] = unsafe.getLong(entry + TIME_OFFSET);
+                            if (samples == timestamps.length) return samples;
                         }
                     }
                 } finally {
                     lock.unlockRead();
                 }
-            } while (samples < 50 && (++bucket & (CONCURRENCY_LEVEL - 1)) != startBucket);
+                bucket = (bucket + 1) & (CONCURRENCY_LEVEL - 1);
+            } while (bucket != startBucket);
 
             return samples;
         }

@@ -23,11 +23,13 @@ public class MappedFile implements Closeable {
     public static final int MAP_RW = 1;
     public static final int MAP_PV = 2;
 
+    private final RandomAccessFile file;
     private final long addr;
     private final long size;
     private int state;
 
     public MappedFile(long size) {
+        this.file = null;
         this.addr = DirectMemory.allocateRaw(size);
         this.size = size;
         this.state = STATE_MALLOC;
@@ -38,22 +40,23 @@ public class MappedFile implements Closeable {
     }
 
     public MappedFile(String name, long size, int mode) throws IOException {
-        RandomAccessFile f = new RandomAccessFile(name, mode == MAP_RW ? "rw" : "r");
+        file = new RandomAccessFile(name, mode == MAP_RW ? "rw" : "r");
         try {
             if (size == 0) {
-                size = (f.length() + 0xfffL) & ~0xfffL;
+                size = (file.length() + 0xfffL) & ~0xfffL;
             } else {
                 size = (size + 0xfffL) & ~0xfffL;
                 if (mode == MAP_RW) {
-                    f.setLength(size);
+                    file.setLength(size);
                 }
             }
 
-            this.addr = map(f, mode, 0, size);
+            this.addr = map(file, mode, 0, size);
             this.size = size;
             this.state = STATE_MMAP;
-        } finally {
-            f.close();
+        } catch (IOException e) {
+            file.close();
+            throw e;
         }
     }
 
@@ -62,8 +65,16 @@ public class MappedFile implements Closeable {
             DirectMemory.freeRaw(addr);
         } else if (state == STATE_MMAP) {
             unmap(addr, size);
+            try {
+                file.close();
+            } catch (IOException ignore) {
+            }
         }
         state = STATE_CLOSED;
+    }
+
+    public final RandomAccessFile getFile() {
+        return file;
     }
 
     public final long getAddr() {
