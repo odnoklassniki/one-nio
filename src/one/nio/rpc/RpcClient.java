@@ -83,7 +83,10 @@ public class RpcClient extends SocketPool implements InvocationHandler {
                 sendRequest(socket, buffer);
             }
 
-            buffer = readResponse(socket, buffer);
+            int responseSize = RpcPacket.getSize(buffer, socket);
+            if (responseSize > 4) buffer = new byte[responseSize];
+            socket.readFully(buffer, 0, responseSize);
+
             returnObject(socket);
             return buffer;
         } catch (Exception e) {
@@ -107,19 +110,5 @@ public class RpcClient extends SocketPool implements InvocationHandler {
     private void sendRequest(Socket socket, byte[] buffer) throws IOException {
         socket.writeFully(buffer, 0, buffer.length);
         socket.readFully(buffer, 0, 4);
-    }
-
-    private byte[] readResponse(Socket socket, byte[] buffer) throws IOException {
-        if (buffer[0] != 0) {
-            throw new IOException("Invalid response header or response too large");
-        }
-
-        int responseSize = (buffer[1] & 0xff) << 16 | (buffer[2] & 0xff) << 8 | (buffer[3] & 0xff);
-        if (responseSize > 4) {
-            buffer = new byte[responseSize];
-        }
-
-        socket.readFully(buffer, 0, responseSize);
-        return buffer;
     }
 }

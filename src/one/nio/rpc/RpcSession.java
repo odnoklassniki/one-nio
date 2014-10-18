@@ -45,11 +45,7 @@ public class RpcSession extends Session {
             }
             bytesRead = 0;
 
-            if (buffer[0] != 0) {
-                throw new IOException("Invalid request or request too large");
-            }
-
-            requestSize = this.requestSize = (buffer[1] & 0xff) << 16 | (buffer[2] & 0xff) << 8 | (buffer[3] & 0xff);
+            requestSize = this.requestSize = RpcPacket.getSize(buffer, socket);
             if (requestSize > buffer.length) {
                 buffer = this.buffer = new byte[requestSize];
             }
@@ -68,7 +64,7 @@ public class RpcSession extends Session {
 
         final Object request;
         try {
-            request = new DeserializeStream(buffer).readObject();
+            request = new DeserializeStream(buffer, requestSize).readObject();
         } catch (SerializerNotFoundException e) {
             writeResponse(e);
             return;
