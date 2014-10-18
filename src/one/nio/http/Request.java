@@ -4,6 +4,9 @@ import one.nio.util.ByteArrayBuilder;
 import one.nio.util.URLEncoder;
 import one.nio.util.Utf8;
 
+import java.util.Arrays;
+import java.util.NoSuchElementException;
+
 public final class Request {
     public static final int METHOD_GET     = 1;
     public static final int METHOD_POST    = 2;
@@ -76,6 +79,23 @@ public final class Request {
         return null;
     }
 
+    public String getParameter(String key, String defaultValue) {
+        String value = getParameter(key);
+        return value != null ? value : defaultValue;
+    }
+
+    public String getRequiredParameter(String key) {
+        String value = getParameter(key);
+        if (value == null) {
+            throw new NoSuchElementException("Missing required parameter: " + key);
+        }
+        return value;
+    }
+
+    public String[] getHeaders() {
+        return Arrays.copyOf(headers, headerCount);
+    }
+
     public String getHeader(String key) {
         for (int i = 0; i < headerCount; i++) {
             if (headers[i].startsWith(key)) {
@@ -83,6 +103,19 @@ public final class Request {
             }
         }
         return null;
+    }
+
+    public String getHeader(String key, String defaultValue) {
+        String value = getHeader(key);
+        return value != null ? value : defaultValue;
+    }
+
+    public String getRequiredHeader(String key) {
+        String value = getHeader(key);
+        if (value == null) {
+            throw new NoSuchElementException("Missing required header: " + key);
+        }
+        return value;
     }
 
     public void addHeader(String header) {

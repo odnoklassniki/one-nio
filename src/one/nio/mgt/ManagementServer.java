@@ -1,8 +1,9 @@
 package one.nio.mgt;
 
-import one.nio.http.HttpHandler;
 import one.nio.http.HttpServer;
 import one.nio.http.HttpSession;
+import one.nio.http.Param;
+import one.nio.http.Path;
 import one.nio.http.Request;
 import one.nio.http.Response;
 import one.nio.net.ConnectionString;
@@ -25,57 +26,54 @@ public class ManagementServer extends HttpServer {
 
     @Override
     public void handleRequest(Request request, HttpSession session) throws IOException {
-        super.handleRequest(request, session);
-        session.scheduleClose();
+        try {
+            super.handleRequest(request, session);
+        } finally {
+            session.scheduleClose();
+        }
     }
 
-    @HttpHandler("/getstatus")
+    @Path("/getstatus")
     public Response getStatusResponse() {
         return Response.ok("OK");
     }
 
-    @HttpHandler("/monitor/mem")
-    public Response getMonitorMemResponse(Request request) {
-        return getJmxResponse(request, "one.nio.mem:type=MallocMT,*", "TotalMemory,UsedMemory,FreeMemory", true);
+    @Path("/monitor/mem")
+    public Response getMonitorMemResponse() {
+        return getJmxResponse("one.nio.mem:type=MallocMT,*", "base", "TotalMemory,UsedMemory,FreeMemory");
     }
 
-    @HttpHandler("/monitor/shm")
-    public Response getMonitorShmResponse(Request request) {
-        return getJmxResponse(request, "one.nio.mem:type=SharedMemoryMap,*", "TotalMemory,UsedMemory,FreeMemory,Capacity,Count", true);
+    @Path("/monitor/shm")
+    public Response getMonitorShmResponse() {
+        return getJmxResponse("one.nio.mem:type=SharedMemoryMap,*", "name", "TotalMemory,UsedMemory,FreeMemory,Capacity,Count");
     }
 
-    @HttpHandler("/monitor/server")
-    public Response getMonitorServerResponse(Request request) {
-        return getJmxResponse(request, "one.nio.server:type=Server,*", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady", true);
+    @Path("/monitor/server")
+    public Response getMonitorServerResponse() {
+        return getJmxResponse("one.nio.server:type=Server,*", "port", "AcceptedSessions,Connections,RequestsProcessed,RequestsRejected,Workers,WorkersActive,SelectorMaxReady");
     }
 
-    @HttpHandler("/jmx")
-    public Response getJmxResponse(Request request) {
-        return getJmxResponse(request, request.getParameter("name="), request.getParameter("attr="), false);
-    }
-
-    public Response getJmxResponse(Request request, String name, String attr, boolean replaceWildcard) {
-        if (name == null || attr == null) {
+    @Path("/jmx")
+    public Response getJmxResponse(@Param("name") String name, @Param("prop=") String prop, @Param("attr") String attr) {
+        if (name == null) {
             return new Response(Response.BAD_REQUEST, Response.EMPTY);
-        }
-
-        if (replaceWildcard && name.endsWith(",*")) {
-            String queryString = request.getQueryString();
-            if (queryString != null) {
-                name = name.substring(0, name.length() - 1) + queryString.replace('&', ',');
-            }
         }
 
         try {
             Set<ObjectName> objNames = Management.resolvePattern(name);
-            String[] attributes = attr.split(",");
             StringBuilder result = new StringBuilder();
 
             for (ObjectName objName : objNames) {
                 result.append(objName.toString());
-                Object[] values = Management.getAttributes(objName, attributes);
-                for (int i = 0; i < values.length; i++) {
-                    result.append(i == 0 ? '\t' : ' ').append(values[i]);
+                if (prop != null) {
+                    for (String property : prop.split(",")) {
+                        result.append('\t').append(objName.getKeyProperty(property));
+                    }
+                }
+                if (attr != null) {
+                    for (Object value : Management.getAttributes(objName, attr.split(","))) {
+                        result.append('\t').append(value);
+                    }
                 }
                 result.append("\r\n");
             }

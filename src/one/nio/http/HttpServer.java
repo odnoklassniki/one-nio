@@ -49,7 +49,7 @@ public class HttpServer extends Server {
         RequestHandlerGenerator generator = new RequestHandlerGenerator();
         for (int i = supers.size(); --i >= 0; ) {
             for (Method m : supers.get(i).getMethods()) {
-                HttpHandler annotation = m.getAnnotation(HttpHandler.class);
+                Path annotation = m.getAnnotation(Path.class);
                 if (annotation != null) {
                     RequestHandler requestHandler = generator.generateFor(m, router);
                     for (String path : annotation.value()) {
