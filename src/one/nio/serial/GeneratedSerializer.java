@@ -151,24 +151,37 @@ public class GeneratedSerializer extends Serializer {
         // 1. Find exact match
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
-            if (f != null && f.getName().equals(name) && f.getType() == type) {
+            if (f != null && f.getType() == type && f.getName().equals(name)) {
                 return i;
             }
         }
 
-        // 2. Find exact match by old name
-        if (oldName != null) {
-            for (int i = 0; i < ownFields.length; i += 2) {
-                Field f = ownFields[i];
-                if (f != null && f.getName().equals(oldName) && f.getType() == type) {
-                    logFieldMismatch("Field renamed from " + oldName, f.getType(), f.getDeclaringClass(), f.getName());
+        // 2. Find exact match by locally old name
+        for (int i = 0; i < ownFields.length; i += 2) {
+            Field f = ownFields[i];
+            if (f != null && f.getType() == type) {
+                Renamed renamed = f.getAnnotation(Renamed.class);
+                if (renamed != null && renamed.from().equals(name)) {
+                    logFieldMismatch("Local field renamed from " + renamed.from(), f.getType(), f.getDeclaringClass(), f.getName());
                     renamedFields.incrementAndGet();
                     return i;
                 }
             }
         }
 
-        // 3. Find match by name only
+        // 3. Find exact match by remotely old name
+        if (oldName != null) {
+            for (int i = 0; i < ownFields.length; i += 2) {
+                Field f = ownFields[i];
+                if (f != null && f.getType() == type && f.getName().equals(oldName)) {
+                    logFieldMismatch("Remote field renamed from " + oldName, f.getType(), f.getDeclaringClass(), f.getName());
+                    renamedFields.incrementAndGet();
+                    return i;
+                }
+            }
+        }
+
+        // 4. Find match by name only
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
             if (f != null && (f.getName().equals(name) || f.getName().equals(oldName))) {
