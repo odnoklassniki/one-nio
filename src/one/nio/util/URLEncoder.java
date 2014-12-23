@@ -73,34 +73,38 @@ public final class URLEncoder {
             return new String(chars);
         }
 
-        int p = i;
+        try {
+            int p = i;
 
-        while (i + 3 <= chars.length) {
-            int c1 = decodeByte(chars, i);
-            if (c1 <= 0x7f) {
-                chars[p] = (char) c1;
-                i += 3;
-            } else if ((c1 & 0xe0) == 0xc0 && i + 6 <= chars.length && chars[i + 3] == '%') {
-                int c2 = decodeByte(chars, i + 3);
-                chars[p] = (char) ((c1 & 0x1f) << 6 | (c2 & 0x3f));
-                i += 6;
-            } else if (i + 9 <= chars.length && chars[i + 3] == '%' && chars[i + 6] == '%') {
-                int c2 = decodeByte(chars, i + 3);
-                int c3 = decodeByte(chars, i + 6);
-                chars[p] = (char) ((c1 & 0x0f) << 12 | (c2 & 0x3f) << 6 | (c3 & 0x3f));
-                i += 9;
-            } else {
-                chars[p] = '%';
-                i++;
+            while (i + 3 <= chars.length) {
+                int c1 = decodeByte(chars, i);
+                if (c1 <= 0x7f) {
+                    chars[p] = (char) c1;
+                    i += 3;
+                } else if ((c1 & 0xe0) == 0xc0 && i + 6 <= chars.length && chars[i + 3] == '%') {
+                    int c2 = decodeByte(chars, i + 3);
+                    chars[p] = (char) ((c1 & 0x1f) << 6 | (c2 & 0x3f));
+                    i += 6;
+                } else if (i + 9 <= chars.length && chars[i + 3] == '%' && chars[i + 6] == '%') {
+                    int c2 = decodeByte(chars, i + 3);
+                    int c3 = decodeByte(chars, i + 6);
+                    chars[p] = (char) ((c1 & 0x0f) << 12 | (c2 & 0x3f) << 6 | (c3 & 0x3f));
+                    i += 9;
+                } else {
+                    chars[p] = '%';
+                    i++;
+                }
+
+                p++;
+                while (i < chars.length && chars[i] != '%') {
+                    chars[p++] = chars[i++];
+                }
             }
 
-            p++;
-            while (i < chars.length && chars[i] != '%') {
-                chars[p++] = chars[i++];
-            }
+            return new String(chars, 0, p);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("Invalid URL: " + url);
         }
-
-        return new String(chars, 0, p);
     }
 
     private static void encodeByte(char[] chars, int p, int value) {
