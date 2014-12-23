@@ -12,11 +12,12 @@
         <mkdir dir="${build.dir}"/>
 
         <available file="${lib.dir}" type="dir" property="lib.dir.exists"/>
-        <path id="lib.ref">
+        <path id="classpath.ref">
             <fileset dir="${lib.dir}" includes="*.jar"/>
+            <fileset file="${java.home}/../lib/tools.jar"/>
         </path>
     </target>
-
+    
     <target name="retrieve-libs" unless="lib.dir.exists">
         <echo message="Downloading external libraries..."/>
         <mkdir dir="${lib.dir}"/>
@@ -38,14 +39,22 @@
     <target name="compile-classes" depends="init, retrieve-libs">
         <echo message="Compiling classes..."/>
         <mkdir dir="${build.dir}/classes"/>
-        <javac srcdir="${src.dir}" destdir="${build.dir}/classes" classpathref="lib.ref" includeantruntime="false"/>
+        <javac srcdir="${src.dir}" destdir="${build.dir}/classes" classpathref="classpath.ref" includeantruntime="false"/>
     </target>
 
     <target name="compile-native" depends="init">
         <echo message="Compiling native library..."/>
         <mkdir dir="${build.dir}/native"/>
+
+        <pathconvert property="src.native" pathsep=" ">
+            <fileset dir="${src.dir}" includes="**/*.c"/>
+        </pathconvert>
+
         <exec os="Linux" executable="gcc">
-            <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args} -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so -I ${java.home}/../include -I ${java.home}/../include/linux ${src.dir}/one/nio/os/native/mem.c ${src.dir}/one/nio/os/native/proc.c ${src.dir}/one/nio/os/native/user.c ${src.dir}/one/nio/net/native/epoll.c ${src.dir}/one/nio/net/native/socket.c -lssl"/>
+            <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args}
+                       -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so
+                       -I ${java.home}/../include -I ${java.home}/../include/linux
+                       ${src.native} -lssl"/>
         </exec>
     </target>
 

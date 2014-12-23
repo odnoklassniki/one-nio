@@ -135,6 +135,16 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
+    public byte[] getOption(int level, int option) {
+        return null;
+    }
+
+    @Override
+    public boolean setOption(int level, int option, byte[] value) {
+        return false;
+    }
+
+    @Override
     public final InetSocketAddress getLocalAddress() {
         return (InetSocketAddress) ch.socket().getLocalSocketAddress();
     }
@@ -145,7 +155,7 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
-    public Socket ssl(boolean serverMode) {
-        throw new UnsupportedOperationException();
+    public Socket ssl(SslContext context) {
+        return this;
     }
 }

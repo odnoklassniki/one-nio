@@ -18,10 +18,13 @@ import java.util.regex.Pattern;
 public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
 
-    private String protocol;
-    private String host;
-    private int port;
-    private Map<String, String> params;
+    protected String protocol;
+    protected String host;
+    protected int port;
+    protected Map<String, String> params;
+
+    protected ConnectionString() {
+    }
 
     public ConnectionString(String connectionString) {
         connectionString = expand(connectionString);

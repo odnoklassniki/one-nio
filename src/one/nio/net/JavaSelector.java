@@ -72,7 +72,7 @@ final class JavaSelector extends Selector {
 
     private void registerPendingSessions() throws ClosedChannelException {
         for (Session session; (session = pendingSessions.poll()) != null; ) {
-            ((JavaSocket) session.socket).ch.register(impl, Session.READABLE, session);
+            ((JavaSocket) session.socket).ch.register(impl, session.eventsToListen, session);
         }
     }
 

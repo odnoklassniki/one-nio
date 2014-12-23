@@ -32,7 +32,7 @@ public class HttpSession extends Session {
         if (length > 0) {
             System.arraycopy(fragment, 0, buffer, 0, length);
         }
-        length += socket.read(buffer, length, buffer.length - length);
+        length += super.read(buffer, length, buffer.length - length);
 
         try {
             int processed = processHttpBuffer(buffer, length);
@@ -62,7 +62,7 @@ public class HttpSession extends Session {
                 } else if (lineLength > 0) {
                     request.addHeader(Utf8.read(buffer, lineStart, lineLength));
                 } else {
-                    server.handleRequest(request, this);
+                        server.handleRequest(request, this);
                     request = null;
                 }
                 lineStart = i + 1;

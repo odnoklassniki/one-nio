@@ -51,7 +51,7 @@ final class NativeSelector extends Selector {
     @Override
     public final void register(Session session) {
         add(session);
-        epollCtl(epollFD, EPOLL_CTL_ADD, ((NativeSocket) session.socket).fd, session.slot, Session.READABLE);
+        epollCtl(epollFD, EPOLL_CTL_ADD, ((NativeSocket) session.socket).fd, session.slot, session.eventsToListen);
     }
 
     @Override

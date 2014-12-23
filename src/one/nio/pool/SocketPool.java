@@ -3,6 +3,7 @@ package one.nio.pool;
 import one.nio.mgt.Management;
 import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
+import one.nio.net.SslContext;
 
 import java.io.IOException;
 
@@ -11,21 +12,30 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected int port;
     protected int readTimeout;
     protected int connectTimeout;
+    protected SslContext sslContext;
 
-    public SocketPool(ConnectionString conn, int defaultPort) throws IOException {
+    public SocketPool(ConnectionString conn) throws IOException {
         super(conn.getIntParam("clientMinPoolSize", 0),
               conn.getIntParam("clientMaxPoolSize", 10),
               conn.getIntParam("timeout", 3000));
+
         this.host = conn.getHost();
-        this.port = conn.getPort() != 0 ? conn.getPort() : defaultPort;
+        this.port = conn.getPort();
         this.readTimeout = conn.getIntParam("readTimeout", timeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", readTimeout);
+
+        setProperties(conn);
+        initialize();
 
         if (conn.getBooleanParam("jmx", false)) {
             Management.registerMXBean(this, "one.nio.pool:type=SocketPool,host=" + host + ",port=" + port);
         }
+    }
 
-        initialize();
+    protected void setProperties(ConnectionString conn) {
+        if ("ssl".equals(conn.getProtocol())) {
+            sslContext = SslContext.getDefault();
+        }
     }
 
     @Override
@@ -103,6 +113,11 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
             socket.setTimeout(connectTimeout);
             socket.connect(host, port);
             socket.setTimeout(readTimeout);
+
+            if (sslContext != null) {
+                socket = socket.ssl(sslContext);
+            }
+
             return socket;
         } catch (Exception e) {
             if (socket != null) socket.close();

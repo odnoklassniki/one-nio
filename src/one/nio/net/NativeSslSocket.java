@@ -3,13 +3,13 @@ package one.nio.net;
 import java.io.IOException;
 
 class NativeSslSocket extends NativeSocket {
-    private static final long GLOBAL_SSL_CTX = sslInit();
-
+    long ctx;
     long ssl;
 
-    NativeSslSocket(int fd, boolean serverMode) throws IOException {
+    NativeSslSocket(int fd, long ctx, boolean serverMode) throws IOException {
         super(fd);
-        this.ssl = sslNew(fd, serverMode, GLOBAL_SSL_CTX);
+        this.ctx = ctx;
+        this.ssl = sslNew(fd, ctx, serverMode);
     }
 
     @Override
@@ -19,6 +19,11 @@ class NativeSslSocket extends NativeSocket {
             ssl = 0;
         }
         super.close();
+    }
+
+    @Override
+    public NativeSocket accept() throws IOException {
+        return new NativeSslSocket(accept0(), ctx, true);
     }
 
     @Override
@@ -39,7 +44,6 @@ class NativeSslSocket extends NativeSocket {
     @Override
     public native void readFully(byte[] data, int offset, int count) throws IOException;
 
-    private static native long sslInit();
-    private static native long sslNew(int fd, boolean serverMode, long ctx) throws IOException;
-    private static native void sslFree(long ssl);
+    static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
+    static native void sslFree(long ssl);
 }

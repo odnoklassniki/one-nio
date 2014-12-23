@@ -25,7 +25,7 @@ class NativeSocket extends Socket {
     }
     
     @Override
-    public final NativeSocket accept() throws IOException {
+    public NativeSocket accept() throws IOException {
         return new NativeSocket(accept0());
     }
 
@@ -63,8 +63,8 @@ class NativeSocket extends Socket {
     }
 
     @Override
-    public final Socket ssl(boolean serverMode) throws IOException {
-        return new NativeSslSocket(fd, serverMode);
+    public final Socket ssl(SslContext context) throws IOException {
+        return new NativeSslSocket(fd, ((NativeSslContext) context).ctx, false);
     }
 
     @Override
@@ -127,11 +127,17 @@ class NativeSocket extends Socket {
     @Override
     public final native void setSendBuffer(int sendBuf);
 
-    private static native int socket0() throws IOException;
-    private native int accept0() throws IOException;
-    private native void connect0(byte[] address, int port) throws IOException;
-    private native void bind0(byte[] address, int port, int backlog) throws IOException;
-    private native long sendFile0(int sourceFD, long offset, long count) throws IOException;
-    private native int getsockname(byte[] buffer);
-    private native int getpeername(byte[] buffer);
+    @Override
+    public final native byte[] getOption(int level, int option);
+
+    @Override
+    public final native boolean setOption(int level, int option, byte[] value);
+
+    static native int socket0() throws IOException;
+    native int accept0() throws IOException;
+    native void connect0(byte[] address, int port) throws IOException;
+    native void bind0(byte[] address, int port, int backlog) throws IOException;
+    native long sendFile0(int sourceFD, long offset, long count) throws IOException;
+    native int getsockname(byte[] buffer);
+    native int getpeername(byte[] buffer);
 }

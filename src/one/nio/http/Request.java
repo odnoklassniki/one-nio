@@ -31,12 +31,14 @@ public final class Request {
 
     private int method;
     private String uri;
+    private int params;
     private int headerCount;
     private String[] headers;
 
     public Request(int method, String uri, int maxHeaderCount) {
         this.method = method;
         this.uri = uri;
+        this.params = uri.indexOf('?');
         this.headerCount = 0;
         this.headers = new String[maxHeaderCount];
     }
@@ -44,6 +46,7 @@ public final class Request {
     public Request(Request prototype) {
         this.method = prototype.method;
         this.uri = prototype.uri;
+        this.params = prototype.params;
         this.headerCount = prototype.headerCount;
         this.headers = prototype.headers.clone();
     }
@@ -57,24 +60,23 @@ public final class Request {
     }
 
     public String getPath() {
-        int p = uri.indexOf('?');
-        return p >= 0 ? uri.substring(0, p) : uri;
+        return params >= 0 ? uri.substring(0, params) : uri;
     }
 
     public String getQueryString() {
-        int p = uri.indexOf('?');
-        return p >= 0 ? URLEncoder.decode(uri.substring(p + 1)) : null;
+        return params >= 0 ? URLEncoder.decode(uri.substring(params + 1)) : null;
     }
 
     public String getParameter(String key) {
-        int p = uri.indexOf('?');
-        if (p >= 0) {
-            p = uri.indexOf(key, p);
-            if (p > 0) {
-                int q = uri.indexOf('&', p += key.length());
-                String rawValue = q > 0 ? uri.substring(p, q) : uri.substring(p);
+        int cur = params + 1;
+        while (cur > 0) {
+            int next = uri.indexOf('&', cur);
+            if (uri.startsWith(key, cur)) {
+                cur += key.length();
+                String rawValue = next > 0 ? uri.substring(cur, next) : uri.substring(cur);
                 return URLEncoder.decode(rawValue);
             }
+            cur = next + 1;
         }
         return null;
     }

@@ -42,28 +42,28 @@ final class CleanupThread extends Thread {
             }
 
             long cleanTime = System.currentTimeMillis();
-            long readExpiration = cleanTime - keepAlive;
-            long writeExpiration = cleanTime - keepAlive * 8;
-            int readExpired = 0;
-            int writeExpired = 0;
+            long idle = cleanTime - keepAlive;
+            long timeout = cleanTime - keepAlive * 8;
+            int idleCount = 0;
+            int timeoutCount = 0;
 
             for (SelectorThread selector : selectors) {
                 for (Session session : selector.selector) {
                     long lastAccessTime = session.lastAccessTime();
-                    if (lastAccessTime > 0 && lastAccessTime < readExpiration) {
-                        if (!session.writePending()) {
+                    if (lastAccessTime > 0 && lastAccessTime < idle) {
+                        if (!session.isActive()) {
                             session.close();
-                            readExpired++;
-                        } else if (lastAccessTime < writeExpiration) {
+                            idleCount++;
+                        } else if (lastAccessTime < timeout) {
                             session.close();
-                            writeExpired++;
+                            timeoutCount++;
                         }
                     }
                 }
             }
 
             if (log.isInfoEnabled()) {
-                log.info(readExpired + " idle + " + writeExpired + " timed out sessions closed in " +
+                log.info(idleCount + " idle + " + timeoutCount + " timed out sessions closed in " +
                         (System.currentTimeMillis() - cleanTime) + " ms");
             }
         }

@@ -4,6 +4,7 @@ import one.nio.net.ConnectionString;
 import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.mgt.Management;
+import one.nio.net.SslContext;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,6 +35,9 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         String[] hosts = conn.getHosts();
         int port = conn.getPort();
+        String protocol = conn.getProtocol();
+        SslContext sslContext = "ssl".equals(protocol) || "https".equals(protocol) ? SslContext.getDefault() : null;
+
         int backlog = conn.getIntParam("backlog", 128);
         int buffers = conn.getIntParam("buffers", 0);
         int recvBuf = conn.getIntParam("recvBuf", buffers);
@@ -49,7 +53,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         this.acceptors = new AcceptorThread[hosts.length];
         for (int i = 0; i < hosts.length; i++) {
             InetAddress address = InetAddress.getByName(hosts[i]);
-            acceptors[i] = new AcceptorThread(this, address, port, backlog, recvBuf, sendBuf, defer);
+            acceptors[i] = new AcceptorThread(this, address, port, sslContext, backlog, recvBuf, sendBuf, defer);
         }
 
         this.selectors = new SelectorThread[selectorCount];

@@ -56,12 +56,12 @@ final class SelectorThread extends Thread {
                     session.process(buffer);
                 } catch (SocketException e) {
                     if (server.isRunning() && log.isDebugEnabled()) {
-                        log.debug("Connection closed: " + session.clientIp());
+                        log.debug("Connection closed: " + session.getRemoteHost());
                     }
                     session.close();
                 } catch (Throwable e) {
                     if (server.isRunning()) {
-                        log.error("Cannot process session from " + session.clientIp(), e);
+                        log.error("Cannot process session from " + session.getRemoteHost(), e);
                     }
                     session.close();
                 }

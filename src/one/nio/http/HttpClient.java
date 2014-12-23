@@ -2,6 +2,7 @@ package one.nio.http;
 
 import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
+import one.nio.net.SslContext;
 import one.nio.pool.PoolException;
 import one.nio.pool.SocketPool;
 import one.nio.util.Utf8;
@@ -13,31 +14,27 @@ import java.util.ArrayList;
 public class HttpClient extends SocketPool {
     private static final int BUFFER_SIZE = 8000;
 
-    protected boolean useSsl;
     protected String hostHeader;
     protected String connectionHeader;
 
     public HttpClient(ConnectionString conn) throws IOException {
-        super(conn, "https".equals(conn.getProtocol()) ? 443 : 80);
-        this.useSsl = "https".equals(conn.getProtocol());
+        super(conn);
         this.hostHeader = "Host: " + conn.getHost();
         this.connectionHeader = conn.getBooleanParam("keepalive", true) ? "Connection: Keep-Alive" : "Connection: close";
     }
 
     @Override
-    public Socket createObject() throws PoolException {
-        Socket s = super.createObject();
-        if (!useSsl) return s;
-
-        try {
-            return s.ssl(false);
-        } catch (IOException e) {
-            s.close();
-            throw new PoolException(name() + " failed to create SSL socket", e);
+    protected void setProperties(ConnectionString conn) {
+        boolean https = "https".equals(conn.getProtocol());
+        if (https) {
+            sslContext = SslContext.getDefault();
+        }
+        if (port == 0) {
+            port = https ? 443 : 80;
         }
     }
 
-    public Response invoke(Request request) throws Exception {
+    public Response invoke(Request request) throws InterruptedException, PoolException, IOException, HttpException {
         int method = request.getMethod();
         byte[] rawRequest = request.toBytes();
         ResponseReader responseReader;
@@ -57,7 +54,7 @@ public class HttpClient extends SocketPool {
             }
 
             Response response = responseReader.readResponse(method);
-            keepAlive = "Keep-Alive".equalsIgnoreCase(response.getHeader("Connection: "));
+            keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection: "));
             return response;
         } finally {
             if (keepAlive) {
@@ -68,15 +65,18 @@ public class HttpClient extends SocketPool {
         }
     }
 
-    public Response get(String uri, String... headers) throws Exception {
+    public Response get(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_GET, uri, headers));
     }
 
-    public Response post(String uri, String... headers) throws Exception {
+    public Response post(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_POST, uri, headers));
     }
 
-    public Response head(String uri, String... headers) throws Exception {
+    public Response head(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_HEAD, uri, headers));
     }
 

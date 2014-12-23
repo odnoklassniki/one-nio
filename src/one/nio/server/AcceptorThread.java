@@ -3,6 +3,7 @@ package one.nio.server;
 import one.nio.net.Selector;
 import one.nio.net.Session;
 import one.nio.net.Socket;
+import one.nio.net.SslContext;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -17,29 +18,29 @@ final class AcceptorThread extends Thread {
     final Server server;
     final InetAddress address;
     final int port;
-    final Socket serverSocket;
     final Random random;
+    final Socket serverSocket;
 
     long acceptedSessions;
 
-    AcceptorThread(Server server, InetAddress address, int port, int backlog, int recvBuf, int sendBuf, boolean defer) throws IOException {
+    AcceptorThread(Server server, InetAddress address, int port, SslContext sslContext,
+                   int backlog, int recvBuf, int sendBuf, boolean defer) throws IOException {
         super("NIO Acceptor " + address + ":" + port);
         setUncaughtExceptionHandler(server);
+
         this.server = server;
         this.address = address;
         this.port = port;
-        this.serverSocket = Socket.createServerSocket();
         this.random = new Random();
 
-        if (recvBuf != 0) {
-            serverSocket.setRecvBuffer(recvBuf);
-        }
-        if (sendBuf != 0) {
-            serverSocket.setSendBuffer(sendBuf);
-        }
-        if (defer) {
-            serverSocket.setDeferAccept(true);
-        }
+        Socket serverSocket = Socket.createServerSocket();
+        if (sslContext != null) serverSocket = serverSocket.ssl(sslContext);
+        this.serverSocket = serverSocket;
+
+        if (recvBuf != 0) serverSocket.setRecvBuffer(recvBuf);
+        if (sendBuf != 0) serverSocket.setSendBuffer(sendBuf);
+        if (defer) serverSocket.setDeferAccept(true);
+
         serverSocket.setNoDelay(true);
         serverSocket.setReuseAddr(true);
         serverSocket.bind(address, port, backlog);

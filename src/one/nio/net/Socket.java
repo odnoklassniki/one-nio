@@ -9,6 +9,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 public abstract class Socket implements Closeable {
+    public static final int SOL_SOCKET    = 1;
+    public static final int SOL_IP        = 0;
+    public static final int SOL_IPV6      = 41;
+    public static final int SOL_TCP       = 6;
+    public static final int SOL_UDP       = 17;
+
     public static final int MSG_OOB       = 0x01;
     public static final int MSG_PEEK      = 0x02;
     public static final int MSG_DONTROUTE = 0x04;
@@ -36,9 +42,11 @@ public abstract class Socket implements Closeable {
     public abstract void setReuseAddr(boolean reuseAddr);
     public abstract void setRecvBuffer(int recvBuf);
     public abstract void setSendBuffer(int sendBuf);
+    public abstract byte[] getOption(int level, int option);
+    public abstract boolean setOption(int level, int option, byte[] value);
     public abstract InetSocketAddress getLocalAddress();
     public abstract InetSocketAddress getRemoteAddress();
-    public abstract Socket ssl(boolean serverMode) throws IOException;
+    public abstract Socket ssl(SslContext context) throws IOException;
 
     public void connect(String host, int port) throws IOException {
         connect(InetAddress.getByName(host), port);
@@ -54,5 +62,12 @@ public abstract class Socket implements Closeable {
 
     public static Socket createServerSocket() throws IOException {
         return NativeLibrary.IS_SUPPORTED ? new NativeSocket() : new JavaServerSocket();
+    }
+
+    public static Socket fromFD(int fd) throws IOException {
+        if (NativeLibrary.IS_SUPPORTED) {
+            return new NativeSocket(fd);
+        }
+        throw new IOException("Operation is not supported");
     }
 }
