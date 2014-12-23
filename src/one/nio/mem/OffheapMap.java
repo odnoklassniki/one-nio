@@ -37,7 +37,8 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected long timeToLive = Long.MAX_VALUE;
     protected long lockWaitTime = 10;
     protected long cleanupInterval = 60000;
-    protected double cleanupThreshold;
+    protected double cleanupThreshold = 0.1;
+    protected int maxSamples = 1000;
     protected BasicCleanup cleanupThread;
 
     protected OffheapMap(int capacity) {
@@ -46,7 +47,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
     protected OffheapMap(int capacity, long address) {
         this(capacity);
-        this.mapBase = address != 0 ? address : DirectMemory.allocateAndFill(this.capacity * 8, this, (byte) 0);
+        this.mapBase = address != 0 ? address : DirectMemory.allocateAndFill(this.capacity * 8L, this, (byte) 0);
     }
 
     private static RWLock[] createLocks() {
@@ -111,6 +112,16 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     @Override
     public void setCleanupThreshold(double cleanupThreshold) {
         this.cleanupThreshold = cleanupThreshold;
+    }
+
+    @Override
+    public int getMaxSamples() {
+        return maxSamples;
+    }
+
+    @Override
+    public void setMaxSamples(int maxSamples) {
+        this.maxSamples = maxSamples;
     }
 
     @Override
@@ -621,7 +632,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                 return 0;
             }
 
-            long[] timestamps = new long[1000];
+            long[] timestamps = new long[getMaxSamples()];
             int samples = collectSamples(timestamps);
             if (samples == 0) {
                 return 0;

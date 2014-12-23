@@ -12,4 +12,6 @@ public interface OffheapMapMXBean {
     void setCleanupInterval(long cleanupInterval);
     double getCleanupThreshold();
     void setCleanupThreshold(double cleanupThreshold);
+    int getMaxSamples();
+    void setMaxSamples(int maxSamples);
 }

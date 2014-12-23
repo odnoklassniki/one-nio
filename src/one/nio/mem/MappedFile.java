@@ -40,7 +40,7 @@ public class MappedFile implements Closeable {
     }
 
     public MappedFile(String name, long size, int mode) throws IOException {
-        file = new RandomAccessFile(name, mode == MAP_RW ? "rw" : "r");
+        this.file = new RandomAccessFile(name, mode == MAP_RW ? "rw" : "r");
         try {
             if (size == 0) {
                 size = (file.length() + 0xfffL) & ~0xfffL;

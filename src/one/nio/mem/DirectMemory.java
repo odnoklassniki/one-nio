@@ -40,6 +40,10 @@ public final class DirectMemory {
         unsafe.freeMemory(address);
     }
 
+    public static void clear(long address, long length) {
+        unsafe.setMemory(address, length, (byte) 0);
+    }
+
     public static long getAddress(ByteBuffer buffer) {
         return unsafe.getLong(buffer, addressOffset);
     }
