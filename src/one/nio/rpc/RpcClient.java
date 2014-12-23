@@ -19,7 +19,7 @@ import java.net.SocketException;
 public class RpcClient extends SocketPool implements InvocationHandler {
 
     public RpcClient(ConnectionString conn) throws IOException {
-        super(conn, 0);
+        super(conn);
     }
 
     public Object invoke(Object request) throws Exception {

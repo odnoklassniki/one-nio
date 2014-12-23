@@ -15,16 +15,16 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.util.concurrent.RejectedExecutionException;
 
-public class RpcSession extends Session {
+public class RpcSession<S> extends Session {
     private static final Log log = LogFactory.getLog(RpcSession.class);
     private static final int BUFFER_SIZE = 8000;
 
-    protected final RpcServer server;
+    protected final RpcServer<S> server;
     private byte[] buffer;
     private int bytesRead;
     private int requestSize;
 
-    public RpcSession(Socket socket, RpcServer server) {
+    public RpcSession(Socket socket, RpcServer<S> server) {
         super(socket);
         this.server = server;
         this.buffer = new byte[BUFFER_SIZE];
@@ -38,7 +38,7 @@ public class RpcSession extends Session {
 
         // Read 4-bytes header
         if (requestSize == 0) {
-            bytesRead += socket.read(buffer, bytesRead, 4 - bytesRead);
+            bytesRead += super.read(buffer, bytesRead, 4 - bytesRead);
             if (bytesRead < 4) {
                 this.bytesRead = bytesRead;
                 return;
@@ -52,7 +52,7 @@ public class RpcSession extends Session {
         }
 
         // Read request
-        bytesRead += socket.read(buffer, bytesRead, requestSize - bytesRead);
+        bytesRead += super.read(buffer, bytesRead, requestSize - bytesRead);
         if (bytesRead < requestSize) {
             this.bytesRead = bytesRead;
             return;
@@ -88,7 +88,7 @@ public class RpcSession extends Session {
                 server.incRequestsRejected();
             }
         } else {
-            writeResponse(server.invoke(request));
+            writeResponse(invoke(request));
             server.incRequestsProcessed();
         }
     }
@@ -106,9 +106,14 @@ public class RpcSession extends Session {
         super.write(buffer, 0, buffer.length);
     }
 
+    protected Object invoke(Object request) throws Exception {
+        RemoteCall remoteCall = (RemoteCall) request;
+        return remoteCall.method().invoke(server.service, remoteCall.args());
+    }
+
     protected void handleClassNotFound(ClassNotFoundException e) throws IOException {
         writeResponse(e);
-        log.error("Cannot deserialize request from " + clientIp(), e);
+        log.error("Cannot deserialize request from " + getRemoteHost(), e);
     }
 
     protected void handleRejectedExecution(RejectedExecutionException e, Object request) throws IOException {
@@ -126,15 +131,15 @@ public class RpcSession extends Session {
         @Override
         public void run() {
             try {
-                writeResponse(server.invoke(request));
+                writeResponse(invoke(request));
             } catch (SocketException e) {
                 if (server.isRunning() && log.isDebugEnabled()) {
-                    log.debug("Connection closed: " + clientIp());
+                    log.debug("Connection closed: " + getRemoteHost());
                 }
                 close();
             } catch (Throwable e) {
                 if (server.isRunning()) {
-                    log.error("Cannot process session from " + clientIp(), e);
+                    log.error("Cannot process session from " + getRemoteHost(), e);
                 }
                 close();
             }

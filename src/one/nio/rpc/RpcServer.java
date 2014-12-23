@@ -1,7 +1,6 @@
 package one.nio.rpc;
 
 import one.nio.net.ConnectionString;
-import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.server.Server;
 
@@ -20,13 +19,12 @@ public class RpcServer<S> extends Server {
         this.service = service;
     }
 
-    @Override
-    public Session createSession(Socket socket) {
-        return new RpcSession(socket, this);
+    public final S service() {
+        return service;
     }
 
-    public Object invoke(Object request) throws Exception {
-        RemoteCall remoteCall = (RemoteCall) request;
-        return remoteCall.method().invoke(service, remoteCall.args());
+    @Override
+    public RpcSession<S> createSession(Socket socket) {
+        return new RpcSession<S>(socket, this);
     }
 }
