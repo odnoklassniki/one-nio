@@ -61,7 +61,7 @@ public class Management {
         return ManagementFactory.getPlatformMBeanServer().getAttribute(objName, attribute);
     }
 
-    public static Object getAttributes(String name, String... attributes) throws JMException {
+    public static Object[] getAttributes(String name, String... attributes) throws JMException {
         return getAttributes(new ObjectName(name), attributes);
     }
 
