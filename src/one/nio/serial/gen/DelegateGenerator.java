@@ -11,8 +11,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
-import sun.misc.Unsafe;
-
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
@@ -22,8 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static one.nio.util.JavaInternals.unsafe;
+
 public class DelegateGenerator extends BytecodeGenerator {
-    private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final String SUPER_CLASS = "sun/reflect/MagicAccessorImpl";
 
     private static AtomicInteger index = new AtomicInteger();

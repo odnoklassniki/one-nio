@@ -3,6 +3,8 @@ package one.nio.mem;
 import java.io.PrintStream;
 import java.util.Arrays;
 
+import static one.nio.util.JavaInternals.unsafe;
+
 public class MallocAnalyzer extends MallocMT {
     private PrintStream out;
 
@@ -31,6 +33,7 @@ public class MallocAnalyzer extends MallocMT {
     public void chunkInfo() {
         BinStats[] usedStats = new BinStats[SEGMENT_COUNT];
         BinStats[] freeStats = new BinStats[SEGMENT_COUNT];
+        BinStats[] altStats = new BinStats[SEGMENT_COUNT];
 
         for (int i = 0; i < SEGMENT_COUNT; i++) {
             long start = segment(i).base + BIN_SPACE;
@@ -43,10 +46,20 @@ public class MallocAnalyzer extends MallocMT {
                 size = sizeField & FREE_MASK;
                 (sizeField == size ? free : used).addChunk(size);
             }
+
+            BinStats alt = altStats[i] = new BinStats();
+            for (int bin = acquireBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
+                long chunk = segment(i).base + bin * BIN_SIZE;
+                while ((chunk = unsafe.getLong(chunk + NEXT_OFFSET)) != 0) {
+                    int size = unsafe.getInt(chunk + SIZE_OFFSET) & FREE_MASK;
+                    alt.addChunk(bin, size);
+                }
+            }
         }
 
         printChunkInfo("=== Used Info ===", usedStats);
         printChunkInfo("=== Free Info ===", freeStats);
+        printChunkInfo("=== AltFree Info ===", altStats);
     }
 
     private void printChunkInfo(String header, BinStats[] stats) {
@@ -55,7 +68,7 @@ public class MallocAnalyzer extends MallocMT {
         long globalCounter = 0;
         long globalTotal = 0;
 
-        for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
+        for (int bin = acquireBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
             out.print("Bin " + bin + "\t" + (binSize(bin) & 0xffffffffL));
 
             int counter = 0;
@@ -114,9 +127,11 @@ public class MallocAnalyzer extends MallocMT {
         }
 
         void addChunk(int size) {
-            int bin = getBin(size);
-            size -= HEADER_SIZE;
+            addChunk(acquireBin(size), size);
+        }
 
+        void addChunk(int bin, int size) {
+            size -= HEADER_SIZE;
             counter[bin]++;
             total[bin] += size;
             if (size < min[bin]) min[bin] = size;

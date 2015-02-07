@@ -1,10 +1,8 @@
 package one.nio.mem;
 
-import one.nio.util.JavaInternals;
-import sun.misc.Unsafe;
+import static one.nio.util.JavaInternals.unsafe;
 
 public class MappedFileTool {
-    private static final Unsafe unsafe = JavaInternals.getUnsafe();
 
     public static void main(String[] args) throws Exception {
         MappedFile mmap = new MappedFile(args[0], 0, MappedFile.MAP_RW);

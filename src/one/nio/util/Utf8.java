@@ -1,10 +1,8 @@
 package one.nio.util;
 
-import sun.misc.Unsafe;
+import static one.nio.util.JavaInternals.*;
 
 public final class Utf8 {
-    private static final Unsafe unsafe = JavaInternals.getUnsafe();
-    private static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
 
     public static int length(String s) {
         int result = 0;

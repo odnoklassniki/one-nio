@@ -52,7 +52,7 @@ public class PersistStream extends SerializeStream {
         long currentOffset = offset;
         if ((offset = currentOffset + size) > limit) {
             limit = Math.max(offset, limit * 2);
-            array = Arrays.copyOf(array, (int) limit);
+            array = Arrays.copyOf(array, (int) (limit - address));
         }
         return currentOffset;
     }

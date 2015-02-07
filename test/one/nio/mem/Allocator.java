@@ -1,6 +1,6 @@
 package one.nio.mem;
 
-import one.nio.util.JavaInternals;
+import static one.nio.util.JavaInternals.unsafe;
 
 interface Allocator {
     long malloc(int size);
@@ -8,7 +8,6 @@ interface Allocator {
     void verify();
 
     static class Unsafe implements Allocator {
-        private static final sun.misc.Unsafe unsafe = JavaInternals.getUnsafe();
 
         @Override
         public long malloc(int size) {

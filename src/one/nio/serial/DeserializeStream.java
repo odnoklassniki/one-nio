@@ -3,6 +3,8 @@ package one.nio.serial;
 import java.io.IOException;
 import java.util.Arrays;
 
+import static one.nio.util.JavaInternals.byteArrayOffset;
+
 public class DeserializeStream extends DataStream {
     static final int INITIAL_CAPACITY = 24;
 

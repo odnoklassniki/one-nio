@@ -3,13 +3,13 @@ package one.nio.mem;
 import one.nio.util.JavaInternals;
 
 import sun.misc.Cleaner;
-import sun.misc.Unsafe;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
+import static one.nio.util.JavaInternals.unsafe;
+
 public final class DirectMemory {
-    private static final Unsafe unsafe = JavaInternals.getUnsafe();
     private static final long addressOffset = JavaInternals.fieldOffset(Buffer.class, "address");
     private static final ByteBuffer prototype = createPrototype();
 

@@ -1,18 +1,14 @@
 package one.nio.serial;
 
-import one.nio.util.JavaInternals;
 import one.nio.util.Utf8;
-
-import sun.misc.Unsafe;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-public class DataStream implements ObjectInput, ObjectOutput {
-    protected static final Unsafe unsafe = JavaInternals.getUnsafe();
-    protected static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
+import static one.nio.util.JavaInternals.*;
 
+public class DataStream implements ObjectInput, ObjectOutput {
     protected static final byte REF_NULL       = -1;
     protected static final byte REF_RECURSIVE  = -2;
     protected static final byte REF_RECURSIVE2 = -3;

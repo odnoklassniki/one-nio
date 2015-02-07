@@ -5,7 +5,7 @@ import one.nio.util.JavaInternals;
 import sun.misc.Unsafe;
 
 public class LongHashSet {
-    protected static final Unsafe unsafe = JavaInternals.getUnsafe();
+    protected static final Unsafe unsafe = JavaInternals.unsafe;
     protected static final long sizeOffset = JavaInternals.fieldOffset(LongHashSet.class, "size");
 
     public static final long EMPTY = 0;

@@ -9,7 +9,7 @@ public class MallocTest extends Thread {
     private static final int MIN_LENGTH   = 1500000;
     private static final int MAX_LENGTH   = 15000000;
 
-    private static final int AVG_SIZE     = 640;
+    private static final int AVG_SIZE     = 140;
     private static final int THREAD_COUNT = 4;
     private static final int DELAY        = 200;
 
@@ -72,8 +72,10 @@ public class MallocTest extends Thread {
 
             if (currentCount < MIN_LENGTH) {
                 grow = true;
+                malloc.verify();
             } else if (currentCount > MAX_LENGTH) {
                 grow = false;
+                malloc.verify();
             }
 
             sleep(DELAY);

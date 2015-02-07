@@ -7,18 +7,15 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class JavaInternals {
-    private static final Unsafe unsafe;
+    public static final Unsafe unsafe = getUnsafe();
+    public static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
 
-    static {
+    public static Unsafe getUnsafe() {
         try {
-            unsafe = (Unsafe) getField(Unsafe.class, "theUnsafe").get(null);
+            return (Unsafe) getField(Unsafe.class, "theUnsafe").get(null);
         } catch (IllegalAccessException e) {
             throw new IllegalStateException(e);
         }
-    }
-
-    public static Unsafe getUnsafe() {
-        return unsafe;
     }
 
     public static Field getField(Class<?> cls, String name) {

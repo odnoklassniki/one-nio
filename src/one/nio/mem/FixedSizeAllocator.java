@@ -1,11 +1,11 @@
 package one.nio.mem;
 
 import one.nio.util.JavaInternals;
-import sun.misc.Unsafe;
+
+import static one.nio.util.JavaInternals.unsafe;
 
 // Fast lock-free allocator that manages entries of the fixed size in a linked list
 public class FixedSizeAllocator {
-    protected static final Unsafe unsafe = JavaInternals.getUnsafe();
     protected static final long headOffset = JavaInternals.fieldOffset(FixedSizeAllocator.class, "head");
 
     // These constants help to go around ABA problem of the lock-free linked list

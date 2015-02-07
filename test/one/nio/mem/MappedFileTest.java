@@ -1,13 +1,8 @@
 package one.nio.mem;
 
-import one.nio.util.JavaInternals;
-
-import sun.misc.Unsafe;
+import static one.nio.util.JavaInternals.*;
 
 public class MappedFileTest extends Thread {
-    private static final Unsafe unsafe = JavaInternals.getUnsafe();
-    private static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
-
     private final MappedFile mmap;
     private final int iterations;
 

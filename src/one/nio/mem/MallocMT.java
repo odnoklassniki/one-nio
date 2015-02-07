@@ -4,6 +4,8 @@ import one.nio.mgt.Management;
 
 import java.util.Random;
 
+import static one.nio.util.JavaInternals.unsafe;
+
 /**
  * MT-friendly version of Malloc.
  * Divides the whole memory space into 8 thread-local areas.
@@ -55,7 +57,7 @@ public class MallocMT extends Malloc {
     @Override
     public long malloc(int size) {
         int alignedSize = (Math.max(size, 16) + (HEADER_SIZE + 7)) & ~7;
-        int bin = getBin(alignedSize);
+        int bin = acquireBin(alignedSize);
 
         Malloc startSegment = segments[random.nextInt() & SEGMENT_MASK];
         Malloc segment = startSegment;
@@ -87,8 +89,6 @@ public class MallocMT extends Malloc {
 
     @Override
     void init() {
-        Management.registerMXBean(this, "one.nio.mem:type=MallocMT,base=" + Long.toHexString(base));
-
         long segmentSize = (capacity / SEGMENT_COUNT) & ~7;
         segments = new Malloc[SEGMENT_COUNT];
 
@@ -102,5 +102,7 @@ public class MallocMT extends Malloc {
         }
 
         random = new Random();
+
+        Management.registerMXBean(this, "one.nio.mem:type=MallocMT,base=" + Long.toHexString(base));
     }
 }

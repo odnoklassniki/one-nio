@@ -8,7 +8,7 @@ public class SerializerCollector extends DataStream {
     private final HashSet<Serializer> serializers = new HashSet<Serializer>();
 
     public SerializerCollector(byte[] array) {
-        super(array, byteArrayOffset, array.length);
+        super(array);
     }
 
     public SerializerCollector(long address, long length) {

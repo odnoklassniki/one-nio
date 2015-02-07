@@ -17,8 +17,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected static final Log log = LogFactory.getLog(OffheapMap.class);
-    protected static final Unsafe unsafe = JavaInternals.getUnsafe();
-    protected static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
+    protected static final Unsafe unsafe = JavaInternals.unsafe;
+    protected static final long byteArrayOffset = JavaInternals.byteArrayOffset;
     protected static final long MB = 1024 * 1024;
 
     protected static final int CONCURRENCY_LEVEL = 65536;  // must be power of 2

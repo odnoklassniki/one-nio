@@ -1,15 +1,12 @@
 package one.nio.serial;
 
-import one.nio.util.JavaInternals;
-
-import sun.misc.Unsafe;
-
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.NotSerializableException;
 
+import static one.nio.util.JavaInternals.unsafe;
+
 public class ExternalizableSerializer extends Serializer<Externalizable> {
-    private static final Unsafe unsafe = JavaInternals.getUnsafe();
 
     ExternalizableSerializer(Class cls) {
         super(cls);

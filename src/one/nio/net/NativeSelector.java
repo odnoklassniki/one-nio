@@ -1,16 +1,13 @@
 package one.nio.net;
 
 import one.nio.mem.DirectMemory;
-import one.nio.util.JavaInternals;
-
-import sun.misc.Unsafe;
 
 import java.util.Arrays;
 import java.util.Iterator;
 
-final class NativeSelector extends Selector {
-    static final Unsafe unsafe = JavaInternals.getUnsafe();
+import static one.nio.util.JavaInternals.unsafe;
 
+final class NativeSelector extends Selector {
     private static final int EPOLL_CTL_ADD = 1;
     private static final int EPOLL_CTL_DEL = 2;
     private static final int EPOLL_CTL_MOD = 3;
