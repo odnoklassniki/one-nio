@@ -43,12 +43,9 @@ public class MappedFile implements Closeable {
         this.file = new RandomAccessFile(name, mode == MAP_RW ? "rw" : "r");
         try {
             if (size == 0) {
-                size = (file.length() + 0xfffL) & ~0xfffL;
-            } else {
-                size = (size + 0xfffL) & ~0xfffL;
-                if (mode == MAP_RW) {
-                    file.setLength(size);
-                }
+                size = file.length();
+            } else if (mode == MAP_RW) {
+                file.setLength(size);
             }
 
             this.addr = map(file, mode, 0, size);
@@ -107,8 +104,9 @@ public class MappedFile implements Closeable {
 
     public static void unmap(long start, long size) {
         if (Mem.IS_SUPPORTED) {
-            Mem.munmap(start, size);
-            return;
+            if (Mem.munmap(start, size) == 0) {
+                return;
+            }
         }
 
         try {
