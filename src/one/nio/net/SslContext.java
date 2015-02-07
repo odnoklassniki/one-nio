@@ -18,6 +18,8 @@ public abstract class SslContext {
     }
 
     public abstract void close();
-    public abstract void setProtocols(String... protocols) throws SSLException;
+    public abstract void setProtocols(String protocols) throws SSLException;
+    public abstract void setCiphers(String ciphers) throws SSLException;
     public abstract void setCertificate(String certFile, String privateKeyFile) throws SSLException;
+    public abstract void setTicketKey(byte[] ticketKey) throws SSLException;
 }

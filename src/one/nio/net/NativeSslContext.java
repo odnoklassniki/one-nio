@@ -1,7 +1,10 @@
 package one.nio.net;
 
 import javax.net.ssl.SSLException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ServiceConfigurationError;
+import java.util.StringTokenizer;
 
 class NativeSslContext extends SslContext {
     static final NativeSslContext DEFAULT;
@@ -21,25 +24,40 @@ class NativeSslContext extends SslContext {
     }
 
     @Override
-    public void setProtocols(String... protocols) {
-        int options = 0x07000000;
-        for (String protocol : protocols) {
-            String s = protocol.toLowerCase();
-            if (s.equals("sslv2")) {
-                options &= ~0x01000000;
-            } else if (s.equals("sslv3")) {
-                options &= ~0x02000000;
-            } else if (s.startsWith("tlsv1")) {
-                options &= ~0x04000000;
+    public void setProtocols(String protocols) {
+        int enabled = 0;
+
+        StringTokenizer st = new StringTokenizer(protocols.toLowerCase(), " ,:+", false);
+        while (st.hasMoreTokens()) {
+            String protocol = st.nextToken();
+            if (protocol.equals("compression")) {
+                enabled |= 0x00020000;
+            } else if (protocol.equals("sslv2")) {
+                enabled |= 0x01000000;
+            } else if (protocol.equals("sslv3")) {
+                enabled |= 0x02000000;
+            } else if (protocol.equals("tlsv1")) {
+                enabled |= 0x04000000;
+            } else if (protocol.equals("tlsv1.1")) {
+                enabled |= 0x08000000;
+            } else if (protocol.equals("tlsv1.2")) {
+                enabled |= 0x10000000;
             }
         }
 
-        clearOptions(0x07000000);
-        setOptions(options);
+        int all = 0x00020000 + 0x01000000 + 0x02000000 + 0x04000000 + 0x08000000 + 0x10000000;
+        clearOptions(enabled);
+        setOptions(all - enabled);
     }
 
     @Override
+    public native void setCiphers(String ciphers) throws SSLException;
+
+    @Override
     public native void setCertificate(String certFile, String privateKeyFile) throws SSLException;
+
+    @Override
+    public native void setTicketKey(byte[] ticketKey) throws SSLException;
 
     private native void setOptions(int options);
     private native void clearOptions(int options);
@@ -47,6 +65,17 @@ class NativeSslContext extends SslContext {
     private static native void init();
     private static native long ctxNew() throws SSLException;
     private static native void ctxFree(long ctx);
+
+    private static byte[] readFile(String fileName) throws IOException {
+        RandomAccessFile raf = new RandomAccessFile(fileName, "r");
+        try {
+            byte[] data = new byte[(int) raf.length()];
+            raf.readFully(data);
+            return data;
+        } finally {
+            raf.close();
+        }
+    }
 
     static {
         init();
@@ -62,9 +91,19 @@ class NativeSslContext extends SslContext {
 
             String protocols = System.getProperty("one.nio.ssl.protocols");
             if (protocols != null) {
-                DEFAULT.setProtocols(protocols.split(","));
+                DEFAULT.setProtocols(protocols);
             }
-        } catch (SSLException e) {
+
+            String ciphers = System.getProperty("one.nio.ssl.ciphers");
+            if (ciphers != null) {
+                DEFAULT.setCiphers(ciphers);
+            }
+
+            String ticketKeyFile = System.getProperty("one.nio.ssl.ticketKeyFile");
+            if (ticketKeyFile != null) {
+                DEFAULT.setTicketKey(readFile(ticketKeyFile));
+            }
+        } catch (IOException e) {
             throw new ServiceConfigurationError("Could not create OpenSSL context", e);
         }
     }

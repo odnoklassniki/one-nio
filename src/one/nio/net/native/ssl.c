@@ -1,5 +1,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -8,6 +10,24 @@
 #include <jni.h>
 #include "jni_util.h"
 
+
+#ifndef SSL_OP_NO_COMPRESSION
+#define SSL_OP_NO_COMPRESSION 0x00020000L
+#endif
+
+#define KEY_NONE      0
+#define KEY_PRIMARY   1
+#define KEY_SECONDARY 2
+#define KEY_SINGLE    3
+
+
+struct SSL_ticket_key {
+    unsigned char type;
+    unsigned char padding[15];
+    unsigned char name[16];
+    unsigned char aes_key[16];
+    unsigned char hmac_key[16];
+};
 
 struct CRYPTO_dynlock_value {
     pthread_mutex_t mutex;
@@ -90,6 +110,38 @@ static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value* lock, const
     }
 }
 
+static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned char* iv,
+                               EVP_CIPHER_CTX* evp_ctx, HMAC_CTX* hmac_ctx, int new_session) {
+    struct SSL_ticket_key* key = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    struct SSL_ticket_key* secondary_key = NULL;
+
+    if (key == NULL) {
+        return -1;
+    } else if (key->type == KEY_PRIMARY) {
+        secondary_key = key + 1;
+    } else if (key->type == KEY_SECONDARY) {
+        secondary_key = key++;
+    }
+    
+    if (new_session) {
+        RAND_pseudo_bytes(iv, 16);
+        memcpy(key_name, key->name, 16);
+        EVP_EncryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, key->aes_key, iv);
+        HMAC_Init_ex(hmac_ctx, key->hmac_key, 16, EVP_sha256(), NULL);
+        return 1;
+    } else {
+        if (memcmp(key_name, key->name, 16) == 0) {
+            HMAC_Init_ex(hmac_ctx, key->hmac_key, 16, EVP_sha256(), NULL);
+            EVP_DecryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, key->aes_key, iv);
+            return 1;
+        } else if (secondary_key != NULL && memcmp(key_name, secondary_key->name, 16) == 0) {
+            HMAC_Init_ex(hmac_ctx, secondary_key->hmac_key, 16, EVP_sha256(), NULL);
+            EVP_DecryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, secondary_key->aes_key, iv);
+            return 2;
+        }
+        return 0;
+    }
+}
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
@@ -124,12 +176,18 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
         throw_ssl_exception(env);
         return 0;
     }
+
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     return (jlong)(intptr_t)ctx;
 }
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_ctxFree(JNIEnv* env, jclass cls, jlong ctx) {
+    struct SSL_ticket_key* key = SSL_CTX_get_app_data((SSL_CTX*)(intptr_t)ctx);
+    if (key != NULL) {
+        free(key);
+    }
     SSL_CTX_free((SSL_CTX*)(intptr_t)ctx);
 }
 
@@ -143,6 +201,20 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_clearOptions(JNIEnv* env, jobject self, jint options) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     SSL_CTX_clear_options(ctx, options);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setCiphers(JNIEnv* env, jobject self, jstring ciphers) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+
+    if (ciphers != NULL) {
+        const char* value = (*env)->GetStringUTFChars(env, ciphers, NULL);
+        int result = SSL_CTX_set_cipher_list(ctx, value);
+        (*env)->ReleaseStringUTFChars(env, ciphers, value);
+        if (result <= 0) {
+            throw_ssl_exception(env);
+        }
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -167,6 +239,46 @@ Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstr
             throw_ssl_exception(env);
             return;
         }
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setTicketKey(JNIEnv* env, jobject self, jbyteArray ticketKey) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    struct SSL_ticket_key* key = SSL_CTX_get_app_data(ctx);
+    
+    if (key == NULL) {
+        key = malloc(2 * sizeof(struct SSL_ticket_key));
+        key->type = KEY_NONE;
+        SSL_CTX_set_app_data(ctx, key);
+    }
+
+    if (ticketKey == NULL) {
+        SSL_CTX_set_tlsext_ticket_key_cb(ctx, NULL);
+        key->type = KEY_NONE;
+    } else if ((*env)->GetArrayLength(env, ticketKey) != 48) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "Ticket key must be 48 bytes long");
+    } else {
+        struct SSL_ticket_key* new_key;
+        unsigned char new_type;
+
+        switch (key->type) {
+            case KEY_NONE:
+                new_key = key;
+                new_type = KEY_SINGLE;
+                break;
+            case KEY_SECONDARY:
+                new_key = key;
+                new_type = KEY_PRIMARY;
+                break;
+            default:
+                new_key = key + 1;
+                new_type = KEY_SECONDARY;
+        }
+
+        (*env)->GetByteArrayRegion(env, ticketKey, 0, 48, (jbyte*)&new_key->name);
+        key->type = new_type;
+        SSL_CTX_set_tlsext_ticket_key_cb(ctx, ticket_key_callback);    
     }
 }
 

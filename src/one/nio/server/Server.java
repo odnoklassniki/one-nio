@@ -24,6 +24,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     private volatile boolean running;
 
+    protected ConnectionString conn;
     protected AcceptorThread[] acceptors;
     protected SelectorThread[] selectors;
     protected WorkerPool workers;
@@ -31,12 +32,12 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     protected boolean useWorkers;
 
     public Server(ConnectionString conn) throws IOException {
-        int processors = Runtime.getRuntime().availableProcessors();
+        this.conn = conn;
 
         String[] hosts = conn.getHosts();
         int port = conn.getPort();
-        String protocol = conn.getProtocol();
-        SslContext sslContext = "ssl".equals(protocol) || "https".equals(protocol) ? SslContext.getDefault() : null;
+        SslContext sslContext = getSslContext(conn);
+        int processors = Runtime.getRuntime().availableProcessors();
 
         int backlog = conn.getIntParam("backlog", 128);
         int buffers = conn.getIntParam("buffers", 0);
@@ -79,9 +80,16 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     public boolean reconfigure(ConnectionString conn) throws IOException {
-        if (acceptors[0].port != conn.getPort()) {
+        if (conn.getProtocol() == null) {
+            if (this.conn.getProtocol() != null) return false;
+        } else if (!conn.getProtocol().equals(this.conn.getProtocol())) {
             return false;
         }
+        if (conn.getPort() != this.conn.getPort()) {
+            return false;
+        }
+
+        this.conn = conn;
 
         workers.setCorePoolSize(conn.getIntParam("minWorkers", 0));
         workers.setMaximumPoolSize(conn.getIntParam("maxWorkers", 1000));
@@ -140,7 +148,12 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         }
     }
 
-    public Session createSession(Socket socket) {
+    protected SslContext getSslContext(ConnectionString conn) {
+        String protocol = conn.getProtocol();
+        return "ssl".equals(protocol) || "https".equals(protocol) ? SslContext.getDefault() : null;
+    }
+
+    protected Session createSession(Socket socket) {
         return new Session(socket);
     }
 
@@ -150,6 +163,10 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     public final long incRequestsRejected() {
         return requestsRejected.incrementAndGet();
+    }
+
+    public final ConnectionString getConnectionString() {
+        return conn;
     }
 
     @Override

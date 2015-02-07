@@ -1,15 +1,16 @@
 package one.nio.net;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 
 class NativeSslSocket extends NativeSocket {
-    long ctx;
+    NativeSslContext context;
     long ssl;
 
-    NativeSslSocket(int fd, long ctx, boolean serverMode) throws IOException {
+    NativeSslSocket(int fd, NativeSslContext context, boolean serverMode) throws IOException {
         super(fd);
-        this.ctx = ctx;
-        this.ssl = sslNew(fd, ctx, serverMode);
+        this.context = context;
+        this.ssl = sslNew(fd, context.ctx, serverMode);
     }
 
     @Override
@@ -23,7 +24,12 @@ class NativeSslSocket extends NativeSocket {
 
     @Override
     public NativeSocket accept() throws IOException {
-        return new NativeSslSocket(accept0(), ctx, true);
+        return new NativeSslSocket(accept0(), context, true);
+    }
+
+    @Override
+    public long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
+        throw new IOException("Cannot use sendFile with SSL");
     }
 
     @Override

@@ -64,7 +64,7 @@ class NativeSocket extends Socket {
 
     @Override
     public final Socket ssl(SslContext context) throws IOException {
-        return new NativeSslSocket(fd, ((NativeSslContext) context).ctx, false);
+        return new NativeSslSocket(fd, (NativeSslContext) context, false);
     }
 
     @Override
