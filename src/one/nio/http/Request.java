@@ -99,9 +99,10 @@ public final class Request {
     }
 
     public String getHeader(String key) {
+        int keyLength = key.length();
         for (int i = 0; i < headerCount; i++) {
-            if (headers[i].startsWith(key)) {
-                return headers[i].substring(key.length());
+            if (headers[i].regionMatches(true, 0, key, 0, keyLength)) {
+                return headers[i].substring(keyLength);
             }
         }
         return null;
