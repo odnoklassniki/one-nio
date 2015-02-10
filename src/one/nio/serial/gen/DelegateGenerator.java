@@ -160,7 +160,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
             if (parentField != null && !parents.contains(parentField)) {
                 parents.add(parentField);
-                mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
+                mv.visitFieldInsn(GETSTATIC, "one/nio/util/JavaInternals", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitLdcInsn(unsafe.objectFieldOffset(parentField));
                 mv.visitTypeInsn(NEW, Type.getInternalName(parentField.getType()));
@@ -173,7 +173,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitInsn(srcType.convertTo(FieldType.Void));
             } else if (Modifier.isFinal(ownField.getModifiers())) {
                 FieldType dstType = FieldType.valueOf(ownField.getType());
-                mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
+                mv.visitFieldInsn(GETSTATIC, "one/nio/util/JavaInternals", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 2);
                 if (parentField != null) emitGetField(mv, parentField);
                 mv.visitLdcInsn(unsafe.objectFieldOffset(ownField));
@@ -308,7 +308,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void putFieldConstant(MethodVisitor mv, Field field, String value) {
         if (Modifier.isFinal(field.getModifiers())) {
-            mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/DelegateGenerator", "unsafe", "Lsun/misc/Unsafe;");
+            mv.visitFieldInsn(GETSTATIC, "one/nio/util/JavaInternals", "unsafe", "Lsun/misc/Unsafe;");
             mv.visitVarInsn(ALOAD, 2);
             mv.visitLdcInsn(unsafe.objectFieldOffset(field));
         } else {
