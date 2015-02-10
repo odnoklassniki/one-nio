@@ -21,6 +21,16 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory {
         ((WaitingSynchronousQueue) getQueue()).queueTime = queueTime;
     }
 
+    void gracefulShutdown(long timeout) {
+        shutdown();
+        try {
+            awaitTermination(timeout, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        shutdownNow();
+    }
+
     @Override
     public Thread newThread(Runnable r) {
         Thread thread = new Thread(r, "NIO Worker #" + index.incrementAndGet());

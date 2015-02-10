@@ -143,9 +143,20 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
             selectors = null;
         }
         if (workers != null) {
-            workers.shutdownNow();
+            workers.gracefulShutdown(30000L);
             workers = null;
         }
+    }
+
+    public void registerShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new Thread("Server Shutdown") {
+            @Override
+            public void run() {
+                log.info("Server is shutting down...");
+                Server.this.stop();
+                log.info("Server stopped");
+            }
+        });
     }
 
     protected SslContext getSslContext(ConnectionString conn) {
