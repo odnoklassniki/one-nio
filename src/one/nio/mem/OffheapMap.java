@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeoutException;
 
 public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected static final Log log = LogFactory.getLog(OffheapMap.class);
@@ -263,11 +264,23 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         }
     }
 
+    public Record<K, V> lockRecordForRead(K key, long timeout) throws TimeoutException {
+        long hashCode = hashCode(key);
+        RWLock lock = lockFor(hashCode);
+        if (!lock.lockRead(timeout)){
+            throw new TimeoutException();
+        }
+        return createRecord(key, hashCode, lock);
+    }
+
     public Record<K, V> lockRecordForRead(K key) {
         long hashCode = hashCode(key);
-        long currentPtr = bucketFor(hashCode);
-
         RWLock lock = lockFor(hashCode).lockRead();
+        return createRecord(key, hashCode, lock);
+    }
+
+    private Record<K, V> createRecord(K key, long hashCode, RWLock lock) {
+        long currentPtr = bucketFor(hashCode);
 
         for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
             if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {
@@ -280,11 +293,23 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return null;
     }
 
+    public WritableRecord<K, V> lockRecordForWrite(K key, long timeout, boolean create) throws TimeoutException {
+        long hashCode = hashCode(key);
+        RWLock lock = lockFor(hashCode);
+        if (!lock.lockWrite(timeout)){
+            throw new TimeoutException();
+        }
+        return createWritableRecord(key, hashCode, lock, create);
+    }
+
     public WritableRecord<K, V> lockRecordForWrite(K key, boolean create) {
         long hashCode = hashCode(key);
-        long currentPtr = bucketFor(hashCode);
-
         RWLock lock = lockFor(hashCode).lockWrite();
+        return createWritableRecord(key, hashCode, lock, create);
+    }
+
+    private WritableRecord<K, V> createWritableRecord(K key, long hashCode, RWLock lock, boolean create) {
+        long currentPtr = bucketFor(hashCode);
 
         for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
             if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {

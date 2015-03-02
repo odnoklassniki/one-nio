@@ -19,8 +19,8 @@ public class OffheapBlobMap extends OffheapMap<byte[], byte[]> {
 
     @Override
     protected long hashCode(byte[] key) {
-        int arrayHashCode = Arrays.hashCode(key);
-        return (long) key.length << 32 | (arrayHashCode & 0xffffffffL);
+        int murmur3Hash = DirectMemory.hash(key, byteArrayOffset, key.length);
+        return (long) key.length << 32 | (murmur3Hash & 0xffffffffL);
     }
 
     @Override
