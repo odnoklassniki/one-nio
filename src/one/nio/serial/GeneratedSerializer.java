@@ -1,5 +1,6 @@
 package one.nio.serial;
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.StubGenerator;
@@ -31,7 +32,7 @@ public class GeneratedSerializer extends Serializer {
             fds[i / 2] = new FieldDescriptor(ownFields[i], ownFields[i + 1]);
         }
 
-        this.delegate = StubGenerator.INSTANCE.instantiate(code(), Delegate.class);
+        this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
     }
 
     byte[] code() {
@@ -86,7 +87,7 @@ public class GeneratedSerializer extends Serializer {
             }
         }
 
-        this.delegate = StubGenerator.INSTANCE.instantiate(code(), Delegate.class);
+        this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
     }
 
     @Override

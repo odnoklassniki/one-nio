@@ -1,5 +1,9 @@
 package one.nio.util;
 
+import one.nio.mem.DirectMemory;
+
+import static one.nio.util.JavaInternals.byteArrayOffset;
+
 public class Hash {
 
     // 64-bit reversible hash by Thomas Wang
@@ -56,5 +60,9 @@ public class Hash {
         h1 *= 0xc2b2ae35;
         h1 ^= h1 >>> 16;
         return h1;
+    }
+
+    public static int murmur3(byte[] array, int start, int length) {
+        return DirectMemory.hash(array, byteArrayOffset, length);
     }
 }

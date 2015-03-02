@@ -1,6 +1,6 @@
 package one.nio.serial;
 
-import one.nio.serial.gen.StubGenerator;
+import one.nio.gen.BytecodeGenerator;
 
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -74,7 +74,7 @@ public class TypeDescriptor {
         int p = descriptor.indexOf('|');
         if (p >= 0) {
             try {
-                return Class.forName(descriptor.substring(0, p), true, StubGenerator.INSTANCE);
+                return Class.forName(descriptor.substring(0, p), true, BytecodeGenerator.INSTANCE);
             } catch (ClassNotFoundException e) {
                 // New class is missed, try old name
                 descriptor = descriptor.substring(p + 1);
@@ -82,7 +82,7 @@ public class TypeDescriptor {
         }
 
         Class renamedClass = Repository.renamedClasses.get(descriptor);
-        return renamedClass != null ? renamedClass : Class.forName(descriptor, true, StubGenerator.INSTANCE);
+        return renamedClass != null ? renamedClass : Class.forName(descriptor, true, BytecodeGenerator.INSTANCE);
     }
 
     public static String classDescriptor(Class<?> cls) {

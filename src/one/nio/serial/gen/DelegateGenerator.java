@@ -346,7 +346,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                     mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;");
                 } else if (fieldType == Class.class) {
                     try {
-                        mv.visitLdcInsn(Class.forName(value, false, StubGenerator.INSTANCE));
+                        mv.visitLdcInsn(Class.forName(value, false, INSTANCE));
                     } catch (ClassNotFoundException e) {
                         throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
                     }

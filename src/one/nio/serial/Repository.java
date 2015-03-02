@@ -1,7 +1,7 @@
 package one.nio.serial;
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.mgt.Management;
-import one.nio.serial.gen.StubGenerator;
 import one.nio.util.Base64;
 import one.nio.util.JavaInternals;
 
@@ -204,7 +204,7 @@ public class Repository {
 
     public static void setOptions(String className, int options) {
         try {
-            Class cls = Class.forName(className, false, StubGenerator.INSTANCE);
+            Class cls = Class.forName(className, false, BytecodeGenerator.INSTANCE);
             setOptions(cls, options);
         } catch (ClassNotFoundException e) {
             // Ignore

@@ -1,6 +1,6 @@
 package one.nio.serial;
 
-import one.nio.serial.gen.StubGenerator;
+import one.nio.gen.BytecodeGenerator;
 import one.nio.util.Hex;
 
 import java.util.Map;
@@ -38,7 +38,7 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     @Override
     public String getClassSerializer(String className) {
         try {
-            Serializer serializer = Repository.classMap.get(Class.forName(className, false, StubGenerator.INSTANCE));
+            Serializer serializer = Repository.classMap.get(Class.forName(className, false, BytecodeGenerator.INSTANCE));
             return serializer == null ? null : serializer.toString();
         } catch (ClassNotFoundException e) {
             return null;

@@ -2,9 +2,9 @@ package one.nio.serial;
 
 import junit.framework.TestCase;
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
-import one.nio.serial.gen.StubGenerator;
 
 import java.io.Serializable;
 import java.lang.annotation.ElementType;
@@ -35,7 +35,7 @@ public class DefaultFieldsTest extends TestCase implements Serializable {
         List<Field> defaultFields = Arrays.asList(DefaultFieldsTest.class.getDeclaredFields());
         byte[] code = DelegateGenerator.generate(DefaultFieldsTest.class, new FieldDescriptor[0], defaultFields);
 
-        Delegate delegate = StubGenerator.INSTANCE.instantiate(code, Delegate.class);
+        Delegate delegate = BytecodeGenerator.INSTANCE.instantiate(code, Delegate.class);
         DefaultFieldsTest obj = (DefaultFieldsTest) delegate.read(new DataStream(0));
 
         assertEquals("abc", obj.s);

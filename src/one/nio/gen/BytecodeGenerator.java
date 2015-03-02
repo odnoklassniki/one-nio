@@ -1,5 +1,8 @@
 package one.nio.gen;
 
+import one.nio.mgt.Management;
+import one.nio.serial.Repository;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.objectweb.asm.MethodVisitor;
@@ -16,6 +19,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorMXBean, Opcodes {
     private static final Log log = LogFactory.getLog(BytecodeGenerator.class);
+
+    public static final BytecodeGenerator INSTANCE = new BytecodeGenerator();
+
+    static {
+        Management.registerMXBean(INSTANCE, "one.nio.serial:type=BytecodeGenerator");
+    }
 
     protected final AtomicInteger totalClasses;
     protected final AtomicInteger totalBytes;
@@ -34,6 +43,15 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         totalBytes.addAndGet(classData.length);
         if (dumpPath != null && !"".equals(dumpPath)) {
             dumpClass(classData, result.getSimpleName());
+        }
+        return result;
+    }
+
+    public synchronized Class<?> defineClassIfNotExists(String className, byte[] classData) {
+        Class<?> result = findLoadedClass(className);
+        if (result == null) {
+            Repository.log.warn("Generating stub for class " + className);
+            result = defineClass(classData);
         }
         return result;
     }
