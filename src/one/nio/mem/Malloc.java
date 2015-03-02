@@ -9,7 +9,7 @@ import static one.nio.util.JavaInternals.unsafe;
  * See http://g.oswego.edu/dl/html/malloc.html
  */
 public class Malloc implements MallocMXBean {
-    static final long SIGNATURE       = 0x3130636f6c6c614dL;
+    static final long SIGNATURE       = 0x3230636f6c6c614dL;
 
     static final int SIGNATURE_OFFSET = 0;
     static final int CAPACITY_OFFSET  = 8;
@@ -31,7 +31,7 @@ public class Malloc implements MallocMXBean {
     static final int OCCUPIED_MASK    = 0x80000000;
     static final int FREE_MASK        = 0x7ffffff8;
 
-    static final int MAX_SCAN_COUNT   = 100;
+    static final int MAX_SCAN_COUNT   = 127;
 
     final long base;
     final long capacity;
@@ -85,7 +85,7 @@ public class Malloc implements MallocMXBean {
 
     public long malloc(int size) {
         int alignedSize = (Math.max(size, 16) + (HEADER_SIZE + 7)) & ~7;
-        long address = mallocImpl(acquireBin(alignedSize), alignedSize);
+        long address = mallocImpl(getBin(alignedSize), alignedSize);
         if (address != 0) {
             return address;
         }
@@ -94,9 +94,9 @@ public class Malloc implements MallocMXBean {
 
     final synchronized long mallocImpl(int bin, int size) {
         do {
-            long chunk = unsafe.getLong(base + bin * BIN_SIZE + NEXT_OFFSET);
-            if (chunk != 0) {
-                return bestFit(chunk, size) + HEADER_SIZE;
+            long address = findChunk(base + bin * BIN_SIZE, size);
+            if (address != 0) {
+                return address + HEADER_SIZE;
             }
         } while (++bin < BIN_COUNT);
 
@@ -209,7 +209,7 @@ public class Malloc implements MallocMXBean {
 
     // Relocate absolute pointers when the heap is loaded from a snapshot
     private void relocate(long delta) {
-        for (int bin = acquireBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
+        for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
             long prev = base + bin * BIN_SIZE;
             for (long chunk; (chunk = unsafe.getLong(prev + NEXT_OFFSET)) != 0; prev = chunk) {
                 chunk += delta;
@@ -227,16 +227,18 @@ public class Malloc implements MallocMXBean {
     }
 
     // Find a suitable chunk in the given bin using best-fit strategy
-    private long bestFit(long chunk, int size) {
-        long bestFitChunk = 0;
+    private long findChunk(long binAddress, int size) {
         int bestFitSize = Integer.MAX_VALUE;
+        long bestFitChunk = 0;
         int scanCount = MAX_SCAN_COUNT;
 
-        do {
+        for (long chunk = binAddress; (chunk = unsafe.getLong(chunk + NEXT_OFFSET)) != 0; ) {
             int chunkSize = unsafe.getInt(chunk + SIZE_OFFSET);
             int leftoverSize = chunkSize - size;
 
-            if (leftoverSize < MIN_CHUNK) {
+            if (leftoverSize < 0) {
+                // Continue search
+            } else if (leftoverSize < MIN_CHUNK) {
                 // Allocated memory perfectly fits the chunk
                 unsafe.putInt(chunk + SIZE_OFFSET, chunkSize | mask);
                 freeMemory -= chunkSize;
@@ -244,23 +246,25 @@ public class Malloc implements MallocMXBean {
                 return chunk;
             } else if (leftoverSize < bestFitSize) {
                 // Search for a chunk with the minimum leftover size
-                bestFitChunk = chunk;
                 bestFitSize = leftoverSize;
-            } else if (--scanCount <= 0) {
+                bestFitChunk = chunk;
+            } else if (--scanCount <= 0 && bestFitChunk != 0) {
                 // Do not let scan for too long
                 break;
             }
-        } while ((chunk = unsafe.getLong(chunk + NEXT_OFFSET)) != 0);
+        }
 
-        // Allocate memory from the best-sized chunk
-        unsafe.putInt(bestFitChunk + SIZE_OFFSET, size | mask);
-        freeMemory -= size;
-        removeFreeChunk(bestFitChunk);
+        if (bestFitChunk != 0) {
+            // Allocate memory from the best-sized chunk
+            unsafe.putInt(bestFitChunk + SIZE_OFFSET, size | mask);
+            freeMemory -= size;
+            removeFreeChunk(bestFitChunk);
 
-        // Cut off the remaining tail and return it to the bin as a smaller chunk
-        long leftoverChunk = bestFitChunk + size;
-        addFreeChunk(leftoverChunk, bestFitSize);
-        unsafe.putInt(leftoverChunk + LEFT_OFFSET, size);
+            // Cut off the remaining tail and return it to the bin as a smaller chunk
+            long leftoverChunk = bestFitChunk + size;
+            addFreeChunk(leftoverChunk, bestFitSize);
+            unsafe.putInt(leftoverChunk + LEFT_OFFSET, size);
+        }
 
         return bestFitChunk;
     }
@@ -270,7 +274,7 @@ public class Malloc implements MallocMXBean {
         unsafe.putInt(address + SIZE_OFFSET, size);
         unsafe.putInt(address + size + LEFT_OFFSET, size);
 
-        long binAddress = base + returnBin(size) * BIN_SIZE;
+        long binAddress = base + getBin(size) * BIN_SIZE;
         long head = unsafe.getLong(binAddress + NEXT_OFFSET);
         unsafe.putLong(address + NEXT_OFFSET, head);
         unsafe.putLong(address + PREV_OFFSET, binAddress);
@@ -293,17 +297,10 @@ public class Malloc implements MallocMXBean {
 
     // Calculate the address of the smallest bin which holds chunks of the given size.
     // Bins grow somewhat logarithmically: 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192 ...
-    static int acquireBin(int size) {
+    static int getBin(int size) {
         size -= HEADER_SIZE + 1;
         int index = 29 - Integer.numberOfLeadingZeros(size);
         return (index << 2) + ((size >>> index) & 3);
-    }
-
-    // A bin where a free chunk returns can be smaller than a bin where it came from
-    static int returnBin(int size) {
-        size -= HEADER_SIZE;
-        int index = 29 - Integer.numberOfLeadingZeros(size);
-        return (index << 2) + ((size >>> index) & 3) - 1;
     }
 
     static int binSize(int bin) {

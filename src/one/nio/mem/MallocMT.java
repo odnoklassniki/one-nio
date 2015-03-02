@@ -57,7 +57,7 @@ public class MallocMT extends Malloc {
     @Override
     public long malloc(int size) {
         int alignedSize = (Math.max(size, 16) + (HEADER_SIZE + 7)) & ~7;
-        int bin = acquireBin(alignedSize);
+        int bin = getBin(alignedSize);
 
         Malloc startSegment = segments[random.nextInt() & SEGMENT_MASK];
         Malloc segment = startSegment;
