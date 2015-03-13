@@ -30,10 +30,14 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.tryReadExternal(in, (Repository.getOptions() & Repository.ARRAY_STUBS) == 0);
-        if (this.cls == null) {
+        try {
+            super.readExternal(in);
+        } catch (ClassNotFoundException e) {
+            if ((Repository.getOptions() & Repository.ARRAY_STUBS) == 0) throw e;
             this.cls = Object[].class;
+            this.origin = Origin.GENERATED;
         }
+
         this.componentType = cls.getComponentType();
     }
 

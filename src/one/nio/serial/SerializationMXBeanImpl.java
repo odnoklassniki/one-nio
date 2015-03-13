@@ -17,6 +17,7 @@
 package one.nio.serial;
 
 import one.nio.gen.BytecodeGenerator;
+import one.nio.serial.gen.StubGenerator;
 import one.nio.util.Hex;
 
 import java.util.Map;
@@ -92,8 +93,8 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
-    public int getUnknownClasses() {
-        return Serializer.unknownClasses.get();
+    public int getStubClasses() {
+        return StubGenerator.stubClasses.get();
     }
 
     @Override

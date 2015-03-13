@@ -43,7 +43,7 @@ public class PersistStream extends SerializeStream {
         if (obj == null) {
             writeByte(REF_NULL);
         } else {
-            int index = context.put(obj);
+            int index = context.indexOf(obj);
             if (index < 0) {
                 Serializer serializer = Repository.get(obj.getClass());
                 if (serializer.uid < 0) {
@@ -52,6 +52,7 @@ public class PersistStream extends SerializeStream {
                     writeByte(REF_EMBEDDED);
                     writeObject(serializer);
                 }
+                context.putAt(index, obj);
                 serializer.write(obj, this);
             } else if (index <= 0xffff) {
                 writeByte(REF_RECURSIVE);

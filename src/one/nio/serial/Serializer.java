@@ -22,11 +22,8 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class Serializer<T> implements Externalizable {
-    static final AtomicInteger unknownClasses = new AtomicInteger();
-
     protected String descriptor;
     protected long uid;
     protected Class cls;
@@ -55,21 +52,12 @@ public abstract class Serializer<T> implements Externalizable {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        tryReadExternal(in, true);
+        this.cls = TypeDescriptor.resolve(descriptor);
+        this.origin = Origin.EXTERNAL;
     }
 
-    protected final void tryReadExternal(ObjectInput in, boolean throwException) throws IOException, ClassNotFoundException {
-        try {
-            this.descriptor = in.readUTF();
-            this.uid = in.readLong();
-            this.cls = TypeDescriptor.resolve(descriptor);
-            this.origin = Origin.EXTERNAL;
-        } catch (ClassNotFoundException e) {
-            if (throwException) throw e;
-            Repository.log.warn("[" + Long.toHexString(uid) + "] Unknown local class: " + descriptor);
-            unknownClasses.incrementAndGet();
-            this.origin = Origin.GENERATED;
-        }
+    public void skipExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        // Nothing to do
     }
 
     protected final String uniqueName(String prefix) {

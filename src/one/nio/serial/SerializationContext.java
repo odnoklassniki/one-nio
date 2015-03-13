@@ -49,6 +49,35 @@ class SerializationContext {
         return -1;
     }
 
+    public int indexOf(Object obj) {
+        if (first == null) {
+            return Integer.MIN_VALUE;
+        }
+
+        Object[] keys = this.keys;
+        if (keys == null) keys = init();
+        int mask = keys.length - 1;
+
+        int i = System.identityHashCode(obj) & mask;
+        while (keys[i] != null) {
+            if (keys[i] == obj) {
+                return values[i];
+            }
+            i = (i + 1) & mask;
+        }
+        return ~i;
+    }
+
+    public void putAt(int index, Object obj) {
+        if (index == Integer.MIN_VALUE) {
+            first = obj;
+        } else {
+            keys[~index] = obj;
+            values[~index] = size;
+            if (++size >= threshold) resize();
+        }
+    }
+
     private Object[] init() {
         this.keys = new Object[INITIAL_CAPACITY];
         this.values = new int[INITIAL_CAPACITY];

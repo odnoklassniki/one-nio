@@ -46,15 +46,17 @@ public class EnumSerializer extends Serializer<Enum> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.tryReadExternal(in, (Repository.getOptions() & Repository.ENUM_STUBS) == 0);
-
         String[] constants = new String[in.readUnsignedShort()];
         for (int i = 0; i < constants.length; i++) {
             constants[i] = in.readUTF();
         }
 
-        if (this.cls == null) {
+        try {
+            super.readExternal(in);
+        } catch (ClassNotFoundException e) {
+            if ((Repository.getOptions() & Repository.ENUM_STUBS) == 0) throw e;
             this.cls = StubGenerator.generateEnum(uniqueName("Enum"), constants);
+            this.origin = Origin.GENERATED;
         }
 
         Enum[] ownValues = cls().getEnumConstants();
@@ -67,6 +69,13 @@ public class EnumSerializer extends Serializer<Enum> {
         this.values = new Enum[constants.length];
         for (int i = 0; i < constants.length; i++) {
             values[i] = find(ownValues, constants[i], i);
+        }
+    }
+
+    public void skipExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        int constants = in.readUnsignedShort();
+        for (int i = 0; i < constants; i++) {
+            in.skipBytes(in.readUnsignedShort());
         }
     }
 

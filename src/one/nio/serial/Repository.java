@@ -111,12 +111,12 @@ public class Repository {
         addBootstrap(new MapSerializer(IdentityHashMap.class));
         addBootstrap(new MapSerializer(ConcurrentHashMap.class));
         
-        addBootstrap(new ExternalizableSerializer(ObjectArraySerializer.class));
-        addBootstrap(new ExternalizableSerializer(EnumSerializer.class));
-        addBootstrap(new ExternalizableSerializer(CollectionSerializer.class));
-        addBootstrap(new ExternalizableSerializer(MapSerializer.class));
-        addBootstrap(new ExternalizableSerializer(ExternalizableSerializer.class));
-        addBootstrap(new ExternalizableSerializer(GeneratedSerializer.class));
+        addBootstrap(new SerializerSerializer(ObjectArraySerializer.class));
+        addBootstrap(new SerializerSerializer(EnumSerializer.class));
+        addBootstrap(new SerializerSerializer(CollectionSerializer.class));
+        addBootstrap(new SerializerSerializer(MapSerializer.class));
+        addBootstrap(new SerializerSerializer(ExternalizableSerializer.class));
+        addBootstrap(new SerializerSerializer(GeneratedSerializer.class));
         addBootstrap(new ExternalizableSerializer(SerializerNotFoundException.class));
 
         try {
@@ -128,7 +128,7 @@ public class Repository {
 
         addBootstrap(new TimestampSerializer());
         addBootstrap(new RemoteCallSerializer());
-        addBootstrap(new ExternalizableSerializer(MethodSerializer.class));
+        addBootstrap(new SerializerSerializer(MethodSerializer.class));
 
         // Unable to run readObject/writeObject for the following classes.
         // Fortunately standard serialization works well for them.
@@ -192,7 +192,7 @@ public class Repository {
     public static synchronized void provideSerializer(Serializer serializer) {
         Serializer oldSerializer = uidMap.put(serializer.uid, serializer);
         if (oldSerializer != null && oldSerializer.cls != serializer.cls) {
-            throw new IllegalStateException("UID collision: " + serializer.cls + " overwrites " + oldSerializer.cls);
+            throw new IllegalStateException("UID collision: " + serializer.descriptor + " overwrites " + oldSerializer.descriptor);
         }
 
         if (serializer.uid < 0) {

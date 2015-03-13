@@ -24,7 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import java.io.IOException;
 
 class RpcPacket {
-    private static final Log log = LogFactory.getLog(RpcSession.class);
+    private static final Log log = LogFactory.getLog(RpcPacket.class);
 
     private static final int WARN_PACKET_SIZE = 4 * 1024 * 1024;
     private static final int ERROR_PACKET_SIZE = 128 * 1024 * 1024;

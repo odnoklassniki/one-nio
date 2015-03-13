@@ -34,9 +34,12 @@ public class CollectionSerializer extends Serializer<Collection> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.tryReadExternal(in, (Repository.getOptions() & Repository.COLLECTION_STUBS) == 0);
-        if (this.cls == null) {
+        try {
+            super.readExternal(in);
+        } catch (ClassNotFoundException e) {
+            if ((Repository.getOptions() & Repository.COLLECTION_STUBS) == 0) throw e;
             this.cls = StubGenerator.generateRegular(uniqueName("List"), "java/util/ArrayList", null);
+            this.origin = Origin.GENERATED;
         }
 
         this.constructor = findConstructor();

@@ -67,19 +67,21 @@ public class GeneratedSerializer extends Serializer {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.tryReadExternal(in, (Repository.getOptions() & Repository.CUSTOM_STUBS) == 0);
-
         this.fds = new FieldDescriptor[in.readUnsignedShort()];
         for (int i = 0; i < fds.length; i++) {
             fds[i] = FieldDescriptor.read(in);
         }
 
-        if (this.cls == null) {
+        try {
+            super.readExternal(in);
+        } catch (ClassNotFoundException e) {
+            if ((Repository.getOptions() & Repository.CUSTOM_STUBS) == 0) throw e;
             if (isException()) {
                 this.cls = StubGenerator.generateRegular(uniqueName("Ex"), "java/lang/Exception", fds);
             } else {
                 this.cls = StubGenerator.generateRegular(uniqueName("Stub"), "java/lang/Object", fds);
             }
+            this.origin = Origin.GENERATED;
         }
 
         Field[] ownFields = getSerializableFields();
@@ -104,6 +106,16 @@ public class GeneratedSerializer extends Serializer {
         }
 
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
+    }
+
+    public void skipExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        int fds = in.readUnsignedShort();
+        for (int i = 0; i < fds; i++) {
+            in.skipBytes(in.readUnsignedShort());
+            if (in.readByte() < 0) {
+                in.skipBytes(in.readUnsignedShort());
+            }
+        }
     }
 
     @Override

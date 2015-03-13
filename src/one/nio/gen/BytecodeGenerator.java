@@ -17,7 +17,6 @@
 package one.nio.gen;
 
 import one.nio.mgt.Management;
-import one.nio.serial.Repository;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -66,7 +65,6 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     public synchronized Class<?> defineClassIfNotExists(String className, byte[] classData) {
         Class<?> result = findLoadedClass(className);
         if (result == null) {
-            Repository.log.warn("Generating stub for class " + className);
             result = defineClass(classData);
         }
         return result;

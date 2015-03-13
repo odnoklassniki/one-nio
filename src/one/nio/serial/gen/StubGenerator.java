@@ -18,6 +18,7 @@ package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.FieldDescriptor;
+import one.nio.serial.Repository;
 
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -25,11 +26,13 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class StubGenerator extends BytecodeGenerator {
-    private static final String PACKAGE_PREFIX = "sun/reflect/";
+    public static final AtomicInteger stubClasses = new AtomicInteger();
 
     public static Class generateRegular(String className, String superName, FieldDescriptor[] fds) {
-        String internalClassName = PACKAGE_PREFIX + className;
+        String internalClassName = getStubName(className);
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, superName,
@@ -69,7 +72,7 @@ public class StubGenerator extends BytecodeGenerator {
     }
 
     public static Class generateEnum(String className, String[] constants) {
-        String internalClassName = PACKAGE_PREFIX + className;
+        String internalClassName = getStubName(className);
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL | ACC_ENUM, internalClassName, null, "java/lang/Enum", null);
@@ -134,5 +137,11 @@ public class StubGenerator extends BytecodeGenerator {
 
         cv.visitEnd();
         return INSTANCE.defineClassIfNotExists(internalClassName.replace('/', '.'), cv.toByteArray());
+    }
+
+    private static String getStubName(String className) {
+        Repository.log.warn("Generating stub for class " + className);
+        stubClasses.incrementAndGet();
+        return "sun/reflect/" + className;
     }
 }

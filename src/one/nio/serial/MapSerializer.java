@@ -34,9 +34,12 @@ public class MapSerializer extends Serializer<Map> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        super.tryReadExternal(in, (Repository.getOptions() & Repository.MAP_STUBS) == 0);
-        if (this.cls == null) {
+        try {
+            super.readExternal(in);
+        } catch (ClassNotFoundException e) {
+            if ((Repository.getOptions() & Repository.MAP_STUBS) == 0) throw e;
             this.cls = StubGenerator.generateRegular(uniqueName("Map"), "java/util/HashMap", null);
+            this.origin = Origin.GENERATED;
         }
 
         this.constructor = findConstructor();

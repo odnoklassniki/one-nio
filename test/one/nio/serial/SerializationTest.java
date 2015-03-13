@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SerializationTest extends TestCase {
 
@@ -53,9 +54,24 @@ public class SerializationTest extends TestCase {
         return objCopy;
     }
 
+    private Object cloneViaPersist(Object obj) throws IOException, ClassNotFoundException {
+        PersistStream out = new PersistStream();
+        out.writeObject(obj);
+        byte[] buf = out.toByteArray();
+
+        DeserializeStream in = new DeserializeStream(buf);
+        Object objCopy = in.readObject();
+        assertEquals(in.count(), buf.length);
+
+        return objCopy;
+    }
+
     private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
-        Object objCopy = clone(obj);
-        Assert.assertEquals(obj, objCopy);
+        Object clone1 = clone(obj);
+        Assert.assertEquals(obj, clone1);
+
+        Object clone2 = cloneViaPersist(obj);
+        Assert.assertEquals(obj, clone2);
     }
 
     private void checkSerializeToString(Object obj) throws IOException, ClassNotFoundException {
@@ -240,5 +256,46 @@ public class SerializationTest extends TestCase {
         for (int i = 0; i < 20000; i++) {
             checkSerialize(new ReadObject2());
         }
+    }
+
+    private static class User implements Serializable {
+        private long id;
+        private long phone;
+        private String name;
+
+        public User(long id, long phone, String name) {
+            this.id = id;
+            this.phone = phone;
+            this.name = name;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            User user = (User) o;
+
+            if (id != user.id) return false;
+            if (phone != user.phone) return false;
+            if (!name.equals(user.name)) return false;
+
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = (int) (id ^ (id >>> 32));
+            result = 31 * result + (int) (phone ^ (phone >>> 32));
+            result = 31 * result + name.hashCode();
+            return result;
+        }
+    }
+
+    public void testMap() throws IOException, ClassNotFoundException {
+        ConcurrentHashMap<Long, User> users = new ConcurrentHashMap<Long, User>();
+        users.put(1L, new User(1, 1234567890L, "My Name"));
+        users.put(2L, new User(2, 9876543210L, "Other Name"));
+        checkSerialize(users);
     }
 }

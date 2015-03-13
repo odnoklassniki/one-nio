@@ -84,6 +84,18 @@ public class MethodSerializer extends InvalidSerializer {
         this.argCount = args.length;
     }
 
+    public void skipExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        in.skipBytes(in.readUnsignedShort());
+        in.skipBytes(in.readUnsignedShort());
+
+        int argsAndReturnType = in.readUnsignedShort() + 1;
+        for (int i = 0; i < argsAndReturnType; i++) {
+            if (in.readByte() < 0) {
+                in.skipBytes(in.readUnsignedShort());
+            }
+        }
+    }
+
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder(super.toString());

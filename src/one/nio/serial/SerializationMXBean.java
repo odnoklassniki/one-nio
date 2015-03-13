@@ -29,7 +29,7 @@ public interface SerializationMXBean {
 
     int getAnonymousClasses();
     int getRenamedClasses();
-    int getUnknownClasses();
+    int getStubClasses();
     int getUnknownTypes();
     int getMissedLocalFields();
     int getMissedStreamFields();
