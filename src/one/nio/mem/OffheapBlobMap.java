@@ -16,7 +16,7 @@
 
 package one.nio.mem;
 
-import java.util.Arrays;
+import one.nio.util.Hash;
 
 public class OffheapBlobMap extends OffheapMap<byte[], byte[]> {
     protected static final int KEY_OFFSET = HEADER_SIZE + 4;
@@ -35,8 +35,8 @@ public class OffheapBlobMap extends OffheapMap<byte[], byte[]> {
 
     @Override
     protected long hashCode(byte[] key) {
-        int murmur3Hash = DirectMemory.hash(key, byteArrayOffset, key.length);
-        return (long) key.length << 32 | (murmur3Hash & 0xffffffffL);
+        int xxhash = Hash.xxhash(key, byteArrayOffset, key.length);
+        return (long) key.length << 32 | (xxhash & 0xffffffffL);
     }
 
     @Override

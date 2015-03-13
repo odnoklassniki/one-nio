@@ -16,9 +16,7 @@
 
 package one.nio.util;
 
-import one.nio.mem.DirectMemory;
-
-import static one.nio.util.JavaInternals.byteArrayOffset;
+import static one.nio.util.JavaInternals.*;
 
 public class Hash {
 
@@ -78,7 +76,111 @@ public class Hash {
         return h1;
     }
 
+    // Murmur3_x86_32 hash code
+    public static int murmur3(Object obj, long offset, int count) {
+        int h1 = 0xa9b4de21;
+        int remain;
+
+        for (remain = count; remain >= 4; remain -= 4) {
+            int k1 = unsafe.getInt(obj, offset);
+            offset += 4;
+
+            k1 *= 0xcc9e2d51;
+            k1 = (k1 << 15) | (k1 >>> 17);
+            k1 *= 0x1b873593;
+
+            h1 ^= k1;
+            h1 = (h1 << 13) | (h1 >>> 19);
+            h1 = h1 * 5 + 0xe6546b64;
+        }
+
+        int k1 = 0;
+        switch (remain) {
+            case 3:
+                k1 = (unsafe.getByte(obj, offset + 2) & 0xff) << 16;
+                // fallthrough
+            case 2:
+                k1 |= (unsafe.getByte(obj, offset + 1) & 0xff) << 8;
+                // fallthrough
+            case 1:
+                k1 |= unsafe.getByte(obj, offset) & 0xff;
+                k1 *= 0xcc9e2d51;
+                k1 = (k1 << 15) | (k1 >>> 17);
+                k1 *= 0x1b873593;
+                h1 ^= k1;
+        }
+
+        h1 ^= count;
+        h1 ^= h1 >>> 16;
+        h1 *= 0x85ebca6b;
+        h1 ^= h1 >>> 13;
+        h1 *= 0xc2b2ae35;
+        h1 ^= h1 >>> 16;
+        return h1;
+    }
+
     public static int murmur3(byte[] array, int start, int length) {
-        return DirectMemory.hash(array, byteArrayOffset, length);
+        return murmur3(array, start + byteArrayOffset, length);
+    }
+
+    // https://code.google.com/p/xxhash/
+    private static final int P1 = 0x9e3779b1;
+    private static final int P2 = 0x85ebca77;
+    private static final int P3 = 0xc2b2ae3d;
+    private static final int P4 = 0x27d4eb2f;
+    private static final int P5 = 0x165667b1;
+
+    public static int xxhash(Object obj, long offset, int count) {
+        int h32;
+        long end = offset + count;
+
+        if (count >= 16) {
+            long limit = end - 16;
+            int v1 = P1 + P2;
+            int v2 = P2;
+            int v3 = 0;
+            int v4 = -P1;
+
+            do {
+                v1 += unsafe.getInt(obj, offset) * P2;
+                v1 = ((v1 << 13) | (v1 >>> 19)) * P1;
+
+                v2 += unsafe.getInt(obj, offset + 4) * P2;
+                v2 = ((v2 << 13) | (v2 >>> 19)) * P1;
+
+                v3 += unsafe.getInt(obj, offset + 8) * P2;
+                v3 = ((v3 << 13) | (v3 >>> 19)) * P1;
+
+                v4 += unsafe.getInt(obj, offset + 12) * P2;
+                v4 = ((v4 << 13) | (v4 >>> 19)) * P1;
+            } while ((offset += 16) <= limit);
+
+            h32 = ((v1 << 1) | (v1 >>> 31)) + ((v2 << 7) | (v2 >>> 25)) + ((v3 << 12) | (v3 >>> 20)) + ((v4 << 18) | (v4 >>> 14));
+        } else {
+            h32 = P5;
+        }
+
+        h32 += count;
+
+        for (; offset + 4 <= end; offset += 4) {
+            h32 += unsafe.getInt(obj, offset) * P3;
+            h32 = ((h32 << 17) | (h32 >>> 15)) * P4;
+        }
+
+        for (; offset < end; offset++) {
+            h32 += (unsafe.getByte(obj, offset) & 0xff) * P5;
+            h32 = ((h32 << 11) | (h32 >>> 21)) * P1;
+        }
+
+        h32 ^= h32 >>> 15;
+        h32 *= P2;
+        h32 ^= h32 >>> 13;
+        h32 *= P3;
+        h32 ^= h32 >>> 16;
+        return h32;
+    }
+
+    public static int xxhash(byte[] array, int start, int length) {
+        return xxhash(array, start + byteArrayOffset, length);
     }
 }
