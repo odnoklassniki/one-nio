@@ -16,6 +16,8 @@
 
 package one.nio.util;
 
+import java.util.Comparator;
+
 public class QuickSelect {
 
     // Select k-th largest element from the array
@@ -34,6 +36,39 @@ public class QuickSelect {
             for (int i = left; i < right; i++) {
                 if (array[i] < pivotValue) {
                     long tmp = array[storage];
+                    array[storage] = array[i];
+                    array[i] = tmp;
+                    storage++;
+                }
+            }
+            array[right] = array[storage];
+            array[storage] = pivotValue;
+
+            if (storage < k) {
+                left = storage + 1;
+            } else {
+                right = storage;
+            }
+        }
+
+        return array[k];
+    }
+
+    public static <T> T select(T[] array, int k, Comparator<T> comparator) {
+        return select(array, k, comparator, 0, array.length - 1);
+    }
+
+    public static <T> T select(T[] array, int k, Comparator<T> comparator, int left, int right) {
+        while (left < right) {
+            int pivot = (left + right) >>> 1;
+            T pivotValue = array[pivot];
+            int storage = left;
+
+            array[pivot] = array[right];
+            array[right] = pivotValue;
+            for (int i = left; i < right; i++) {
+                if (comparator.compare(array[i], pivotValue) < 0) {
+                    T tmp = array[storage];
                     array[storage] = array[i];
                     array[i] = tmp;
                     storage++;
