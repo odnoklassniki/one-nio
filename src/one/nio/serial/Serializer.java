@@ -60,6 +60,10 @@ public abstract class Serializer<T> implements Externalizable {
         // Nothing to do
     }
 
+    public byte[] code() {
+        return null;
+    }
+
     protected final String uniqueName(String prefix) {
         int p = descriptor.indexOf('|');
         String className = p < 0 ? descriptor : descriptor.substring(0, p);

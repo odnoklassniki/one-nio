@@ -27,6 +27,8 @@ import java.io.ObjectOutput;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GeneratedSerializer extends Serializer {
@@ -34,6 +36,7 @@ public class GeneratedSerializer extends Serializer {
     static final AtomicInteger missedStreamFields = new AtomicInteger();
     static final AtomicInteger migratedFields = new AtomicInteger();
     static final AtomicInteger renamedFields = new AtomicInteger();
+    static final AtomicInteger unsupportedFields = new AtomicInteger();
 
     private FieldDescriptor[] fds;
     private ArrayList<Field> defaultFields;
@@ -48,11 +51,8 @@ public class GeneratedSerializer extends Serializer {
             fds[i / 2] = new FieldDescriptor(ownFields[i], ownFields[i + 1]);
         }
 
+        checkFieldTypes();
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
-    }
-
-    byte[] code() {
-        return DelegateGenerator.generate(cls, fds, defaultFields);
     }
 
     @Override
@@ -105,9 +105,11 @@ public class GeneratedSerializer extends Serializer {
             }
         }
 
+        checkFieldTypes();
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
     }
 
+    @Override
     public void skipExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         int fds = in.readUnsignedShort();
         for (int i = 0; i < fds; i++) {
@@ -116,6 +118,11 @@ public class GeneratedSerializer extends Serializer {
                 in.skipBytes(in.readUnsignedShort());
             }
         }
+    }
+
+    @Override
+    public byte[] code() {
+        return DelegateGenerator.generate(cls, fds, defaultFields);
     }
 
     @Override
@@ -243,6 +250,21 @@ public class GeneratedSerializer extends Serializer {
                         && parentField == null) {
                     logFieldMismatch("Inlining field", f.getType(), cls, f.getName());
                     getSerializableFields(f.getType(), f, list);
+                }
+            }
+        }
+    }
+
+    private void checkFieldTypes() {
+        for (FieldDescriptor fd : fds) {
+            Field f = fd.ownField();
+            if (f != null) {
+                Class type = f.getType();
+                if (Collection.class.isAssignableFrom(type) && !CollectionSerializer.isValidType(type)
+                        || Map.class.isAssignableFrom(type) && !MapSerializer.isValidType(type)) {
+                    generateUid();
+                    logFieldMismatch("Unsupported field type", type, cls, f.getName());
+                    unsupportedFields.incrementAndGet();
                 }
             }
         }

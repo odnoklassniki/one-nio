@@ -72,6 +72,7 @@ public class EnumSerializer extends Serializer<Enum> {
         }
     }
 
+    @Override
     public void skipExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         int constants = in.readUnsignedShort();
         for (int i = 0; i < constants; i++) {

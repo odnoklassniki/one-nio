@@ -284,7 +284,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
         // Nothing to do
     }
 
-    protected void register(Object obj) {
+    public void register(Object obj) {
         // Nothing to do
     }
 

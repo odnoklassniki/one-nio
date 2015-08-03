@@ -39,15 +39,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static one.nio.util.JavaInternals.unsafe;
 
 public class DelegateGenerator extends BytecodeGenerator {
-    private static final String SUPER_CLASS = "sun/reflect/MagicAccessorImpl";
-
-    private static AtomicInteger index = new AtomicInteger();
+    private static final AtomicInteger index = new AtomicInteger();
 
     public static byte[] generate(Class cls, FieldDescriptor[] fds, List<Field> defaultFields) {
-        String className = "sun/reflect/Delegate" + index.getAndIncrement() + "_" + cls.getSimpleName();
+        String className = "sun/reflect/Delegate" + index.getAndIncrement() + '_' + cls.getSimpleName();
 
-        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, className, null, SUPER_CLASS,
+        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL, className, null, MAGIC_CLASS,
                 new String[] { "one/nio/serial/gen/Delegate" });
 
         generateConstructor(cv);
@@ -66,7 +64,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitCode();
 
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESPECIAL, SUPER_CLASS, "<init>", "()V");
+        mv.visitMethodInsn(INVOKESPECIAL, MAGIC_CLASS, "<init>", "()V");
 
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
@@ -195,7 +193,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitLdcInsn(unsafe.objectFieldOffset(ownField));
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
-                checkFieldType(mv, sourceClass);
+                if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
                 emitTypeCast(mv, sourceClass, ownField.getType());
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
             } else {
@@ -203,7 +201,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 if (parentField != null) emitGetField(mv, parentField);
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
-                checkFieldType(mv, sourceClass);
+                if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
                 emitTypeCast(mv, sourceClass, ownField.getType());
                 emitPutField(mv, ownField);
             }
@@ -387,16 +385,6 @@ public class DelegateGenerator extends BytecodeGenerator {
         }
     }
 
-    private static void checkFieldType(MethodVisitor mv, Class fieldType) {
-        if ((Repository.getOptions() & Repository.CHECK_FIELD_TYPE) != 0 && !fieldType.isPrimitive()) {
-            emitTypeCast(mv, Object.class, fieldType);
-        } else if (fieldType.isArray()) {
-            // Always cast arrays or otherwise JIT compiler may crash
-            Class targetType = Object[].class.isAssignableFrom(fieldType) ? Object[].class : fieldType;
-            emitTypeCast(mv, Object.class, targetType);
-        }
-    }
-
     private static void emitTypeCast(MethodVisitor mv, Class<?> src, Class<?> dst) {
         // Trivial case
         if (src == dst || dst.isAssignableFrom(src)) {
@@ -416,6 +404,17 @@ public class DelegateGenerator extends BytecodeGenerator {
             for (int opcode = srcType.convertTo(dstType); opcode != 0; opcode >>>= 8) {
                 mv.visitInsn(opcode & 0xff);
             }
+            return;
+        }
+
+        // Primitive[] -> Primitive[]
+        if (src.isArray() && src.getComponentType().isPrimitive() && dst.isArray() && dst.getComponentType().isPrimitive()) {
+            String copySig = "(" + Type.getDescriptor(src) + Type.getDescriptor(dst) + ")V";
+            mv.visitInsn(DUP);
+            mv.visitInsn(ARRAYLENGTH);
+            mv.visitIntInsn(NEWARRAY, FieldType.valueOf(dst.getComponentType()).bytecodeType);
+            mv.visitInsn(DUP_X1);
+            mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/gen/ArrayCopy", "copy", copySig);
             return;
         }
 

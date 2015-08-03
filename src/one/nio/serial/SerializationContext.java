@@ -51,7 +51,7 @@ class SerializationContext {
 
     public int indexOf(Object obj) {
         if (first == null) {
-            return Integer.MIN_VALUE;
+            return -1;
         }
 
         Object[] keys = this.keys;
@@ -65,17 +65,8 @@ class SerializationContext {
             }
             i = (i + 1) & mask;
         }
-        return ~i;
-    }
 
-    public void putAt(int index, Object obj) {
-        if (index == Integer.MIN_VALUE) {
-            first = obj;
-        } else {
-            keys[~index] = obj;
-            values[~index] = size;
-            if (++size >= threshold) resize();
-        }
+        return -1;
     }
 
     private Object[] init() {

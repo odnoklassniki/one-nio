@@ -21,6 +21,7 @@ import one.nio.serial.gen.StubGenerator;
 import java.io.ObjectInput;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 public class MapSerializer extends Serializer<Map> {
@@ -116,10 +117,19 @@ public class MapSerializer extends Serializer<Map> {
                     ", changed type to " + implementation.getName());
 
             try {
-                return implementation.getDeclaredConstructor();
+                return implementation.getConstructor();
             } catch (NoSuchMethodException e1) {
                 return null;
             }
+        }
+    }
+
+    static boolean isValidType(Class<?> type) {
+        try {
+            type.getConstructor();
+            return (type.getModifiers() & Modifier.ABSTRACT) == 0;
+        } catch (NoSuchMethodException e) {
+            return type == Map.class || type == SortedMap.class || type == NavigableMap.class;
         }
     }
 }

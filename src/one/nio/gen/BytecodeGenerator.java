@@ -27,6 +27,7 @@ import org.objectweb.asm.Type;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -36,9 +37,10 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     private static final Log log = LogFactory.getLog(BytecodeGenerator.class);
 
     public static final BytecodeGenerator INSTANCE = new BytecodeGenerator();
+    public static final String MAGIC_CLASS = "sun/reflect/MagicAccessorImpl";
 
     static {
-        Management.registerMXBean(INSTANCE, "one.nio.serial:type=BytecodeGenerator");
+        Management.registerMXBean(INSTANCE, "one.nio.gen:type=BytecodeGenerator");
     }
 
     protected final AtomicInteger totalClasses;
@@ -122,6 +124,21 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         String name = m.getName();
         String sig = Type.getMethodDescriptor(m);
         mv.visitMethodInsn(opcode, holder, name, sig);
+    }
+
+    public static void emitInvoke(MethodVisitor mv, Constructor c) {
+        String holder = Type.getInternalName(c.getDeclaringClass());
+        String name = c.getName();
+        String sig = Type.getConstructorDescriptor(c);
+        mv.visitMethodInsn(INVOKESPECIAL, holder, name, sig);
+    }
+
+    public static void emitThrow(MethodVisitor mv, String exceptionClass, String message) {
+        mv.visitTypeInsn(NEW, exceptionClass);
+        mv.visitInsn(DUP);
+        mv.visitLdcInsn(message);
+        mv.visitMethodInsn(INVOKESPECIAL, exceptionClass, "<init>", "(Ljava/lang/String;)V");
+        mv.visitInsn(ATHROW);
     }
 
     public static void emitInt(MethodVisitor mv, int c) {

@@ -65,8 +65,7 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     @Override
     public byte[] getCode(String uid) {
         try {
-            Serializer serializer = Repository.requestSerializer(Hex.parseLong(uid));
-            return serializer instanceof GeneratedSerializer ? ((GeneratedSerializer) serializer).code() : null;
+            return Repository.requestSerializer(Hex.parseLong(uid)).code();
         } catch (SerializerNotFoundException e) {
             return null;
         }
@@ -120,6 +119,11 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     @Override
     public int getRenamedFields() {
         return GeneratedSerializer.renamedFields.get();
+    }
+
+    @Override
+    public int getUnsupportedFields() {
+        return GeneratedSerializer.unsupportedFields.get();
     }
 
     @Override

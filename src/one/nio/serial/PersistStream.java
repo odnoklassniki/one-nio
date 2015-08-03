@@ -52,7 +52,7 @@ public class PersistStream extends SerializeStream {
                     writeByte(REF_EMBEDDED);
                     writeObject(serializer);
                 }
-                context.putAt(index, obj);
+                context.put(obj);
                 serializer.write(obj, this);
             } else if (index <= 0xffff) {
                 writeByte(REF_RECURSIVE);

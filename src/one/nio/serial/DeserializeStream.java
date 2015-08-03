@@ -78,7 +78,7 @@ public class DeserializeStream extends DataStream {
     }
 
     @Override
-    protected void register(Object obj) {
+    public void register(Object obj) {
         context[contextSize] = obj;
     }
 }

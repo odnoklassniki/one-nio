@@ -35,6 +35,7 @@ public interface SerializationMXBean {
     int getMissedStreamFields();
     int getMigratedFields();
     int getRenamedFields();
+    int getUnsupportedFields();
 
     int getEnumCountMismatches();
     int getEnumMissedConstants();

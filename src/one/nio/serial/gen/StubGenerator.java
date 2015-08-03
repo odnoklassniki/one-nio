@@ -34,8 +34,8 @@ public class StubGenerator extends BytecodeGenerator {
     public static Class generateRegular(String className, String superName, FieldDescriptor[] fds) {
         String internalClassName = getStubName(className);
 
-        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL, internalClassName, null, superName,
+        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL, internalClassName, null, superName,
                 new String[] { "java/io/Serializable" });
 
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
@@ -74,8 +74,8 @@ public class StubGenerator extends BytecodeGenerator {
     public static Class generateEnum(String className, String[] constants) {
         String internalClassName = getStubName(className);
 
-        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cv.visit(V1_5, ACC_PUBLIC | ACC_FINAL | ACC_ENUM, internalClassName, null, "java/lang/Enum", null);
+        ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL | ACC_ENUM, internalClassName, null, "java/lang/Enum", null);
 
         String classDesc = 'L' + internalClassName + ';';
         for (String c : constants) {

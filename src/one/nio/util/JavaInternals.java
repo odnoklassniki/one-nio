@@ -21,6 +21,7 @@ import sun.misc.Unsafe;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 public final class JavaInternals {
     public static final Unsafe unsafe = getUnsafe();
@@ -122,5 +123,36 @@ public final class JavaInternals {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    // Useful for patching final fields
+    public static void setStaticField(Class<?> cls, String name, Object value) {
+        try {
+            Field field = cls.getDeclaredField(name);
+            if (!Modifier.isStatic(field.getModifiers())) {
+                throw new IllegalArgumentException("Static field expected");
+            }
+            unsafe.putObject(unsafe.staticFieldBase(field), unsafe.staticFieldOffset(field), value);
+        } catch (NoSuchFieldException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    // Useful for patching final fields
+    public static void setObjectField(Object obj, String name, Object value) {
+        try {
+            Field field = obj.getClass().getDeclaredField(name);
+            if (Modifier.isStatic(field.getModifiers())) {
+                throw new IllegalArgumentException("Object field expected");
+            }
+            unsafe.putObject(obj, unsafe.objectFieldOffset(field), value);
+        } catch (NoSuchFieldException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E extends Throwable> void uncheckedThrow(Throwable e) throws E {
+        throw (E) e;
     }
 }

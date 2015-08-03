@@ -64,10 +64,10 @@ public class Repository {
     public static final int MAP_STUBS        = 4;
     public static final int ENUM_STUBS       = 8;
     public static final int CUSTOM_STUBS     = 16;
-    public static final int CHECK_FIELD_TYPE = 256;
+    public static final int DEFAULT_OPTIONS  = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS;
 
     private static long nextBootstrapUid = -10;
-    private static int options = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS;
+    private static int options = Integer.getInteger("one.nio.serial.options", DEFAULT_OPTIONS);
 
     static {
         addBootstrap(new IntegerSerializer());
