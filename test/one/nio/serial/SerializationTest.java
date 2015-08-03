@@ -29,11 +29,8 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class SerializationTest extends TestCase {
 
@@ -66,11 +63,31 @@ public class SerializationTest extends TestCase {
         return objCopy;
     }
 
+    private static final Class[] collectionInterfaces = {SortedSet.class, NavigableSet.class, Set.class, Queue.class, List.class};
+    private static final Class[] mapInterfaces = {SortedMap.class, NavigableMap.class};
+
+    private void checkClass(Class<?> cls, Class<?> other) {
+        if (other != cls) {
+            if (Collection.class.isAssignableFrom(cls)) {
+                for (Class<?> iface : collectionInterfaces) {
+                    Assert.assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
+                }
+            }
+            if (Map.class.isAssignableFrom(cls)) {
+                for (Class<?> iface : mapInterfaces) {
+                    Assert.assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
+                }
+            }
+        }
+    }
+
     private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
         Object clone1 = clone(obj);
+        checkClass(obj.getClass(), clone1.getClass());
         Assert.assertEquals(obj, clone1);
 
         Object clone2 = cloneViaPersist(obj);
+        checkClass(obj.getClass(), clone2.getClass());
         Assert.assertEquals(obj, clone2);
     }
 
@@ -297,5 +314,34 @@ public class SerializationTest extends TestCase {
         users.put(1L, new User(1, 1234567890L, "My Name"));
         users.put(2L, new User(2, 9876543210L, "Other Name"));
         checkSerialize(users);
+    }
+
+    public void testCollections() throws IOException, ClassNotFoundException {
+        Random random = new Random();
+        ArrayList<Long> list = new ArrayList<Long>();
+        for (int i = 0; i < 100; i++) {
+            list.add(random.nextLong());
+        }
+
+        HashMap<String, Integer> map = new HashMap<String, Integer>();
+        map.put("first", 1);
+        map.put("second", 2);
+        map.put("third", 3);
+
+        checkSerialize(list);
+        checkSerialize(Arrays.asList(1, 2, 3));
+        checkSerialize(Collections.emptySet());
+        checkSerialize(Collections.singleton("abc"));
+        checkSerialize(Collections.singletonMap("Key", "Value"));
+        checkSerialize(Collections.synchronizedSortedSet(new TreeSet<Object>(list)));
+        checkSerialize(Collections.unmodifiableSortedMap(new ConcurrentSkipListMap<Object, Object>()));
+        checkSerialize(EnumSet.noneOf(SimpleEnum.class));
+        checkSerialize(EnumSet.of(ComplexEnum.C3));
+        checkSerialize(EnumSet.allOf(ComplexEnum.class));
+        checkSerialize(new EnumMap<SimpleEnum, Boolean>(Collections.singletonMap(SimpleEnum.A, true)));
+        checkSerialize(Collections.synchronizedSortedMap(new TreeMap<String, Integer>(map)));
+
+        checkSerialize(list.subList(10, 20));
+        checkSerialize(map.keySet());
     }
 }
