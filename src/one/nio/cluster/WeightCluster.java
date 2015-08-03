@@ -19,8 +19,10 @@ package one.nio.cluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Timer;
@@ -99,6 +101,14 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
     public synchronized void removeProviders(Collection<T> oldProviders) {
         providers.keySet().removeAll(oldProviders);
         rebuildProviderSelector();
+    }
+
+    public synchronized List<T> replaceProviders(Map<T, Integer> newProviders) {
+        ArrayList<T> oldProviders = new ArrayList<T>(providers.keySet());
+        providers.clear();
+        providers.putAll(newProviders);
+        rebuildProviderSelector();
+        return oldProviders;
     }
 
     public synchronized Integer getWeight(T provider) {
