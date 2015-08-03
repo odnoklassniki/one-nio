@@ -43,8 +43,12 @@ public class Management {
     }
 
     public static void registerMXBean(Object object, String name) {
+        registerMXBean(object, null, name);
+    }
+
+    public static void registerMXBean(Object object, Class mxbeanInterface, String name) {
         try {
-            StandardMBean mb = new StandardMBean(object, null, true);
+            StandardMBean mb = new StandardMBean(object, mxbeanInterface, true);
             MBeanServer beanServer = ManagementFactory.getPlatformMBeanServer();
 
             ObjectName objectName = new ObjectName(name);

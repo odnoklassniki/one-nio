@@ -23,8 +23,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ThreadDumper {
+    private static final AtomicLong dumpTime = new AtomicLong();
     private static Method dumpMethod;
 
     // tools.jar must be in class path when loading ThreadDumper implementation
@@ -54,6 +56,14 @@ public class ThreadDumper {
             throw target instanceof IOException ? (IOException) target : new IOException(target);
         } catch (Exception e) {
             throw new IOException(e);
+        }
+    }
+
+    public static void dump(OutputStream out, long minDumpInterval) throws IOException {
+        long currentTime = System.currentTimeMillis();
+        long lastDumpTime = dumpTime.get();
+        if (currentTime - lastDumpTime >= minDumpInterval && dumpTime.compareAndSet(lastDumpTime, currentTime)) {
+            dump(out);
         }
     }
 }
