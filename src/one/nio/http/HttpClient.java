@@ -33,7 +33,7 @@ public class HttpClient extends SocketPool {
     protected String hostHeader;
     protected String connectionHeader;
 
-    public HttpClient(ConnectionString conn) throws IOException {
+    public HttpClient(ConnectionString conn) {
         super(conn);
         this.hostHeader = "Host: " + conn.getHost();
         this.connectionHeader = conn.getBooleanParam("keepalive", true) ? "Connection: Keep-Alive" : "Connection: close";
@@ -129,7 +129,7 @@ public class HttpClient extends SocketPool {
                 response.addHeader(header);
             }
 
-            if (method != Request.METHOD_HEAD) {
+            if (method != Request.METHOD_HEAD && response.getStatus() != 204) {
                 String contentLength = response.getHeader("Content-Length: ");
                 if (contentLength != null) {
                     byte[] body = new byte[Integer.parseInt(contentLength)];

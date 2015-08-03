@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-package one.nio.cluster;
+package one.nio.http;
 
-import one.nio.http.HttpClient;
-import one.nio.http.Request;
-import one.nio.http.Response;
+import one.nio.cluster.ServiceProvider;
 import one.nio.net.ConnectionString;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class HttpProvider implements ServiceProvider {
-    private static final Charset UTF8 = Charset.forName("UTF-8");
-
     private final HttpClient client;
     private final String host;
     private final AtomicBoolean available;
@@ -41,15 +36,13 @@ public class HttpProvider implements ServiceProvider {
         this.failures = new AtomicInteger();
     }
 
-    public String invoke(Request request) throws Exception {
+    public Response invoke(Request request) throws Exception {
         Response response = client.invoke(request);
-        if (response.getStatus() != 200) {
+        int status = response.getStatus();
+        if (status < 200 || status >= 300) {
             throw new IOException(this + " call failed with status " + response.getHeaders()[0]);
         }
-        if (response.getBody() == null) {
-            throw new IOException(this + " returned empty body");
-        }
-        return new String(response.getBody(), UTF8);
+        return response;
     }
 
     public String getHost() {
