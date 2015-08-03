@@ -184,7 +184,7 @@ Java_one_nio_net_NativeSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jin
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
-    } else {
+    } else if (count != 0) {
         int result = send(fd, (void*)(intptr_t)buf, count, flags | MSG_NOSIGNAL);
         if (result > 0) {
             return result;
@@ -204,7 +204,7 @@ Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, 
 
     if (fd == -1) {
         throw_socket_closed(env);
-    } else {
+    } else if (count != 0) {
         int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
         (*env)->GetByteArrayRegion(env, data, offset, result, buf);
         result = send(fd, buf, result, MSG_NOSIGNAL);
@@ -250,7 +250,7 @@ Java_one_nio_net_NativeSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
-    } else {
+    } else if (count != 0) {
         int result = recv(fd, (void*)(intptr_t)buf, count, flags);
         if (result > 0) {
             return result;
@@ -270,7 +270,7 @@ Java_one_nio_net_NativeSocket_read(JNIEnv* env, jobject self, jbyteArray data, j
 
     if (fd == -1) {
         throw_socket_closed(env);
-    } else {
+    } else if (count != 0) {
         int result = recv(fd, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, 0);
         if (result > 0) {
             (*env)->SetByteArrayRegion(env, data, offset, result, buf);
@@ -315,7 +315,7 @@ Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD
 
     if (fd == -1) {
         throw_socket_closed(env);
-    } else {
+    } else if (count != 0) {
         jlong result = sendfile(fd, sourceFD, (off_t*)&offset, count);
         if (result > 0) {
             return result;
