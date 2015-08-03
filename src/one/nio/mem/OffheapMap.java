@@ -362,9 +362,8 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     long nextEntry;
                     for (long entry = unsafe.getAddress(currentPtr); entry != 0; entry = nextEntry) {
                         nextEntry = unsafe.getAddress(entry + NEXT_OFFSET);
-                        if (unsafe.getLong(entry + TIME_OFFSET) <= expirationTime) {
+                        if (shouldCleanup(entry, expirationTime)) {
                             unsafe.putAddress(currentPtr, nextEntry);
-                            evicted(entry);
                             destroyEntry(entry);
                             expired++;
                         } else {
@@ -419,7 +418,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         });
     }
 
-    private void iterate(Visitor<K, V> visitor, int taskNum, int taskCount) {
+    public void iterate(Visitor<K, V> visitor, int taskNum, int taskCount) {
         for (int i = taskNum; i < capacity; i += taskCount) {
             long currentPtr = mapBase + (long) i * 8;
             RWLock lock = locks[i & (CONCURRENCY_LEVEL - 1)].lockRead();
@@ -446,7 +445,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         });
     }
 
-    private void iterate(WritableVisitor<K, V> visitor, int taskNum, int taskCount) {
+    public void iterate(WritableVisitor<K, V> visitor, int taskNum, int taskCount) {
         for (int i = taskNum; i < capacity; i += taskCount) {
             long currentPtr = mapBase + (long) i * 8;
             RWLock lock = locks[i & (CONCURRENCY_LEVEL - 1)].lockWrite();
@@ -489,12 +488,14 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return false;
     }
 
-    protected K keyAt(long entry) {
-        return null;  // override it in child classes if needed
+    // Called from CleanupThread. Returns true if the entry should be removed.
+    // Can be used to perform custom logic on entry eviction.
+    protected boolean shouldCleanup(long entry, long expirationTime) {
+        return unsafe.getLong(entry + TIME_OFFSET) <= expirationTime;
     }
 
-    protected void evicted(long entry) {
-        // Called from cleanup thread
+    protected K keyAt(long entry) {
+        return null;  // override it in child classes if needed
     }
 
     protected abstract long hashCode(K key);
@@ -596,6 +597,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             map.destroyEntry(entry);
             map.count.decrementAndGet();
             entry = 0;
+        }
+
+        public long currentPtr() {
+            return currentPtr;
         }
 
         @Override
