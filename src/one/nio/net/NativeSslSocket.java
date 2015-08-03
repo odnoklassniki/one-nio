@@ -30,7 +30,7 @@ class NativeSslSocket extends NativeSocket {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         if (ssl != 0) {
             sslFree(ssl);
             ssl = 0;
@@ -49,22 +49,22 @@ class NativeSslSocket extends NativeSocket {
     }
 
     @Override
-    public native int writeRaw(long buf, int count, int flags) throws IOException;
+    public synchronized native int writeRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public native int write(byte[] data, int offset, int count) throws IOException;
+    public synchronized native int write(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public native void writeFully(byte[] data, int offset, int count) throws IOException;
+    public synchronized native void writeFully(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public native int readRaw(long buf, int count, int flags) throws IOException;
+    public synchronized native int readRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public native int read(byte[] data, int offset, int count) throws IOException;
+    public synchronized native int read(byte[] data, int offset, int count) throws IOException;
 
     @Override
-    public native void readFully(byte[] data, int offset, int count) throws IOException;
+    public synchronized native void readFully(byte[] data, int offset, int count) throws IOException;
 
     static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
     static native void sslFree(long ssl);

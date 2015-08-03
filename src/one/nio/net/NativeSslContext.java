@@ -16,6 +16,8 @@
 
 package one.nio.net;
 
+import one.nio.mgt.Management;
+
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -29,11 +31,14 @@ class NativeSslContext extends SslContext {
 
     NativeSslContext() throws SSLException {
         this.ctx = ctxNew();
+        Management.registerMXBean(new NativeSslContextMXBeanImpl(),
+                "one.nio.net:type=SslContext,id=" + Long.toHexString(ctx));
     }
 
     @Override
     public void close() {
         if (ctx != 0) {
+            Management.unregisterMXBean("one.nio.net:type=SslContext,id=" + Long.toHexString(ctx));
             ctxFree(ctx);
             ctx = 0;
         }
@@ -75,8 +80,14 @@ class NativeSslContext extends SslContext {
     @Override
     public native void setTicketKey(byte[] ticketKey) throws SSLException;
 
+    @Override
+    public native void setTimeout(long timeout) throws SSLException;
+
     private native void setOptions(int options);
     private native void clearOptions(int options);
+
+    private native long getSessionCounter(int key);
+    private native long[] getSessionCounters(int keysBitmap);
 
     private static native void init();
     private static native long ctxNew() throws SSLException;
@@ -119,8 +130,76 @@ class NativeSslContext extends SslContext {
             if (ticketKeyFile != null) {
                 DEFAULT.setTicketKey(readFile(ticketKeyFile));
             }
+
+            String timeout = System.getProperty("one.nio.ssl.timeout");
+            if (timeout != null) {
+                DEFAULT.setTimeout(Long.parseLong(timeout));
+            }
         } catch (IOException e) {
             throw new ServiceConfigurationError("Could not create OpenSSL context", e);
+        }
+    }
+
+    private class NativeSslContextMXBeanImpl implements SslContextMXBean {
+
+        @Override
+        public long getNumber() {
+            return getSessionCounter(0);
+        }
+
+        @Override
+        public long getConnect() {
+            return getSessionCounter(1);
+        }
+
+        @Override
+        public long getConnectGood() {
+            return getSessionCounter(2);
+        }
+
+        @Override
+        public long getConnectRenegotiate() {
+            return getSessionCounter(3);
+        }
+
+        @Override
+        public long getAccept() {
+            return getSessionCounter(4);
+        }
+
+        @Override
+        public long getAcceptGood() {
+            return getSessionCounter(5);
+        }
+
+        @Override
+        public long getAcceptRenegotiate() {
+            return getSessionCounter(6);
+        }
+
+        @Override
+        public long getHits() {
+            return getSessionCounter(7);
+        }
+
+        @Override
+        public long getCustomHits() {
+            return getSessionCounter(8);
+        }
+
+        @Override
+        public long getMisses() {
+            return getSessionCounter(9);
+        }
+
+        @Override
+        public long getTimeouts() {
+            return getSessionCounter(10);
+        }
+
+        @Override
+        public long getEvicted() {
+            return getSessionCounter(11);
         }
     }
 }

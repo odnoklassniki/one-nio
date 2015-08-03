@@ -38,4 +38,5 @@ public abstract class SslContext {
     public abstract void setCiphers(String ciphers) throws SSLException;
     public abstract void setCertificate(String certFile, String privateKeyFile) throws SSLException;
     public abstract void setTicketKey(byte[] ticketKey) throws SSLException;
+    public abstract void setTimeout(long timeout) throws SSLException;
 }

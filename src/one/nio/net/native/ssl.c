@@ -20,6 +20,8 @@
 #define KEY_SECONDARY 2
 #define KEY_SINGLE    3
 
+#define MAX_COUNTERS  32
+
 
 struct SSL_ticket_key {
     unsigned char type;
@@ -40,8 +42,27 @@ static jfieldID f_ssl;
 
 static void throw_ssl_exception(JNIEnv* env) {
     char buf[256];
-    char* message = ERR_error_string(ERR_get_error(), buf);
-    throw_by_name(env, "javax/net/ssl/SSLException", message);
+    const char* klass;
+    unsigned long err = ERR_get_error();
+    char* message = ERR_error_string(err, buf);
+
+    switch (ERR_GET_REASON(err)) {
+        case SSL_R_SSL_HANDSHAKE_FAILURE:
+        case SSL_R_BAD_HANDSHAKE_LENGTH:
+            klass = "javax/net/ssl/SSLHandshakeException";
+            break;
+        case SSL_R_UNKNOWN_PROTOCOL:
+        case SSL_R_UNSUPPORTED_PROTOCOL:
+        case SSL_R_NO_PROTOCOLS_AVAILABLE:
+        case SSL_R_PROTOCOL_IS_SHUTDOWN:
+        case SSL_R_BAD_PROTOCOL_VERSION_NUMBER:
+            klass = "javax/net/ssl/SSLProtocolException";
+            break;
+        default:
+            klass = "javax/net/ssl/SSLException";
+    }
+
+    throw_by_name(env, klass, message);
 }
 
 static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
@@ -75,6 +96,37 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             throw_by_name(env, "javax/net/ssl/SSLException", buf);
             return 0;
     }
+}
+
+static long get_session_counter(SSL_CTX* ctx, int key) {
+	switch (key) {
+		case 0:
+			return SSL_CTX_sess_number(ctx);
+		case 1:
+			return SSL_CTX_sess_connect(ctx);
+		case 2:
+			return SSL_CTX_sess_connect_good(ctx);
+		case 3:
+			return SSL_CTX_sess_connect_renegotiate(ctx);
+		case 4:
+			return SSL_CTX_sess_accept(ctx);
+		case 5:
+			return SSL_CTX_sess_accept_good(ctx);
+		case 6:
+			return SSL_CTX_sess_accept_renegotiate(ctx);
+		case 7:
+			return SSL_CTX_sess_hits(ctx);
+		case 8:
+			return SSL_CTX_sess_cb_hits(ctx);
+		case 9:
+			return SSL_CTX_sess_misses(ctx);
+		case 10:
+			return SSL_CTX_sess_timeouts(ctx);
+		case 11:
+			return SSL_CTX_sess_cache_full(ctx);
+		default:
+			return 0;
+	}
 }
 
 static unsigned long id_function() {
@@ -280,6 +332,36 @@ Java_one_nio_net_NativeSslContext_setTicketKey(JNIEnv* env, jobject self, jbyteA
         key->type = new_type;
         SSL_CTX_set_tlsext_ticket_key_cb(ctx, ticket_key_callback);    
     }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setTimeout(JNIEnv* env, jobject self, jlong timeout) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    SSL_CTX_set_timeout(ctx, timeout);
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_net_NativeSslContext_getSessionCounter(JNIEnv* env, jobject self, jint key) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    return get_session_counter(ctx, key);
+}
+
+JNIEXPORT jlongArray JNICALL
+Java_one_nio_net_NativeSslContext_getSessionCounters(JNIEnv* env, jobject self, jint keysBitmap) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    jlong raw_values[MAX_COUNTERS];
+    jlongArray values;
+    int i;
+
+    for (i = 0; i < MAX_COUNTERS; i++) {
+        if (keysBitmap & (1 << i)) {
+	        raw_values[i] = get_session_counter(ctx, i);
+        }
+    }
+
+    values = (*env)->NewLongArray(env, MAX_COUNTERS);
+    (*env)->SetLongArrayRegion(env, values, 0, MAX_COUNTERS, raw_values);
+    return values;
 }
 
 JNIEXPORT jlong JNICALL
