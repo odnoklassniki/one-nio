@@ -36,6 +36,7 @@ public class ConnectionString {
 
     protected String protocol;
     protected String host;
+    protected String path;
     protected int port;
     protected Map<String, String> params;
 
@@ -45,12 +46,11 @@ public class ConnectionString {
     public ConnectionString(String connectionString) {
         connectionString = expand(connectionString);
 
-        int p = connectionString.indexOf("://");
-        int addrStart = 0;
-        if (p >= 0) {
-            this.protocol = connectionString.substring(0, p);
-            addrStart = p + 3;
+        int p = connectionString.indexOf("//");
+        if (p > 1) {
+            this.protocol = connectionString.substring(0, p - 1);
         }
+        int addrStart = p >= 0 ? p + 2 : 0;
 
         int queryString = connectionString.indexOf('?', addrStart);
         if (queryString >= 0) {
@@ -71,6 +71,7 @@ public class ConnectionString {
             this.host = connectionString.substring(addrStart, addrEnd);
             this.port = 0;
         }
+        this.path = connectionString.substring(addrEnd);
     }
 
     public String getProtocol() {
@@ -83,6 +84,10 @@ public class ConnectionString {
 
     public int getPort() {
         return port;
+    }
+
+    public String getPath() {
+        return path;
     }
 
     public String[] getHosts() {

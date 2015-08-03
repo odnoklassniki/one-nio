@@ -28,7 +28,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
-import java.net.SocketException;
 import java.util.concurrent.RejectedExecutionException;
 
 public class RpcSession<S> extends Session {
@@ -148,16 +147,8 @@ public class RpcSession<S> extends Session {
         public void run() {
             try {
                 writeResponse(invoke(request));
-            } catch (SocketException e) {
-                if (server.isRunning() && log.isDebugEnabled()) {
-                    log.debug("Connection closed: " + getRemoteHost());
-                }
-                close();
             } catch (Throwable e) {
-                if (server.isRunning()) {
-                    log.error("Cannot process session from " + getRemoteHost(), e);
-                }
-                close();
+                server.handleException(RpcSession.this, e);
             }
         }
     }

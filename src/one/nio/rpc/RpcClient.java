@@ -34,7 +34,7 @@ import java.net.SocketException;
 
 public class RpcClient extends SocketPool implements InvocationHandler {
 
-    public RpcClient(ConnectionString conn) throws IOException {
+    public RpcClient(ConnectionString conn) {
         super(conn);
     }
 

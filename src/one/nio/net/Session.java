@@ -29,6 +29,10 @@ public class Session implements Closeable {
     public static final int EVENT_MASK = 0xff;
     public static final int SSL        = 0x100;
 
+    public static final int ACTIVE = 0;
+    public static final int IDLE   = 1;
+    public static final int STALE  = 2;
+
     protected Socket socket;
     protected Selector selector;
     protected int slot;
@@ -53,8 +57,16 @@ public class Session implements Closeable {
         return lastAccessTime;
     }
 
-    public boolean isActive() {
-        return writeQueue != null;
+    public int checkStatus(long currentTime, long keepAlive) {
+        long lastAccessTime = this.lastAccessTime;
+        if (lastAccessTime < currentTime - keepAlive) {
+            if (writeQueue == null) {
+                return IDLE;
+            } else if (lastAccessTime < currentTime - keepAlive * 8) {
+                return STALE;
+            }
+        }
+        return ACTIVE;
     }
 
     @Override
@@ -159,7 +171,7 @@ public class Session implements Closeable {
     }
 
     public void process(byte[] buffer) throws Exception {
-        lastAccessTime = 0;
+        lastAccessTime = Long.MAX_VALUE;
 
         if (eventsToListen >= SSL) {
             if ((events & READABLE) != 0) processWrite();

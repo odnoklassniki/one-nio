@@ -25,8 +25,10 @@ import one.nio.net.SslContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -118,7 +120,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
             boolean affinity = conn.getBooleanParam("affinity", false);
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, selectorCount);
             for (int i = selectors.length; i < selectorCount; i++) {
-                newSelectors[i] = new SelectorThread(this, i, affinity ? 1 << (i % processors) : 0);
+                newSelectors[i] = new SelectorThread(this, i, affinity ? 1L << (i % processors) : 0);
                 newSelectors[i].start();
             }
             selectors = newSelectors;
@@ -305,6 +307,19 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     public final void asyncExecute(Runnable command) {
         workers.execute(command);
+    }
+
+    public void handleException(Session session, Throwable e) {
+        if (running) {
+            if (e instanceof SocketException) {
+                if (log.isDebugEnabled()) log.debug("Connection closed: " + session.getRemoteHost());
+            } else if (e instanceof SSLHandshakeException) {
+                if (log.isDebugEnabled()) log.debug("Handshake failure: " + session.getRemoteHost());
+            } else {
+                log.error("Cannot process session from " + session.getRemoteHost(), e);
+            }
+        }
+        session.close();
     }
 
     @Override

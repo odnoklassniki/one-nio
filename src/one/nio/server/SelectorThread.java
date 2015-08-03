@@ -24,7 +24,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
-import java.net.SocketException;
 import java.util.Iterator;
 
 final class SelectorThread extends Thread {
@@ -70,16 +69,8 @@ final class SelectorThread extends Thread {
                 Session session = selectedSessions.next();
                 try {
                     session.process(buffer);
-                } catch (SocketException e) {
-                    if (server.isRunning() && log.isDebugEnabled()) {
-                        log.debug("Connection closed: " + session.getRemoteHost());
-                    }
-                    session.close();
                 } catch (Throwable e) {
-                    if (server.isRunning()) {
-                        log.error("Cannot process session from " + session.getRemoteHost(), e);
-                    }
-                    session.close();
+                    server.handleException(session, e);
                 }
             }
 

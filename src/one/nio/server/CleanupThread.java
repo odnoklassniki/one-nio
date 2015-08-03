@@ -46,6 +46,7 @@ final class CleanupThread extends Thread {
     @Override
     public void run() {
         for (;;) {
+            long keepAlive = this.keepAlive;
             try {
                 Thread.sleep(keepAlive / 2);
             } catch (InterruptedException e) {
@@ -58,28 +59,25 @@ final class CleanupThread extends Thread {
             }
 
             long cleanTime = System.currentTimeMillis();
-            long idle = cleanTime - keepAlive;
-            long timeout = cleanTime - keepAlive * 8;
             int idleCount = 0;
-            int timeoutCount = 0;
+            int staleCount = 0;
 
             for (SelectorThread selector : selectors) {
                 for (Session session : selector.selector) {
-                    long lastAccessTime = session.lastAccessTime();
-                    if (lastAccessTime > 0 && lastAccessTime < idle) {
-                        if (!session.isActive()) {
-                            session.close();
+                    int status = session.checkStatus(cleanTime, keepAlive);
+                    if (status != Session.ACTIVE) {
+                        if (status == Session.IDLE) {
                             idleCount++;
-                        } else if (lastAccessTime < timeout) {
-                            session.close();
-                            timeoutCount++;
+                        } else {
+                            staleCount++;
                         }
+                        session.close();
                     }
                 }
             }
 
             if (log.isInfoEnabled()) {
-                log.info(idleCount + " idle + " + timeoutCount + " timed out sessions closed in " +
+                log.info(idleCount + " idle + " + staleCount + " stale sessions closed in " +
                         (System.currentTimeMillis() - cleanTime) + " ms");
             }
         }

@@ -21,8 +21,6 @@ import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
 import one.nio.net.SslContext;
 
-import java.io.IOException;
-
 public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected String host;
     protected int port;
@@ -30,7 +28,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected int connectTimeout;
     protected SslContext sslContext;
 
-    public SocketPool(ConnectionString conn) throws IOException {
+    public SocketPool(ConnectionString conn) {
         super(conn.getIntParam("clientMinPoolSize", 0),
               conn.getIntParam("clientMaxPoolSize", 10),
               conn.getIntParam("timeout", 3000));
