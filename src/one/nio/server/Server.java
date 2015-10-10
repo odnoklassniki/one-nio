@@ -77,7 +77,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         this.selectors = new SelectorThread[selectorCount];
         for (int i = 0; i < selectorCount; i++) {
-            this.selectors[i] = new SelectorThread(this, i, affinity ? 1 << (i % processors) : 0);
+            this.selectors[i] = new SelectorThread(this, i, affinity ? 1L << (i % processors) : 0);
         }
 
         this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
