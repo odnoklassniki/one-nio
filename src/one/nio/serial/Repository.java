@@ -64,7 +64,7 @@ public class Repository {
     public static final int MAP_STUBS        = 4;
     public static final int ENUM_STUBS       = 8;
     public static final int CUSTOM_STUBS     = 16;
-    public static final int DEFAULT_OPTIONS  = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS;
+    public static final int DEFAULT_OPTIONS  = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS | CUSTOM_STUBS;
 
     private static long nextBootstrapUid = -10;
     private static int options = Integer.getInteger("one.nio.serial.options", DEFAULT_OPTIONS);
@@ -119,12 +119,8 @@ public class Repository {
         addBootstrap(new SerializerSerializer(GeneratedSerializer.class));
         addBootstrap(new ExternalizableSerializer(SerializerNotFoundException.class));
 
-        try {
-            addBootstrap(generateFor(Class.forName("one.app.remote.reflect.MethodId")));
-            addBootstrap(generateFor(Class.forName("one.app.remote.comp.RemoteMethodCallRequest")));
-        } catch (ClassNotFoundException e) {
-            // Could not find additional bootstrap classes
-        }
+        addOptionalBootstrap("one.app.remote.reflect.MethodId");
+        addOptionalBootstrap("one.app.remote.comp.RemoteMethodCallRequest");
 
         addBootstrap(new TimestampSerializer());
         addBootstrap(new RemoteCallSerializer());
@@ -149,6 +145,16 @@ public class Repository {
     private static void addBootstrap(Serializer serializer) {
         serializer.uid = nextBootstrapUid--;
         provideSerializer(serializer);
+    }
+
+    private static void addOptionalBootstrap(String className) {
+        try {
+            addBootstrap(generateFor(Class.forName(className)));
+        } catch (ClassNotFoundException e) {
+            // Optional class is missing. Skip the slot to maintain the order of other bootstrap serializers.
+            log.warn("Missing optional bootstrap class: " + className);
+            nextBootstrapUid--;
+        }
     }
 
     @SuppressWarnings("unchecked")
