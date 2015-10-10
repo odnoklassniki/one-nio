@@ -17,16 +17,24 @@
 package one.nio.async;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class CombinedFuture<V> implements Future<V[]>, Serializable {
+public class CombinedFuture<V> implements Future<List<V>>, Serializable {
     private Future<V>[] futures;
 
     public CombinedFuture(Future<V>... futures) {
         this.futures = futures;
+    }
+
+    @SuppressWarnings("unchecked")
+    public CombinedFuture(Collection<Future> futures) {
+        this.futures = futures.toArray(new Future[futures.size()]);
     }
 
     @Override
@@ -57,21 +65,19 @@ public class CombinedFuture<V> implements Future<V[]>, Serializable {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public V[] get() throws InterruptedException, ExecutionException {
-        V[] result = (V[]) new Object[futures.length];
-        for (int i = 0; i < futures.length; i++) {
-            result[i] = futures[i].get();
+    public List<V> get() throws InterruptedException, ExecutionException {
+        ArrayList<V> result = new ArrayList<V>(futures.length);
+        for (Future<V> future : futures) {
+            result.add(future.get());
         }
         return result;
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public V[] get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        V[] result = (V[]) new Object[futures.length];
-        for (int i = 0; i < futures.length; i++) {
-            result[i] = futures[i].get(timeout, unit);
+    public List<V> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        ArrayList<V> result = new ArrayList<V>(futures.length);
+        for (Future<V> future : futures) {
+            result.add(future.get(timeout, unit));
         }
         return result;
     }

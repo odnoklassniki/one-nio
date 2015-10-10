@@ -17,11 +17,11 @@
 package one.nio.async;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class SettableFuture<V> implements Future<V> {
+public class SettableFuture<V> implements RunnableFuture<V> {
     protected V value;
     protected Throwable throwable;
     protected volatile boolean done;
@@ -90,5 +90,10 @@ public class SettableFuture<V> implements Future<V> {
                 throw new TimeoutException();
             }
         }
+    }
+
+    @Override
+    public void run() {
+        set(null);
     }
 }
