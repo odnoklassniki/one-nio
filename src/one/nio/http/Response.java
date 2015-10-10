@@ -22,7 +22,7 @@ import one.nio.util.Utf8;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
-public final class Response {
+public class Response {
     public static final String CONTINUE                        = "100 Continue";
     public static final String SWITCHING_PROTOCOLS             = "101 Switching Protocols";
     public static final String OK                              = "200 OK";
@@ -87,7 +87,7 @@ public final class Response {
         this.headers[1] = "Content-Length: " + body.length;
         this.body = body;
     }
-    
+
     public Response(Response prototype) {
         this.headerCount = prototype.headerCount;
         this.headers = Arrays.copyOf(prototype.headers, prototype.headerCount + 4);

@@ -77,7 +77,6 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
 
         if (m.getReturnType() == Response.class) {
             mv.visitVarInsn(ALOAD, 2);
-            mv.visitVarInsn(ALOAD, 1);
         }
 
         mv.visitVarInsn(ALOAD, 0);
@@ -86,7 +85,7 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
         emitInvoke(mv, m);
 
         if (m.getReturnType() == Response.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/HttpSession", "writeResponse", "(Lone/nio/http/Request;Lone/nio/http/Response;)V");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/HttpSession", "writeResponse", "(Lone/nio/http/Response;)V");
         }
 
         mv.visitInsn(RETURN);

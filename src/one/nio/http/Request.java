@@ -21,9 +21,10 @@ import one.nio.util.URLEncoder;
 import one.nio.util.Utf8;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public final class Request {
+public class Request {
     public static final int METHOD_GET     = 1;
     public static final int METHOD_POST    = 2;
     public static final int METHOD_HEAD    = 3;
@@ -95,6 +96,38 @@ public final class Request {
             cur = next + 1;
         }
         return null;
+    }
+
+    public Iterator<String> getParameters(final String key) {
+         return new Iterator<String>() {
+             int cur = findNext(params + 1);
+
+             @Override
+             public boolean hasNext() {
+                 return cur > 0;
+             }
+
+             @Override
+             public String next() {
+                 int next = uri.indexOf('&', cur);
+                 cur += key.length();
+                 String rawValue = next > 0 ? uri.substring(cur, next) : uri.substring(cur);
+                 cur = findNext(next + 1);
+                 return URLEncoder.decode(rawValue);
+             }
+
+             @Override
+             public void remove() {
+                  throw new UnsupportedOperationException();
+             }
+
+             private int findNext(int cur) {
+                 while (cur > 0 && !uri.startsWith(key, cur)) {
+                     cur = uri.indexOf('&', cur) + 1;
+                 }
+                 return cur;
+             }
+         };
     }
 
     public String getParameter(String key, String defaultValue) {

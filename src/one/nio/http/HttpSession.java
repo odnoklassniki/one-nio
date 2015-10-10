@@ -24,22 +24,38 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
+import java.util.LinkedList;
 
 public class HttpSession extends Session {
     private static final Log log = LogFactory.getLog(HttpSession.class);
 
     private static final int MAX_HEADERS = 32;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
+    private static final int MAX_PIPELINE_LENGTH = 256;
 
     protected final HttpServer server;
-    private byte[] fragment;
-    private int fragmentLength;
-    private Request request;
+    protected final LinkedList<Request> pipeline = new LinkedList<Request>();
+    protected final byte[] fragment = new byte[MAX_FRAGMENT_LENGTH];
+    protected int fragmentLength;
+    protected Request parsing;
+    protected Request handling;
 
     public HttpSession(Socket socket, HttpServer server) {
         super(socket);
         this.server = server;
-        this.fragment = new byte[MAX_FRAGMENT_LENGTH];
+    }
+
+    @Override
+    public int checkStatus(long currentTime, long keepAlive) {
+        long lastAccessTime = this.lastAccessTime;
+        if (lastAccessTime < currentTime - keepAlive) {
+            if (queueHead == null && handling == null) {
+                return IDLE;
+            } else if (lastAccessTime < currentTime - keepAlive * 8) {
+                return STALE;
+            }
+        }
+        return ACTIVE;
     }
 
     @Override
@@ -68,18 +84,26 @@ public class HttpSession extends Session {
         }
     }
 
-    private int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
+    protected synchronized int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
         int lineStart = 0;
         for (int i = 1; i < length; i++) {
             if (buffer[i] == '\n') {
                 int lineLength = i - lineStart - (buffer[i - 1] == '\r' ? 1 : 0);
-                if (request == null) {
-                    request = parseRequest(buffer, lineStart, lineLength);
+                if (parsing == null) {
+                    parsing = parseRequest(buffer, lineStart, lineLength);
                 } else if (lineLength > 0) {
-                    request.addHeader(Utf8.read(buffer, lineStart, lineLength));
+                    parsing.addHeader(Utf8.read(buffer, lineStart, lineLength));
                 } else {
-                        server.handleRequest(request, this);
-                    request = null;
+                    if (closing) {
+                        return i + 1;
+                    } else if (handling == null) {
+                        server.handleRequest(handling = parsing, this);
+                    } else if (pipeline.size() < MAX_PIPELINE_LENGTH) {
+                        pipeline.addLast(parsing);
+                    } else {
+                        throw new IOException("Pipeline length exceeded");
+                    }
+                    parsing = null;
                 }
                 lineStart = i + 1;
             }
@@ -100,17 +124,27 @@ public class HttpSession extends Session {
         throw new HttpException("Invalid request");
     }
 
-    public void writeResponse(Request request, Response response) throws IOException {
+    public synchronized void writeResponse(Response response) throws IOException {
+        if (handling == null) {
+            throw new IOException("Out of order response");
+        }
+
         server.incRequestsProcessed();
-        boolean close = "close".equalsIgnoreCase(request.getHeader("Connection: "));
+
+        boolean close = "close".equalsIgnoreCase(handling.getHeader("Connection: "));
         response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
-        byte[] bytes = response.toBytes(request.getMethod() != Request.METHOD_HEAD);
+        byte[] bytes = response.toBytes(handling.getMethod() != Request.METHOD_HEAD);
         super.write(bytes, 0, bytes.length);
         if (close) scheduleClose();
+
+        if ((handling = pipeline.pollFirst()) != null) {
+            server.handleRequest(handling, this);
+        }
     }
 
     public void writeError(String code, String message) throws IOException {
         server.incRequestsRejected();
+
         Response response = new Response(code, message == null ? Response.EMPTY : Utf8.toBytes(message));
         response.addHeader("Connection: close");
         byte[] bytes = response.toBytes(true);

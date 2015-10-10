@@ -35,7 +35,7 @@ public class HttpServerTest extends HttpServer {
     @Path({"/multi1", "/multi2"})
     public void handleMultiple(Request request, HttpSession session) throws IOException {
         Response response = Response.ok("Multiple: " + request.getPath());
-        session.writeResponse(request, response);
+        session.writeResponse(response);
     }
 
     @Override
@@ -64,7 +64,7 @@ public class HttpServerTest extends HttpServer {
     public void handleDefault(Request request, HttpSession session) throws IOException {
         Response response = Response.ok(Utf8.toBytes("<html><body><pre>Default</pre></body></html>"));
         response.addHeader("Content-Type: text/html");
-        session.writeResponse(request, response);
+        session.writeResponse(response);
     }
 
     public static void main(String[] args) throws Exception {

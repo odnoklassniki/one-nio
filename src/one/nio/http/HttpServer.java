@@ -53,7 +53,7 @@ public class HttpServer extends Server {
 
     public void handleDefault(Request request, HttpSession session) throws IOException {
         Response response = new Response(Response.NOT_FOUND, Response.EMPTY);
-        session.writeResponse(request, response);
+        session.writeResponse(response);
     }
 
     public void addRequestHandlers(Object router) {
