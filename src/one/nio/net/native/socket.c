@@ -198,7 +198,7 @@ Java_one_nio_net_NativeSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jin
 }
 
 JNIEXPORT int JNICALL
-Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count, jint flags) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     jbyte buf[MAX_STACK_BUF];
 
@@ -207,7 +207,7 @@ Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, 
     } else if (count != 0) {
         int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
         (*env)->GetByteArrayRegion(env, data, offset, result, buf);
-        result = send(fd, buf, result, MSG_NOSIGNAL);
+        result = send(fd, buf, result, flags | MSG_NOSIGNAL);
         if (result > 0) {
             return result;
         } else if (result == 0) {

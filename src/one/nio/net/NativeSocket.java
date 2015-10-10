@@ -100,7 +100,7 @@ class NativeSocket extends Socket {
     public native int writeRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public native int write(byte[] data, int offset, int count) throws IOException;
+    public native int write(byte[] data, int offset, int count, int flags) throws IOException;
 
     @Override
     public native void writeFully(byte[] data, int offset, int count) throws IOException;

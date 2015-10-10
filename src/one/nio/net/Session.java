@@ -39,7 +39,7 @@ public class Session implements Closeable {
     protected int events;
     protected int eventsToListen;
     protected boolean closing;
-    protected WriteQueue writeQueue;
+    protected QueueItem queueHead;
     protected volatile long lastAccessTime;
 
     public Session(Socket socket) {
@@ -60,7 +60,7 @@ public class Session implements Closeable {
     public int checkStatus(long currentTime, long keepAlive) {
         long lastAccessTime = this.lastAccessTime;
         if (lastAccessTime < currentTime - keepAlive) {
-            if (writeQueue == null) {
+            if (queueHead == null) {
                 return IDLE;
             } else if (lastAccessTime < currentTime - keepAlive * 8) {
                 return STALE;
@@ -71,16 +71,20 @@ public class Session implements Closeable {
 
     @Override
     public synchronized void close() {
+        for (QueueItem item = queueHead; item != null; item = item.next) {
+            item.release();
+        }
+        queueHead = null;
+
         if (socket.isOpen()) {
             closing = true;
-            writeQueue = null;
             selector.unregister(this);
             socket.close();
         }
     }
 
     public synchronized void scheduleClose() {
-        if (writeQueue == null) {
+        if (queueHead == null) {
             close();
         } else {
             closing = true;
@@ -90,9 +94,9 @@ public class Session implements Closeable {
     public synchronized void getQueueStats(long[] stats) {
         int length = 0;
         long bytes = 0;
-        for (WriteQueue head = writeQueue; head != null; head = head.next) {
+        for (QueueItem item = queueHead; item != null; item = item.next) {
             length++;
-            bytes += head.count;
+            bytes += item.remaining();
         }
         stats[0] = length;
         stats[1] = bytes;
@@ -116,64 +120,64 @@ public class Session implements Closeable {
         }
     }
 
-    public synchronized void write(byte[] data, int offset, int count) throws IOException {
-        if (writeQueue == null) {
-            int bytesWritten = socket.write(data, offset, count);
-            if (bytesWritten < count) {
-                int newEventsToListen;
-                if (bytesWritten >= 0) {
-                    offset += bytesWritten;
-                    count -= bytesWritten;
-                    newEventsToListen = WRITEABLE;
-                } else {
-                    newEventsToListen = SSL | READABLE;
-                }
-                writeQueue = new WriteQueue(data, offset, count);
-                listen(newEventsToListen);
+    public void write(byte[] data, int offset, int count) throws IOException {
+        write(data, offset, count, 0);
+    }
+
+    public void write(byte[] data, int offset, int count, int flags) throws IOException {
+        write(new ArrayQueueItem(data, offset, count, flags));
+    }
+
+    protected synchronized void write(QueueItem item) throws IOException {
+        if (closing) {
+            throw new SocketException("Socket closed");
+        }
+
+        if (queueHead == null) {
+            int written = item.write(socket);
+            if (item.remaining() > 0) {
+                queueHead = item;
+                listen(written >= 0 ? WRITEABLE : SSL | READABLE);
+            } else {
+                item.release();
             }
-        } else if (!closing) {
-            WriteQueue tail = writeQueue;
+        } else {
+            QueueItem tail = queueHead;
             while (tail.next != null) {
                 tail = tail.next;
             }
-            tail.next = new WriteQueue(data, offset, count);
-        } else {
-            throw new SocketException("Socket closed");
+            tail.next = item;
         }
-    }
-
-    protected synchronized void processWrite() throws Exception {
-        for (WriteQueue head = writeQueue; head != null; head = head.next) {
-            int bytesWritten = socket.write(head.data, head.offset, head.count);
-            if (bytesWritten < head.count) {
-                int newEventsToListen;
-                if (bytesWritten >= 0) {
-                    head.offset += bytesWritten;
-                    head.count -= bytesWritten;
-                    newEventsToListen = WRITEABLE;
-                } else {
-                    newEventsToListen = SSL | READABLE;
-                }
-                writeQueue = head;
-                listen(newEventsToListen);
-                return;
-            } else if (closing) {
-                close();
-                return;
-            }
-        }
-        writeQueue = null;
-        listen(READABLE);
     }
 
     protected void processRead(byte[] buffer) throws Exception {
         read(buffer, 0, buffer.length);
     }
 
+    protected synchronized void processWrite() throws Exception {
+        for (QueueItem item = queueHead; item != null; queueHead = item = item.next) {
+            int written = item.write(socket);
+            if (item.remaining() > 0) {
+                listen(written >= 0 ? WRITEABLE : SSL | READABLE);
+                return;
+            }
+            item.release();
+        }
+
+        if (closing) {
+            close();
+        } else {
+            listen(READABLE);
+        }
+    }
+
     public void process(byte[] buffer) throws Exception {
         lastAccessTime = Long.MAX_VALUE;
 
         if (eventsToListen >= SSL) {
+            // At any time during SSL connection a renegotiation may occur, that is,
+            // a write operation may require a readable socket, and a read operation
+            // may require a writable socket. In this case eventsToListen will have SSL flag set.
             if ((events & READABLE) != 0) processWrite();
             if ((events & WRITEABLE) != 0) processRead(buffer);
         } else {
@@ -188,16 +192,46 @@ public class Session implements Closeable {
         lastAccessTime = System.currentTimeMillis();
     }
 
-    private static class WriteQueue {
-        byte[] data;
-        int offset;
-        int count;
-        WriteQueue next;
+    public static abstract class QueueItem {
+        protected QueueItem next;
 
-        WriteQueue(byte[] data, int offset, int count) {
+        public int remaining() {
+            return 0;
+        }
+
+        public void release() {
+            // Override in subclasses to release associated resources
+        }
+
+        public abstract int write(Socket socket) throws IOException;
+    }
+
+    public static class ArrayQueueItem extends QueueItem {
+        protected byte[] data;
+        protected int offset;
+        protected int count;
+        protected int written;
+        protected int flags;
+        
+        public ArrayQueueItem(byte[] data, int offset, int count, int flags) {
             this.data = data;
             this.offset = offset;
             this.count = count;
+            this.flags = flags;
+        }
+
+        @Override
+        public int remaining() {
+            return count - written;
+        }
+
+        @Override
+        public int write(Socket socket) throws IOException {
+            int bytes = socket.write(data, offset + written, count - written, flags);
+            if (bytes > 0) {
+                written += bytes;
+            }
+            return bytes;
         }
     }
 }

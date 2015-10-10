@@ -65,7 +65,7 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
-    public final int write(byte[] data, int offset, int count) throws IOException {
+    public final int write(byte[] data, int offset, int count, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 

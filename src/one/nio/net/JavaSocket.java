@@ -72,7 +72,7 @@ final class JavaSocket extends Socket {
     }
 
     @Override
-    public final int write(byte[] data, int offset, int count) throws IOException {
+    public final int write(byte[] data, int offset, int count, int flags) throws IOException {
         return ch.write(ByteBuffer.wrap(data, offset, count));
     }
 
