@@ -26,7 +26,11 @@ public abstract class SharedMemoryFixedMap<K, V> extends SharedMemoryMap<K, V> {
     protected final FixedSizeAllocator allocator;
 
     protected SharedMemoryFixedMap(String fileName, long fileSize, int valueSize) throws IOException {
-        super((int) (fileSize / getEntrySize(valueSize) * 1.5), fileName, fileSize);
+        this(fileName, fileSize, valueSize, 0);
+    }
+
+    protected SharedMemoryFixedMap(String fileName, long fileSize, int valueSize, long expirationTime) throws IOException {
+        super((int) (fileSize / getEntrySize(valueSize) * 1.5), fileName, fileSize, expirationTime);
         this.valueSize = valueSize;
         this.allocator = createFixedSizeAllocator(getEntrySize(valueSize));
     }

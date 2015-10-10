@@ -24,6 +24,10 @@ public class SharedMemoryBlobMap extends SharedMemoryLongMap<byte[]> {
         super(capacity, fileName, fileSize);
     }
 
+    public SharedMemoryBlobMap(int capacity, String fileName, long fileSize, long expirationTime) throws IOException {
+        super(capacity, fileName, fileSize, expirationTime);
+    }
+
     @Override
     protected int sizeOf(byte[] value) {
         return value.length + 4;

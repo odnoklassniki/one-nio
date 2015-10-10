@@ -16,7 +16,6 @@
 
 package one.nio.mem;
 
-import one.nio.serial.Serializer;
 import one.nio.util.Hash;
 
 import java.io.IOException;
@@ -27,12 +26,8 @@ public class SharedMemoryLongMap<V> extends SharedMemoryMap<Long, V> {
         super(capacity, fileName, fileSize);
     }
 
-    public SharedMemoryLongMap(int capacity, Class<V> valueType, String fileName, long fileSize) throws IOException {
-        super(capacity, valueType, fileName, fileSize);
-    }
-
-    public SharedMemoryLongMap(int capacity, Serializer<V> serializer, String fileName, long fileSize) throws IOException {
-        super(capacity, serializer, fileName, fileSize);
+    public SharedMemoryLongMap(int capacity, String fileName, long fileSize, long expirationTime) throws IOException {
+        super(capacity, fileName, fileSize, expirationTime);
     }
 
     @Override

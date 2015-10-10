@@ -52,6 +52,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
     protected long mapBase;
     protected long timeToLive = Long.MAX_VALUE;
+    protected long minTimeToLive = 0;
     protected long lockWaitTime = 10;
     protected long cleanupInterval = 60000;
     protected double cleanupThreshold = 0.1;
@@ -99,6 +100,16 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     @Override
     public void setTimeToLive(long timeToLive) {
         this.timeToLive = timeToLive;
+    }
+
+    @Override
+    public long getMinTimeToLive() {
+        return minTimeToLive;
+    }
+
+    @Override
+    public void setMinTimeToLive(long minTimeToLive) {
+        this.minTimeToLive = minTimeToLive;
     }
 
     @Override
@@ -174,7 +185,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return null;
     }
 
-    public void put(K key, V value) {
+    public void put(K key, V value) throws OutOfMemoryException {
         long hashCode = hashCode(key);
         long currentPtr = bucketFor(hashCode);
         int newSize = sizeOf(value);
@@ -210,7 +221,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         }
     }
 
-    public boolean putIfAbsent(K key, V value) {
+    public boolean putIfAbsent(K key, V value) throws OutOfMemoryException {
         long hashCode = hashCode(key);
         long currentPtr = bucketFor(hashCode);
 
@@ -502,7 +513,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected abstract boolean equalsAt(long entry, K key);
     protected abstract V valueAt(long entry);
     protected abstract void setValueAt(long entry, V value);
-    protected abstract long allocateEntry(K key, long hashCode, int size);
+    protected abstract long allocateEntry(K key, long hashCode, int size) throws OutOfMemoryException;
     protected abstract void destroyEntry(long entry);
     protected abstract int sizeOf(long entry);
     protected abstract int sizeOf(V value);
@@ -565,7 +576,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             this.currentPtr = currentPtr;
         }
 
-        public void setValue(V value) {
+        public void setValue(V value) throws OutOfMemoryException {
             int newSize = map.sizeOf(value);
 
             if (entry != 0) {
@@ -694,7 +705,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                 log.debug(Arrays.toString(timestamps));
             }
 
-            return removeExpired(expirationAge);
+            return removeExpired(Math.max(expirationAge, getMinTimeToLive()));
         }
 
         private int collectSamples(long[] timestamps) {

@@ -46,22 +46,19 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
 
     protected static final int MAX_CUSTOM_DATA_SIZE = (int) (MAP_OFFSET - CUSTOM_DATA_OFFSET);
 
-    protected final Serializer<V> serializer;
+    protected final String className = this.getClass().getSimpleName();
     protected final MappedFile mmap;
     protected final String name;
     protected MallocMT allocator;
+    protected Serializer<V> serializer;
 
     protected SharedMemoryMap(int capacity, String fileName, long fileSize) throws IOException {
-        this(capacity, (Serializer<V>) null, fileName, fileSize);
+        this(capacity, fileName, fileSize, 0);
     }
 
-    protected SharedMemoryMap(int capacity, Class<V> valueType, String fileName, long fileSize) throws IOException {
-        this(capacity, Repository.get(valueType), fileName, fileSize);
-    }
-
-    protected SharedMemoryMap(int capacity, Serializer<V> serializer, String fileName, long fileSize) throws IOException {
+    protected SharedMemoryMap(int capacity, String fileName, long fileSize, long expirationTime) throws IOException {
         super(capacity);
-        this.serializer = serializer;
+
         if (fileName == null) {
             this.mmap = new MappedFile(fileSize);
             this.name = "anon." + Long.toHexString(mmap.getAddr());
@@ -73,12 +70,11 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
         long mallocOffset = MAP_OFFSET + (long) this.capacity * 8;
         if (mmap.getSize() <= mallocOffset) {
             long minSize = (mallocOffset + (MB - 1)) / MB;
-            throw new IllegalArgumentException("Minimum SharedMemoryMap size is " + minSize + " MB");
+            throw new IllegalArgumentException("Minimum " + className + " size is " + minSize + " MB");
         }
 
-        init();
+        init(expirationTime);
         createAllocator(mmap.getAddr() + mallocOffset, mmap.getSize() - mallocOffset);
-        loadSchema();
 
         Management.registerMXBean(this, "one.nio.mem:type=SharedMemoryMap,name=" + name);
     }
@@ -91,20 +87,11 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
         setHeader(TIMESTAMP_OFFSET, System.currentTimeMillis());
         setHeader(SIGNATURE_OFFSET, SIGNATURE_CLEAR);
         mmap.close();
-        log.info("SharedMemoryMap gracefully closed");
+        log.info(className + " gracefully closed");
     }
 
-    private void init() {
-        boolean needCleanup = false;
-        if (getHeader(SIGNATURE_OFFSET) != SIGNATURE_CLEAR) {
-            log.info("Initial cleanup of SharedMemoryMap...");
-            needCleanup = true;
-        } else if (getHeader(CAPACITY_OFFSET) != capacity) {
-            log.info("SharedMemoryMap capacity has changed, performing cleanup...");
-            needCleanup = true;
-        }
-
-        if (needCleanup) {
+    private void init(long expirationTime) {
+        if (needCleanup(expirationTime)) {
             unsafe.setMemory(mmap.getAddr(), mmap.getSize(), (byte) 0);
             setHeader(CAPACITY_OFFSET, capacity);
         }
@@ -114,10 +101,26 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
 
         long oldBase = getHeader(BASE_OFFSET);
         if (oldBase != 0) {
-            log.info("Relocating SharedMemoryMap...");
+            log.info("Relocating " + className + "...");
             relocate(mmap.getAddr() - oldBase);
         }
         setHeader(BASE_OFFSET, mmap.getAddr());
+    }
+
+    protected boolean needCleanup(long expirationTime) {
+        if (getHeader(SIGNATURE_OFFSET) != SIGNATURE_CLEAR) {
+            log.info("Initial cleanup of " + className + "...");
+            return true;
+        }
+        if (getHeader(TIMESTAMP_OFFSET) < expirationTime) {
+            log.info(className + " expired, performing cleanup...");
+            return true;
+        }
+        if (getHeader(CAPACITY_OFFSET) != capacity) {
+            log.info(className + " capacity has changed, performing cleanup...");
+            return true;
+        }
+        return false;
     }
 
     protected void relocate(long delta) {
@@ -237,14 +240,53 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected void createAllocator(long startAddress, long totalMemory) {
         this.allocator = new MallocMT(startAddress, totalMemory);
 
-        log.info("SharedMemoryMap initialized: capacity = " + getCount() + "/" + getCapacity()
+        log.info(className + " initialized: capacity = " + getCount() + "/" + getCapacity()
                 + ", memory = " + allocator.getUsedMemory() / MB + "/" + allocator.getTotalMemory() / MB + " MB");
+    }
+
+    public void setSerializer(Class<V> valueType) throws IOException {
+        this.serializer = Repository.get(valueType);
+        loadSchema();
+    }
+
+    public void setSerializer(Serializer<V> serializer) throws IOException {
+        this.serializer = serializer;
+        loadSchema();
+    }
+
+    protected void loadSchema() throws IOException {
+        log.info("Loading serialization schema for " + className + "...");
+
+        long metadataSize = getHeader(CUSTOM_SIZE_OFFSET);
+        if (metadataSize < 0 || metadataSize > MAX_CUSTOM_DATA_SIZE) {
+            throw new IllegalStateException("Invalid metadata size: " + metadataSize);
+        }
+
+        int count = 0;
+        DeserializeStream ds = new DeserializeStream(mmap.getAddr() + CUSTOM_DATA_OFFSET, (int) metadataSize);
+        while (ds.available() > 0) {
+            try {
+                Repository.provideSerializer((Serializer) ds.readObject());
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            } catch (ClassNotFoundException e) {
+                throw new IllegalStateException(e);
+            }
+            count++;
+        }
+
+        log.info("Loaded " + count + " serializers for " + className);
+
+        long oldUid = getHeader(UID_OFFSET);
+        if (oldUid != 0 && oldUid != serializer.uid()) {
+            convert(findSerializer(oldUid), serializer);
+        }
     }
 
     protected void storeSchema() {
         if (serializer == null) return;
 
-        log.info("Saving serialization schema...");
+        log.info("Saving serialization schema for " + className + "...");
 
         final HashSet<Serializer> serializers = new HashSet<Serializer>();
         if (serializer.uid() >= 0) {
@@ -282,43 +324,12 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
         setHeader(UID_OFFSET, serializer.uid());
         setHeader(CUSTOM_SIZE_OFFSET, ss.count());
 
-        log.info("Stored " + serializers.size() + " serializers. Metadata size = " + ss.count());
+        log.info("Stored " + serializers.size() + " serializers for " + className + ". Metadata size = " + ss.count());
     }
 
-    protected void loadSchema() throws IOException {
-        if (serializer == null) return;
-
-        log.info("Loading serialization schema...");
-
-        long metadataSize = getHeader(CUSTOM_SIZE_OFFSET);
-        if (metadataSize < 0 || metadataSize > MAX_CUSTOM_DATA_SIZE) {
-            throw new IllegalStateException("Invalid metadata size: " + metadataSize);
-        }
-
-        int count = 0;
-        DeserializeStream ds = new DeserializeStream(mmap.getAddr() + CUSTOM_DATA_OFFSET, (int) metadataSize);
-        while (ds.available() > 0) {
-            try {
-                Repository.provideSerializer((Serializer) ds.readObject());
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            } catch (ClassNotFoundException e) {
-                throw new IllegalStateException(e);
-            }
-            count++;
-        }
-
-        log.info("Loaded " + count + " serializers");
-
-        long oldUid = getHeader(UID_OFFSET);
-        if (oldUid != 0 && oldUid != serializer.uid()) {
-            convert(getSerializer(oldUid));
-        }
-    }
-
-    protected void convert(final Serializer<V> oldSerializer) {
-        log.info("Main serializer mismatch. Will run in-memory conversion.");
-        log.info("Old serializer:\n" + oldSerializer + "New serializer:\n" + serializer);
+    protected void convert(final Serializer<V> oldSerializer, final Serializer<V> newSerializer) {
+        log.info("Main serializer mismatch. Will run in-memory conversion for " + className + ".");
+        log.info("Old serializer:\n" + oldSerializer + "New serializer:\n" + newSerializer);
 
         long startTime = System.currentTimeMillis();
         long startFreeMemory = allocator.getFreeMemory();
@@ -346,7 +357,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
                             entry = newEntry;
                         }
 
-                        serializer.write(value, new SerializeStream(entry + headerSize, Integer.MAX_VALUE));
+                        newSerializer.write(value, new SerializeStream(entry + headerSize, Integer.MAX_VALUE));
                         converted++;
                     }
                 }
@@ -362,7 +373,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     }
 
     @SuppressWarnings("unchecked")
-    private Serializer<V> getSerializer(long uid) throws SerializerNotFoundException {
+    private Serializer<V> findSerializer(long uid) throws SerializerNotFoundException {
         return Repository.requestSerializer(uid);
     }
 }

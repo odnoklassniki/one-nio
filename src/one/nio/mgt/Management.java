@@ -35,6 +35,8 @@ public class Management {
 
     static {
         try {
+            // After registering this magic instance, new HotSpot internal MBeans appear:
+            // HotspotRuntimeMBean, getHotspotMemoryMBean etc.
             Object hotspotInternal = Class.forName("sun.management.HotspotInternal").newInstance();
             ManagementFactory.getPlatformMBeanServer().registerMBean(hotspotInternal, null);
         } catch (Exception e) {

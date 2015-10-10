@@ -22,6 +22,8 @@ public interface OffheapMapMXBean {
     long getExpirations();
     long getTimeToLive();
     void setTimeToLive(long timeToLive);
+    long getMinTimeToLive();
+    void setMinTimeToLive(long minTimeToLive);
     long getLockWaitTime();
     void setLockWaitTime(long lockWaitTime);
     long getCleanupInterval();
