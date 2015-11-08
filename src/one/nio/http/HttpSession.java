@@ -29,7 +29,7 @@ import java.util.LinkedList;
 public class HttpSession extends Session {
     private static final Log log = LogFactory.getLog(HttpSession.class);
 
-    private static final int MAX_HEADERS = 32;
+    private static final int MAX_HEADERS = 48;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;
 
@@ -86,40 +86,46 @@ public class HttpSession extends Session {
 
     protected synchronized int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
         int lineStart = 0;
-        for (int i = 1; i < length; i++) {
-            if (buffer[i] == '\n') {
-                int lineLength = i - lineStart - (buffer[i - 1] == '\r' ? 1 : 0);
-                if (parsing == null) {
-                    parsing = parseRequest(buffer, lineStart, lineLength);
-                } else if (lineLength > 0) {
+        for (int i = 0; i < length; i++) {
+            if (buffer[i] != '\n') continue;
+
+            int lineLength = i - lineStart;
+            if (i > 0 && buffer[i - 1] == '\r') lineLength--;
+
+            if (parsing == null) {
+                parsing = parseRequest(buffer, lineStart, lineLength);
+            } else if (lineLength > 0) {
+                if (parsing.getHeaderCount() < MAX_HEADERS) {
                     parsing.addHeader(Utf8.read(buffer, lineStart, lineLength));
-                } else {
-                    if (closing) {
-                        return i + 1;
-                    } else if (handling == null) {
-                        server.handleRequest(handling = parsing, this);
-                    } else if (pipeline.size() < MAX_PIPELINE_LENGTH) {
-                        pipeline.addLast(parsing);
-                    } else {
-                        throw new IOException("Pipeline length exceeded");
-                    }
-                    parsing = null;
                 }
-                lineStart = i + 1;
+            } else {
+                if (closing) {
+                    return i + 1;
+                } else if (handling == null) {
+                    server.handleRequest(handling = parsing, this);
+                } else if (pipeline.size() < MAX_PIPELINE_LENGTH) {
+                    pipeline.addLast(parsing);
+                } else {
+                    throw new IOException("Pipeline length exceeded");
+                }
+                parsing = null;
             }
+
+            lineStart = i + 1;
         }
         return lineStart;
     }
 
     protected Request parseRequest(byte[] buffer, int start, int length) throws HttpException {
+        boolean http11 = length > 13 && buffer[start + length - 1] == '1';
         if (length > 13 && Utf8.startsWith(Request.VERB_GET, buffer, start)) {
-            return new Request(Request.METHOD_GET, Utf8.read(buffer, start + 4, length - 13), MAX_HEADERS);
+            return new Request(Request.METHOD_GET, Utf8.read(buffer, start + 4, length - 13), http11);
         } else if (length > 14 && Utf8.startsWith(Request.VERB_POST, buffer, start)) {
-            return new Request(Request.METHOD_POST, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS);
+            return new Request(Request.METHOD_POST, Utf8.read(buffer, start + 5, length - 14), http11);
         } else if (length > 14 && Utf8.startsWith(Request.VERB_HEAD, buffer, start)) {
-            return new Request(Request.METHOD_HEAD, Utf8.read(buffer, start + 5, length - 14), MAX_HEADERS);
+            return new Request(Request.METHOD_HEAD, Utf8.read(buffer, start + 5, length - 14), http11);
         } else if (length > 17 && Utf8.startsWith(Request.VERB_OPTIONS, buffer, start)) {
-            return new Request(Request.METHOD_OPTIONS, Utf8.read(buffer, start + 8, length - 17), MAX_HEADERS);
+            return new Request(Request.METHOD_OPTIONS, Utf8.read(buffer, start + 8, length - 17), http11);
         }
         throw new HttpException("Invalid request");
     }
@@ -131,11 +137,15 @@ public class HttpSession extends Session {
 
         server.incRequestsProcessed();
 
-        boolean close = "close".equalsIgnoreCase(handling.getHeader("Connection: "));
-        response.addHeader(close ? "Connection: close" : "Connection: Keep-Alive");
+        String connection = handling.getHeader("Connection: ");
+        boolean keepAlive = handling.isHttp11()
+                ? !"close".equalsIgnoreCase(connection)
+                : "Keep-Alive".equalsIgnoreCase(connection);
+        response.addHeader(keepAlive ? "Connection: Keep-Alive" : "Connection: close");
+
         byte[] bytes = response.toBytes(handling.getMethod() != Request.METHOD_HEAD);
         super.write(bytes, 0, bytes.length);
-        if (close) scheduleClose();
+        if (!keepAlive) scheduleClose();
 
         if ((handling = pipeline.pollFirst()) != null) {
             server.handleRequest(handling, this);

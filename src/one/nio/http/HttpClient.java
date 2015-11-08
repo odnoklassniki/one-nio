@@ -97,7 +97,7 @@ public class HttpClient extends SocketPool {
     }
 
     private Request createRequest(int method, String uri, String... headers) {
-        Request request = new Request(method, uri, headers.length + 2);
+        Request request = new Request(method, uri, true);
         request.addHeader(hostHeader);
         request.addHeader(connectionHeader);
         for (String header : headers) {

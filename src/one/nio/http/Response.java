@@ -66,7 +66,7 @@ public class Response {
 
     public static final byte[] EMPTY = new byte[0];
 
-    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes("HTTP/1.1 ");
+    private static final byte[] HTTP11_HEADER = Utf8.toBytes("HTTP/1.1 ");
     private static final int PROTOCOL_HEADER_LENGTH = 11;
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -111,7 +111,7 @@ public class Response {
     }
     
     public void addHeader(String header) {
-        if (headerCount == headers.length) {
+        if (headerCount >= headers.length) {
             headers = Arrays.copyOf(headers, headers.length + 4);
         }
         headers[headerCount++] = header;
@@ -162,7 +162,7 @@ public class Response {
         }
 
         ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
-        builder.append(PROTOCOL_HEADER);
+        builder.append(HTTP11_HEADER);
         for (int i = 0; i < headerCount; i++) {
             builder.append(headers[i]).append('\r').append('\n');
         }

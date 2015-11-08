@@ -38,8 +38,7 @@ public class HttpProvider implements ServiceProvider {
 
     public Response invoke(Request request) throws Exception {
         Response response = client.invoke(request);
-        int status = response.getStatus();
-        if (status < 200 || status >= 300) {
+        if (response.getStatus() >= 500) {
             throw new IOException(this + " call failed with status " + response.getHeaders()[0]);
         }
         return response;

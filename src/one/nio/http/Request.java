@@ -20,6 +20,7 @@ import one.nio.util.ByteArrayBuilder;
 import one.nio.util.URLEncoder;
 import one.nio.util.Utf8;
 
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -43,29 +44,36 @@ public class Request {
             VERB_OPTIONS
     };
 
-    private static final byte[] PROTOCOL_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
+    private static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
+    private static final byte[] HTTP11_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
     private static final int PROTOCOL_HEADER_LENGTH = 13;
+    private static final Charset UTF8 = Charset.forName("UTF-8");
 
     private int method;
     private String uri;
+    private boolean http11;
     private int params;
     private int headerCount;
     private String[] headers;
+    private byte[] body;
 
-    public Request(int method, String uri, int maxHeaderCount) {
+    public Request(int method, String uri, boolean http11) {
         this.method = method;
         this.uri = uri;
+        this.http11 = http11;
         this.params = uri.indexOf('?');
         this.headerCount = 0;
-        this.headers = new String[maxHeaderCount];
+        this.headers = new String[16];
     }
 
     public Request(Request prototype) {
         this.method = prototype.method;
         this.uri = prototype.uri;
+        this.http11 = prototype.http11;
         this.params = prototype.params;
         this.headerCount = prototype.headerCount;
         this.headers = prototype.headers.clone();
+        this.body = prototype.body;
     }
 
     public int getMethod() {
@@ -74,6 +82,10 @@ public class Request {
 
     public String getURI() {
         return uri;
+    }
+
+    public boolean isHttp11() {
+        return http11;
     }
 
     public String getPath() {
@@ -143,8 +155,12 @@ public class Request {
         return value;
     }
 
+    public int getHeaderCount() {
+        return headerCount;
+    }
+
     public String[] getHeaders() {
-        return Arrays.copyOf(headers, headerCount);
+        return headers;
     }
 
     public String getHeader(String key) {
@@ -171,9 +187,22 @@ public class Request {
     }
 
     public void addHeader(String header) {
-        if (headerCount < headers.length) {
-            headers[headerCount++] = header;
+        if (headerCount >= headers.length) {
+            headers = Arrays.copyOf(headers, headers.length + 8);
         }
+        headers[headerCount++] = header;
+    }
+
+    public byte[] getBody() {
+        return body;
+    }
+
+    public void setBody(byte[] body) {
+        this.body = body;
+    }
+
+    public void setBodyUtf8(String body) {
+        this.body = body.getBytes(UTF8);
     }
 
     public byte[] toBytes() {
@@ -181,17 +210,24 @@ public class Request {
         for (int i = 0; i < headerCount; i++) {
             estimatedSize += headers[i].length();
         }
+        if (body != null) {
+            estimatedSize += body.length;
+        }
 
         ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
-        builder.append(VERBS[method]).append(uri).append(PROTOCOL_HEADER);
+        builder.append(VERBS[method]).append(uri).append(http11 ? HTTP11_HEADER : HTTP10_HEADER);
         for (int i = 0; i < headerCount; i++) {
             builder.append(headers[i]).append('\r').append('\n');
         }
-        return builder.append('\r').append('\n').trim();
+        builder.append('\r').append('\n');
+        if (body != null) {
+            builder.append(body);
+        }
+        return builder.trim();
     }
 
     @Override
     public String toString() {
-        return Utf8.toString(toBytes());
+        return new String(toBytes(), UTF8);
     }
 }
