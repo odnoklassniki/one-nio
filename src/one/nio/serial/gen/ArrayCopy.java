@@ -82,4 +82,6 @@ public class ArrayCopy {
     public static void copy(double[] src, int[] dst)     { for (int i = 0; i < src.length; i++) dst[i] = (int) src[i]; }
     public static void copy(double[] src, long[] dst)    { for (int i = 0; i < src.length; i++) dst[i] = (long) src[i]; }
     public static void copy(double[] src, float[] dst)   { for (int i = 0; i < src.length; i++) dst[i] = (float) src[i]; }
+
+    public static void copy(Object[] src, Object[] dst)  { System.arraycopy(src, 0, dst, 0, src.length); }
 }

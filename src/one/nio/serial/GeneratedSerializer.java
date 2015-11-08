@@ -21,6 +21,7 @@ import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.StubGenerator;
 
+import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -260,6 +261,10 @@ public class GeneratedSerializer extends Serializer {
             Field f = fd.ownField();
             if (f != null) {
                 Class type = f.getType();
+                if (Externalizable.class.isAssignableFrom(type) || Repository.hasOptions(type, Repository.FIELD_SERIALIZATION)) {
+                    continue;
+                }
+
                 if (Collection.class.isAssignableFrom(type) && !CollectionSerializer.isValidType(type)
                         || Map.class.isAssignableFrom(type) && !MapSerializer.isValidType(type)) {
                     generateUid();

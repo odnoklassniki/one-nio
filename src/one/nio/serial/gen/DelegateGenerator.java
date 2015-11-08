@@ -407,12 +407,21 @@ public class DelegateGenerator extends BytecodeGenerator {
             return;
         }
 
-        // Primitive[] -> Primitive[]
-        if (src.isArray() && src.getComponentType().isPrimitive() && dst.isArray() && dst.getComponentType().isPrimitive()) {
-            String copySig = "(" + Type.getDescriptor(src) + Type.getDescriptor(dst) + ")V";
+        // A[] -> B[]
+        if (src.isArray() && dst.isArray() && src.getComponentType().isPrimitive() == dst.getComponentType().isPrimitive()) {
             mv.visitInsn(DUP);
             mv.visitInsn(ARRAYLENGTH);
-            mv.visitIntInsn(NEWARRAY, FieldType.valueOf(dst.getComponentType()).bytecodeType);
+
+            Class dstComponent = dst.getComponentType();
+            String copySig;
+            if (dstComponent.isPrimitive()) {
+                mv.visitIntInsn(NEWARRAY, FieldType.valueOf(dstComponent).bytecodeType);
+                copySig = "(" + Type.getDescriptor(src) + Type.getDescriptor(dst) + ")V";
+            } else {
+                mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(dstComponent));
+                copySig = "([Ljava/lang/Object;[Ljava/lang/Object;)V";
+            }
+
             mv.visitInsn(DUP_X1);
             mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/gen/ArrayCopy", "copy", copySig);
             return;

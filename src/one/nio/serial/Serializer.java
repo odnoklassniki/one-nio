@@ -114,6 +114,12 @@ public abstract class Serializer<T> implements Externalizable {
     public abstract void skip(DataStream in) throws IOException, ClassNotFoundException;
     public abstract void toJson(T obj, StringBuilder builder) throws IOException;
 
+    public static int sizeOf(Object obj) throws IOException {
+        CalcSizeStream css = new CalcSizeStream();
+        css.writeObject(obj);
+        return css.count;
+    }
+
     public static byte[] serialize(Object obj) throws IOException {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(obj);

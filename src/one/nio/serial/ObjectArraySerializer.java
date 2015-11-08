@@ -34,8 +34,9 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
             super.readExternal(in);
         } catch (ClassNotFoundException e) {
             if ((Repository.getOptions() & Repository.ARRAY_STUBS) == 0) throw e;
+            // Cannot generate the right array class because the element's serializer is not known yet
             this.cls = Object[].class;
-            this.origin = Origin.GENERATED;
+            this.origin = Origin.EXTERNAL;
         }
 
         this.componentType = cls.getComponentType();
