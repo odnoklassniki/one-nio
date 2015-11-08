@@ -45,11 +45,6 @@ public abstract class Socket implements Closeable {
     public abstract void bind(InetAddress address, int port, int backlog) throws IOException;
     public abstract int writeRaw(long buf, int count, int flags) throws IOException;
     public abstract int write(byte[] data, int offset, int count, int flags) throws IOException;
-
-    public int write(byte[] data, int offset, int count) throws IOException {
-        return write(data, offset, count, 0);
-    }
-
     public abstract void writeFully(byte[] data, int offset, int count) throws IOException;
     public abstract int readRaw(long buf, int count, int flags) throws IOException;
     public abstract int read(byte[] data, int offset, int count) throws IOException;

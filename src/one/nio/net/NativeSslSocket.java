@@ -52,7 +52,7 @@ class NativeSslSocket extends NativeSocket {
     public synchronized native int writeRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public synchronized native int write(byte[] data, int offset, int count) throws IOException;
+    public synchronized native int write(byte[] data, int offset, int count, int flags) throws IOException;
 
     @Override
     public synchronized native void writeFully(byte[] data, int offset, int count) throws IOException;

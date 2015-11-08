@@ -40,7 +40,7 @@ final class AcceptorThread extends Thread {
     long acceptedSessions;
 
     AcceptorThread(Server server, InetAddress address, int port, SslContext sslContext,
-                   int backlog, int recvBuf, int sendBuf, boolean defer) throws IOException {
+                   int backlog, int recvBuf, int sendBuf, boolean defer, boolean noDelay) throws IOException {
         super("NIO Acceptor " + address + ":" + port);
         setUncaughtExceptionHandler(server);
 
@@ -57,7 +57,7 @@ final class AcceptorThread extends Thread {
         if (sendBuf != 0) serverSocket.setSendBuffer(sendBuf);
         if (defer) serverSocket.setDeferAccept(true);
 
-        serverSocket.setNoDelay(true);
+        serverSocket.setNoDelay(noDelay);
         serverSocket.setReuseAddr(true);
         serverSocket.bind(address, port, backlog);
     }

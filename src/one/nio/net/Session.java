@@ -128,7 +128,7 @@ public class Session implements Closeable {
         write(new ArrayQueueItem(data, offset, count, flags));
     }
 
-    protected synchronized void write(QueueItem item) throws IOException {
+    public synchronized void write(QueueItem item) throws IOException {
         if (closing) {
             throw new SocketException("Socket closed");
         }

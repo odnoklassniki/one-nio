@@ -26,6 +26,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLProtocolException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -62,6 +63,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         int recvBuf = conn.getIntParam("recvBuf", buffers);
         int sendBuf = conn.getIntParam("sendBuf", buffers);
         boolean defer = conn.getBooleanParam("defer", false);
+        boolean noDelay = conn.getBooleanParam("noDelay", true);
         int selectorCount = conn.getIntParam("selectors", processors);
         boolean affinity = conn.getBooleanParam("affinity", false);
         int minWorkers = conn.getIntParam("minWorkers", 0);
@@ -72,7 +74,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         this.acceptors = new AcceptorThread[hosts.length];
         for (int i = 0; i < hosts.length; i++) {
             InetAddress address = InetAddress.getByName(hosts[i]);
-            acceptors[i] = new AcceptorThread(this, address, port, sslContext, backlog, recvBuf, sendBuf, defer);
+            acceptors[i] = new AcceptorThread(this, address, port, sslContext, backlog, recvBuf, sendBuf, defer, noDelay);
         }
 
         this.selectors = new SelectorThread[selectorCount];
@@ -313,7 +315,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         if (running) {
             if (e instanceof SocketException) {
                 if (log.isDebugEnabled()) log.debug("Connection closed: " + session.getRemoteHost());
-            } else if (e instanceof SSLHandshakeException) {
+            } else if (e instanceof SSLHandshakeException || e instanceof SSLProtocolException) {
                 if (log.isDebugEnabled()) log.debug("Handshake failure: " + session.getRemoteHost());
             } else {
                 log.error("Cannot process session from " + session.getRemoteHost(), e);

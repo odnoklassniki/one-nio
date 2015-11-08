@@ -1,4 +1,6 @@
 #include <openssl/ssl.h>
+#include <openssl/dh.h>
+#include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -7,13 +9,10 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include <jni.h>
 #include "jni_util.h"
 
-
-#ifndef SSL_OP_NO_COMPRESSION
-#define SSL_OP_NO_COMPRESSION 0x00020000L
-#endif
 
 #define KEY_NONE      0
 #define KEY_PRIMARY   1
@@ -21,6 +20,9 @@
 #define KEY_SINGLE    3
 
 #define MAX_COUNTERS  32
+
+#define STATE_SERVER     ((char*)1)
+#define STATE_HANDSHAKED ((char*)2)
 
 
 struct SSL_ticket_key {
@@ -38,6 +40,28 @@ struct CRYPTO_dynlock_value {
 static pthread_mutex_t* mutexes;
 static jfieldID f_ctx;
 static jfieldID f_ssl;
+static int preclosed_socket;
+
+// openssl dhparam -C 2048
+static unsigned char dh2048_p[] = {
+    0xF5, 0x03, 0x6F, 0xFC, 0xA7, 0xFD, 0xC7, 0xD2, 0x69, 0xD8, 0xED, 0x73, 0x7D, 0x4D, 0x2A, 0x05,
+    0xD9, 0x48, 0x47, 0x9E, 0xA9, 0xDF, 0xCD, 0x9E, 0x15, 0xB5, 0xD9, 0x4F, 0x6D, 0x80, 0x65, 0xFD,
+    0x41, 0xBC, 0xF1, 0xFB, 0xEF, 0x24, 0x85, 0xD7, 0x1C, 0x58, 0x73, 0x4E, 0xD1, 0xC8, 0x33, 0x0F,
+    0x89, 0x31, 0xBB, 0xD3, 0x1C, 0x66, 0x7D, 0x47, 0x00, 0x81, 0xA9, 0xBC, 0x53, 0x13, 0x04, 0x41,
+    0x42, 0xBA, 0x14, 0x3A, 0x8E, 0x5F, 0xDC, 0xB2, 0xEB, 0x7B, 0xAC, 0x14, 0x8A, 0xE0, 0x75, 0x68,
+    0x35, 0x4B, 0x20, 0x6C, 0x54, 0x52, 0x30, 0x85, 0xD0, 0x83, 0x14, 0x54, 0xC5, 0xBE, 0xB7, 0xF3,
+    0xC7, 0xC8, 0x9F, 0x31, 0xE2, 0xE4, 0x8A, 0x43, 0x9D, 0x69, 0xE7, 0xFD, 0x69, 0xDA, 0xE3, 0xA7,
+    0x79, 0x59, 0x1C, 0x6E, 0x89, 0x0F, 0xCB, 0xD6, 0xAD, 0x24, 0x49, 0x00, 0xE2, 0xEC, 0x7C, 0x3C,
+    0x05, 0x57, 0xEC, 0xEE, 0x47, 0x9F, 0x1E, 0xE7, 0x6C, 0x54, 0x1A, 0x40, 0x74, 0x02, 0x18, 0xEF,
+    0xF4, 0xCC, 0xF9, 0x64, 0x68, 0xD6, 0x2A, 0x2A, 0x8B, 0xDC, 0x75, 0xEE, 0x61, 0x5A, 0xCF, 0x45,
+    0x1F, 0xAC, 0x85, 0x7D, 0xD0, 0x31, 0x97, 0x43, 0xA7, 0x97, 0x7C, 0x1F, 0xE1, 0xCF, 0xE8, 0xCD,
+    0x1F, 0xE4, 0x87, 0xBF, 0x50, 0x1B, 0x34, 0xAE, 0xA9, 0x7B, 0x70, 0x13, 0xBB, 0xD0, 0x8E, 0xD7,
+    0xE5, 0x23, 0x25, 0x87, 0xDA, 0x29, 0xC3, 0x78, 0xB1, 0x71, 0x5A, 0xC9, 0x4E, 0x86, 0x9E, 0x09,
+    0x16, 0x2E, 0x48, 0x84, 0xBF, 0x8F, 0x22, 0xAF, 0x08, 0x77, 0x5C, 0xB3, 0x8A, 0x76, 0xD6, 0x3A,
+    0x21, 0xCD, 0x2B, 0xC8, 0xC8, 0xF9, 0xD5, 0x76, 0x16, 0x08, 0xAD, 0xAC, 0x38, 0xD1, 0xAF, 0x7F,
+    0x0E, 0xDC, 0x20, 0xB8, 0x86, 0x9B, 0x15, 0x6D, 0xC0, 0x83, 0x9A, 0x11, 0x79, 0x04, 0x20, 0xD3
+};
+static unsigned char dh2048_g[] = { 0x02 };
 
 
 static void throw_ssl_exception(JNIEnv* env) {
@@ -45,10 +69,17 @@ static void throw_ssl_exception(JNIEnv* env) {
     const char* klass;
     unsigned long err = ERR_get_error();
     char* message = ERR_error_string(err, buf);
+    ERR_clear_error();
 
     switch (ERR_GET_REASON(err)) {
         case SSL_R_SSL_HANDSHAKE_FAILURE:
         case SSL_R_BAD_HANDSHAKE_LENGTH:
+        case SSL_R_NO_CIPHERS_PASSED:
+        case SSL_R_NO_SHARED_CIPHER:
+        case SSL_R_WRONG_VERSION_NUMBER:
+        case SSL_R_INAPPROPRIATE_FALLBACK:
+        case SSL_R_CCS_RECEIVED_EARLY:
+        case SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC:
             klass = "javax/net/ssl/SSLHandshakeException";
             break;
         case SSL_R_UNKNOWN_PROTOCOL:
@@ -85,12 +116,16 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             throw_ssl_exception(env);
             return 0;
         case SSL_ERROR_WANT_READ:
-        case SSL_ERROR_WANT_WRITE:
-            if ((fcntl(SSL_get_fd(ssl), F_GETFL) & O_NONBLOCK) == 0) {
+        case SSL_ERROR_WANT_WRITE: {
+            int fd = SSL_get_fd(ssl);
+            if (fd == preclosed_socket) {
+                throw_socket_closed(env);
+            } else if ((fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
                 throw_by_name(env, "java/net/SocketTimeoutException", "Connection timed out");
                 return 0;
             }
             return err;
+        }
         default:
             sprintf(buf, "Unexpected SSL error code (%d)", err);
             throw_by_name(env, "javax/net/ssl/SSLException", buf);
@@ -127,6 +162,24 @@ static long get_session_counter(SSL_CTX* ctx, int key) {
 		default:
 			return 0;
 	}
+}
+
+static void setup_dh_params(SSL_CTX* ctx) {
+    DH* dh = DH_new();
+    if (dh != NULL) {
+        dh->p = BN_bin2bn(dh2048_p, sizeof(dh2048_p), NULL);
+        dh->g = BN_bin2bn(dh2048_g, sizeof(dh2048_g), NULL);
+        SSL_CTX_set_tmp_dh(ctx, dh);
+        DH_free(dh);
+    }
+}
+
+static void setup_ecdh_params(SSL_CTX* ctx) {
+    EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    if (ecdh != NULL) {
+        SSL_CTX_set_tmp_ecdh(ctx, ecdh);
+        EC_KEY_free(ecdh);
+    }
 }
 
 static unsigned long id_function() {
@@ -195,6 +248,20 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
     }
 }
 
+static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
+    if (cb == SSL_CB_HANDSHAKE_START) {
+        // Reject any renegotiation by replacing actual socket with a dummy
+        if (SSL_get_app_data(ssl) == STATE_HANDSHAKED) {
+            SSL_set_fd((SSL*)ssl, preclosed_socket);
+        }
+    } else if (cb == SSL_CB_HANDSHAKE_DONE) {
+        if (SSL_get_app_data(ssl) == STATE_SERVER) {
+            SSL_set_app_data((SSL*)ssl, STATE_HANDSHAKED);
+        }
+        ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+    }
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
     SSL_load_error_strings();
@@ -219,6 +286,8 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
 
     f_ctx = cache_field(env, "one/nio/net/NativeSslContext", "ctx", "J");
     f_ssl = cache_field(env, "one/nio/net/NativeSslSocket", "ssl", "J");
+
+    preclosed_socket = socket(PF_INET, SOCK_STREAM, 0);
 }
 
 JNIEXPORT jlong JNICALL
@@ -230,7 +299,15 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
     }
 
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE |
+                             SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
+                             SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+    SSL_CTX_set_read_ahead(ctx, 1);
+    SSL_CTX_set_info_callback(ctx, ssl_info_callback);
+
+    setup_dh_params(ctx);
+    setup_ecdh_params(ctx);
+
     return (jlong)(intptr_t)ctx;
 }
 
@@ -368,7 +445,12 @@ JNIEXPORT jlong JNICALL
 Java_one_nio_net_NativeSslSocket_sslNew(JNIEnv* env, jclass cls, jint fd, jlong ctx, jboolean serverMode) {
     SSL* ssl = SSL_new((SSL_CTX*)(intptr_t)ctx);
     if (ssl != NULL && SSL_set_fd(ssl, fd)) {
-        if (serverMode) SSL_set_accept_state(ssl); else SSL_set_connect_state(ssl);
+        if (serverMode) {
+            SSL_set_accept_state(ssl);
+            SSL_set_app_data(ssl, STATE_SERVER);
+        } else {
+            SSL_set_connect_state(ssl);
+        }
         return (jlong)(intptr_t)ssl;
     }
 
@@ -400,7 +482,7 @@ Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, 
 }
 
 JNIEXPORT int JNICALL
-Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count, jint flags) {
     SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
     jbyte buf[MAX_STACK_BUF];
 
