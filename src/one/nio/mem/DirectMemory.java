@@ -27,7 +27,8 @@ import static one.nio.util.JavaInternals.unsafe;
 
 public final class DirectMemory {
     private static final long addressOffset = JavaInternals.fieldOffset(Buffer.class, "address");
-    private static final ByteBuffer prototype = createPrototype();
+    private static final long capacityOffset = JavaInternals.fieldOffset(Buffer.class, "capacity");
+    private static final ByteBuffer prototype = ByteBuffer.allocateDirect(0);
 
     public static long allocate(long size, Object holder) {
         final long address = unsafe.allocateMemory(size);
@@ -67,6 +68,7 @@ public final class DirectMemory {
     public static ByteBuffer wrap(long address, int count) {
         ByteBuffer result = prototype.duplicate();
         unsafe.putLong(result, addressOffset, address);
+        unsafe.putLong(result, capacityOffset, count);
         result.limit(count);
         return result;
     }
@@ -110,15 +112,5 @@ public final class DirectMemory {
         if ((count & 1) != 0) {
             unsafe.putByte(to, toOffset, unsafe.getByte(from, fromOffset));
         }
-    }
-
-    private static ByteBuffer createPrototype() {
-        ByteBuffer result = ByteBuffer.allocateDirect(0);
-        try {
-            JavaInternals.getField(Buffer.class, "capacity").setInt(result, Integer.MAX_VALUE);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
-        }
-        return result;
     }
 }
