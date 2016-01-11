@@ -16,12 +16,15 @@
 
 package one.nio.util;
 
+import java.util.Arrays;
+
 public final class Hex {
     public static final char[] SMALL   = "0123456789abcdef".toCharArray();
     public static final char[] CAPITAL = "0123456789ABCDEF".toCharArray();
     public static final int[] DIGIT_VALUE = new int[256];
 
     static {
+        Arrays.fill(DIGIT_VALUE, -1);
         for (int i = 0; i <= 9; i++) {
             DIGIT_VALUE['0' + i] = i;
         }
@@ -83,7 +86,9 @@ public final class Hex {
         int length = input.length();
         int result = 0;
         for (int i = 0; i < length; i++) {
-            result = (result << 4) | DIGIT_VALUE[input.charAt(i)];
+            int digit = DIGIT_VALUE[input.charAt(i)];
+            if (digit < 0) throw new IllegalArgumentException();
+            result = (result << 4) | digit;
         }
         return result;
     }
@@ -92,7 +97,9 @@ public final class Hex {
         int length = input.length();
         long result = 0;
         for (int i = 0; i < length; i++) {
-            result = (result << 4) | DIGIT_VALUE[input.charAt(i)];
+            int digit = DIGIT_VALUE[input.charAt(i)];
+            if (digit < 0) throw new IllegalArgumentException();
+            result = (result << 4) | digit;
         }
         return result;
     }

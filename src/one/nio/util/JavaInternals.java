@@ -91,9 +91,9 @@ public final class JavaInternals {
         return null;
     }
 
-    public static Constructor getConstructor(Class<?> cls, Class... params) {
+    public static <T> Constructor<T> getConstructor(Class<T> cls, Class... params) {
         try {
-            Constructor c = cls.getDeclaredConstructor(params);
+            Constructor<T> c = cls.getDeclaredConstructor(params);
             c.setAccessible(true);
             return c;
         } catch (Exception e) {
@@ -101,7 +101,7 @@ public final class JavaInternals {
         }
     }
 
-    public static Constructor getConstructor(String cls, Class... params) {
+    public static Constructor<?> getConstructor(String cls, Class... params) {
         try {
             return getConstructor(Class.forName(cls), params);
         } catch (ClassNotFoundException e) {
