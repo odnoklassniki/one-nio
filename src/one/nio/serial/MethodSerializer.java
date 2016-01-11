@@ -99,9 +99,8 @@ public class MethodSerializer extends InvalidSerializer {
 
     @Override
     public String toString() {
-        StringBuilder builder = new StringBuilder(super.toString());
-        builder.append("Method: ").append(method).append('\n');
-        return builder.toString();
+        return super.toString() +
+                "Method: " + method + '\n';
     }
 
     public Method method() {

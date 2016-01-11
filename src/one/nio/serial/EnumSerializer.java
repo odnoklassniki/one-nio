@@ -21,6 +21,7 @@ import one.nio.serial.gen.StubGenerator;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.IOException;
+import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class EnumSerializer extends Serializer<Enum> {
@@ -66,9 +67,18 @@ public class EnumSerializer extends Serializer<Enum> {
             enumCountMismatches.incrementAndGet();
         }
 
+        // 1. Find exact matches
+        EnumSet usedConstants = EnumSet.noneOf(cls);
         this.values = new Enum[constants.length];
         for (int i = 0; i < constants.length; i++) {
-            values[i] = find(ownValues, constants[i], i);
+            values[i] = findMatch(constants[i], usedConstants);
+        }
+
+        // 2. Handle renaming
+        for (int i = 0; i < values.length && i < ownValues.length; i++) {
+            if (values[i] == null && !usedConstants.contains(ownValues[i])) {
+                values[i] = ownValues[i];
+            }
         }
     }
 
@@ -107,20 +117,18 @@ public class EnumSerializer extends Serializer<Enum> {
         builder.append('"').append(obj.name()).append('"');
     }
 
-    private Enum find(Enum[] values, String name, int index) {
-        for (Enum v : values) {
-            if (name.equals(v.name())) {
-                return v;
-            }
+    @SuppressWarnings("unchecked")
+    private Enum findMatch(String name, EnumSet found) {
+        try {
+            Enum localConstant = Enum.valueOf(cls, name);
+            found.add(localConstant);
+            return localConstant;
+        } catch (IllegalArgumentException e) {
+            Repository.log.warn("[" + Long.toHexString(uid) + "] Missed local enum constant " + descriptor + '.' + name);
+            enumCountMismatches.incrementAndGet();
         }
-
-        Repository.log.warn("[" + Long.toHexString(uid) + "] Missed local enum constant " + descriptor + "." + name);
-        enumMissedConstants.incrementAndGet();
 
         Default defaultName = cls().getAnnotation(Default.class);
-        if (defaultName != null) {
-            return Enum.valueOf(cls, defaultName.value());
-        }
-        return index < values.length ? values[index] : null;
+        return defaultName == null ? null : Enum.valueOf(cls, defaultName.value());
     }
 }

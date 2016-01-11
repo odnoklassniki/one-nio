@@ -86,12 +86,9 @@ public abstract class Serializer<T> implements Externalizable {
 
     @Override
     public String toString() {
-        StringBuilder builder = new StringBuilder(100);
-        builder.append("---\n");
-        builder.append("Class: ").append(descriptor).append('\n');
-        builder.append("UID: ").append(Long.toHexString(uid)).append('\n');
-        builder.append("Origin: ").append(origin).append('\n');
-        return builder.toString();
+        return "Class: " + descriptor + '\n' +
+                "UID: " + Long.toHexString(uid) + '\n' +
+                "Origin: " + origin + '\n';
     }
 
     @Override
