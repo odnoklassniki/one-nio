@@ -75,13 +75,13 @@ public class SettableFuture<V> implements RunnableFuture<V> {
         notifyAll();
     }
 
-    private synchronized void waitForCompletion() throws InterruptedException {
+    protected synchronized void waitForCompletion() throws InterruptedException {
         while (!done) {
             wait();
         }
     }
 
-    private synchronized void waitForCompletion(long timeout) throws InterruptedException, TimeoutException {
+    protected synchronized void waitForCompletion(long timeout) throws InterruptedException, TimeoutException {
         long waitUntil = System.currentTimeMillis() + timeout;
         while (!done) {
             wait(timeout);
