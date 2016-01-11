@@ -1,3 +1,19 @@
+/*
+ * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/sendfile.h>
@@ -81,6 +97,17 @@ static inline void wakeup_blocking_call(int fd) {
     if (blocked_thread != 0) {
         pthread_kill(blocked_thread, SIG_WAKEUP);
     }
+}
+
+static inline int is_io_exception(int fd) {
+    if (errno == EINTR) {
+        // Blocking call was interrupted by a signal; the operation can be restarted
+        return 0;
+    } else if (errno == EWOULDBLOCK && (fcntl(fd, F_GETFL) & O_NONBLOCK)) {
+        // Non-blocking operation is is progress; this is not an error
+        return 0;
+    }
+    return 1;
 }
 
 
@@ -190,7 +217,7 @@ Java_one_nio_net_NativeSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jin
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
-        } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+        } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }
     }
@@ -212,7 +239,7 @@ Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, 
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
-        } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+        } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }
     }
@@ -237,7 +264,7 @@ Java_one_nio_net_NativeSocket_writeFully(JNIEnv* env, jobject self, jbyteArray d
             } else if (result == 0) {
                 throw_socket_closed(env);
                 break;
-            } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+            } else if (is_io_exception(fd)) {
                 throw_io_exception(env);
                 break;
             }
@@ -256,7 +283,7 @@ Java_one_nio_net_NativeSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
-        } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+        } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }
     }
@@ -277,7 +304,7 @@ Java_one_nio_net_NativeSocket_read(JNIEnv* env, jobject self, jbyteArray data, j
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
-        } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+        } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }
     }
@@ -301,7 +328,7 @@ Java_one_nio_net_NativeSocket_readFully(JNIEnv* env, jobject self, jbyteArray da
             } else if (result == 0) {
                 throw_socket_closed(env);
                 break;
-            } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+            } else if (is_io_exception(fd)) {
                 throw_io_exception(env);
                 break;
             }
@@ -321,7 +348,7 @@ Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
-        } else if (errno != EWOULDBLOCK || (fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
+        } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }
     }
