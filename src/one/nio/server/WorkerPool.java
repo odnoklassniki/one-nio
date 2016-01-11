@@ -16,20 +16,23 @@
 
 package one.nio.server;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory {
-    private final Server server;
+final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thread.UncaughtExceptionHandler {
+    private static final Log log = LogFactory.getLog(WorkerPool.class);
+
     private final AtomicInteger index;
 
-    WorkerPool(Server server, int minThreads, int maxThreads, long queueTime) {
+    WorkerPool(int minThreads, int maxThreads, long queueTime) {
         super(minThreads, maxThreads, 60L, TimeUnit.SECONDS, new WaitingSynchronousQueue<Runnable>(queueTime));
         setThreadFactory(this);
-        this.server = server;
         this.index = new AtomicInteger();
     }
 
@@ -50,8 +53,13 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory {
     @Override
     public Thread newThread(Runnable r) {
         Thread thread = new Thread(r, "NIO Worker #" + index.incrementAndGet());
-        thread.setUncaughtExceptionHandler(server);
+        thread.setUncaughtExceptionHandler(this);
         return thread;
+    }
+
+    @Override
+    public void uncaughtException(Thread t, Throwable e) {
+        log.error("Uncaught exception in " + t, e);
     }
 
     private static final class WaitingSynchronousQueue<E> extends SynchronousQueue<E> {

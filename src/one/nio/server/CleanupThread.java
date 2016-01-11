@@ -29,7 +29,6 @@ final class CleanupThread extends Thread {
 
     CleanupThread(Server server, int keepAlive) {
         super("NIO Cleanup");
-        setUncaughtExceptionHandler(server);
         this.server = server;
         this.keepAlive = keepAlive * 1000L;
     }
@@ -45,7 +44,7 @@ final class CleanupThread extends Thread {
 
     @Override
     public void run() {
-        for (;;) {
+        while (!isInterrupted()) {
             long keepAlive = this.keepAlive;
             try {
                 Thread.sleep(keepAlive / 2);
@@ -53,32 +52,31 @@ final class CleanupThread extends Thread {
                 break;
             }
 
-            SelectorThread[] selectors = server.selectors;
-            if (!server.isRunning()) {
-                break;
-            }
+            try {
+                long cleanTime = System.currentTimeMillis();
+                int idleCount = 0;
+                int staleCount = 0;
 
-            long cleanTime = System.currentTimeMillis();
-            int idleCount = 0;
-            int staleCount = 0;
-
-            for (SelectorThread selector : selectors) {
-                for (Session session : selector.selector) {
-                    int status = session.checkStatus(cleanTime, keepAlive);
-                    if (status != Session.ACTIVE) {
-                        if (status == Session.IDLE) {
-                            idleCount++;
-                        } else {
-                            staleCount++;
+                for (SelectorThread selector : server.selectors) {
+                    for (Session session : selector.selector) {
+                        int status = session.checkStatus(cleanTime, keepAlive);
+                        if (status != Session.ACTIVE) {
+                            if (status == Session.IDLE) {
+                                idleCount++;
+                            } else {
+                                staleCount++;
+                            }
+                            session.close();
                         }
-                        session.close();
                     }
                 }
-            }
 
-            if (log.isInfoEnabled()) {
-                log.info(idleCount + " idle + " + staleCount + " stale sessions closed in " +
-                        (System.currentTimeMillis() - cleanTime) + " ms");
+                if (log.isInfoEnabled()) {
+                    log.info(idleCount + " idle + " + staleCount + " stale sessions closed in " +
+                            (System.currentTimeMillis() - cleanTime) + " ms");
+                }
+            } catch (Throwable e) {
+                log.error("Uncaught exception in CleanupThread", e);
             }
         }
     }

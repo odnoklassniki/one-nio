@@ -16,23 +16,20 @@
 
 package one.nio.server;
 
-public interface ServerMXBean {
-    int getConnections();
-    boolean getWorkersUsed();
-    int getWorkers();
-    int getWorkersActive();
-    long getAcceptedSessions();
-    long getRejectedSessions();
-    int getSelectorCount();
-    double getSelectorAvgReady();
-    int getSelectorMaxReady();
-    long getSelectorOperations();
-    long getSelectorSessions();
-    double getQueueAvgLength();
-    long getQueueAvgBytes();
-    long getQueueMaxLength();
-    long getQueueMaxBytes();
-    long getRequestsProcessed();
-    long getRequestsRejected();
-    void reset();
+public class RejectedSessionException extends Exception {
+
+    public RejectedSessionException() {
+    }
+
+    public RejectedSessionException(String message) {
+        super(message);
+    }
+
+    public RejectedSessionException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public RejectedSessionException(Throwable cause) {
+        super(cause);
+    }
 }

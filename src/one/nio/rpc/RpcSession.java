@@ -24,14 +24,10 @@ import one.nio.serial.DeserializeStream;
 import one.nio.serial.SerializeStream;
 import one.nio.serial.SerializerNotFoundException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.IOException;
 import java.util.concurrent.RejectedExecutionException;
 
 public class RpcSession<S> extends Session {
-    private static final Log log = LogFactory.getLog(RpcSession.class);
     private static final int BUFFER_SIZE = 8000;
 
     protected final RpcServer<S> server;
@@ -83,8 +79,8 @@ public class RpcSession<S> extends Session {
         } catch (SerializerNotFoundException e) {
             writeResponse(e);
             return;
-        } catch (ClassNotFoundException e) {
-            handleClassNotFound(e);
+        } catch (Exception e) {
+            handleDeserializationException(e);
             server.incRequestsRejected();
             return;
         } finally {
@@ -126,7 +122,7 @@ public class RpcSession<S> extends Session {
         return remoteCall.method().invoke(server.service, remoteCall.args());
     }
 
-    protected void handleClassNotFound(ClassNotFoundException e) throws IOException {
+    protected void handleDeserializationException(Exception e) throws IOException {
         writeResponse(e);
         log.error("Cannot deserialize request from " + getRemoteHost(), e);
     }
@@ -148,7 +144,7 @@ public class RpcSession<S> extends Session {
             try {
                 writeResponse(invoke(request));
             } catch (Throwable e) {
-                server.handleException(RpcSession.this, e);
+                handleException(e);
             }
         }
     }

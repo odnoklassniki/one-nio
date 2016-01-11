@@ -20,15 +20,10 @@ import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.util.Utf8;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.IOException;
 import java.util.LinkedList;
 
 public class HttpSession extends Session {
-    private static final Log log = LogFactory.getLog(HttpSession.class);
-
     private static final int MAX_HEADERS = 48;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;

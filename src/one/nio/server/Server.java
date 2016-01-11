@@ -25,23 +25,19 @@ import one.nio.net.SslContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import javax.net.ssl.SSLHandshakeException;
-import javax.net.ssl.SSLProtocolException;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.SocketException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
+public class Server implements ServerMXBean {
     private static final Log log = LogFactory.getLog(Server.class);
 
-    private final SelectorStats selectorStats;
-    private final QueueStats queueStats;
     private final AtomicLong requestsProcessed;
     private final AtomicLong requestsRejected;
 
-    private volatile boolean running;
+    private volatile SelectorStats selectorStats;
+    private volatile QueueStats queueStats;
 
     protected ConnectionString conn;
     protected AcceptorThread[] acceptors;
@@ -79,10 +75,10 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
         this.selectors = new SelectorThread[selectorCount];
         for (int i = 0; i < selectorCount; i++) {
-            this.selectors[i] = new SelectorThread(this, i, affinity ? 1L << (i % processors) : 0);
+            this.selectors[i] = new SelectorThread(i, affinity ? 1L << (i % processors) : 0);
         }
 
-        this.workers = new WorkerPool(this, minWorkers, maxWorkers, queueTime);
+        this.workers = new WorkerPool(minWorkers, maxWorkers, queueTime);
         this.useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
 
         if (keepAlive > 0) {
@@ -122,7 +118,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
             boolean affinity = conn.getBooleanParam("affinity", false);
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, selectorCount);
             for (int i = selectors.length; i < selectorCount; i++) {
-                newSelectors[i] = new SelectorThread(this, i, affinity ? 1L << (i % processors) : 0);
+                newSelectors[i] = new SelectorThread(i, affinity ? 1L << (i % processors) : 0);
                 newSelectors[i].start();
             }
             selectors = newSelectors;
@@ -132,7 +128,6 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     public void start() {
-        running = true;
         for (SelectorThread selector : selectors) {
             selector.start();
         }
@@ -145,7 +140,6 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     public void stop() {
-        running = false;
         if (cleanup != null) {
             cleanup.shutdown();
             cleanup = null;
@@ -184,7 +178,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         return "ssl".equals(protocol) || "https".equals(protocol) ? SslContext.getDefault() : null;
     }
 
-    protected Session createSession(Socket socket) {
+    protected Session createSession(Socket socket) throws RejectedSessionException {
         return new Session(socket);
     }
 
@@ -198,11 +192,6 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
 
     public final ConnectionString getConnectionString() {
         return conn;
-    }
-
-    @Override
-    public final boolean isRunning() {
-        return running;
     }
 
     @Override
@@ -239,48 +228,60 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     }
 
     @Override
+    public long getRejectedSessions() {
+        long result = 0;
+        for (AcceptorThread acceptor : acceptors) {
+            result += acceptor.rejectedSessions;
+        }
+        return result;
+    }
+
+    @Override
     public int getSelectorCount() {
         return selectors.length;
     }
 
     @Override
     public double getSelectorAvgReady() {
-        return selectorStats.getAvgReady();
+        SelectorStats selectorStats = getSelectorStats();
+        return selectorStats.operations == 0 ? 0.0 : (double) selectorStats.sessions / selectorStats.operations;
     }
 
     @Override
     public int getSelectorMaxReady() {
-        return selectorStats.getMaxReady();
+        return getSelectorStats().maxReady;
     }
 
     @Override
     public long getSelectorOperations() {
-        return selectorStats.getOperations();
+        return getSelectorStats().operations;
     }
 
     @Override
     public long getSelectorSessions() {
-        return selectorStats.getSessions();
+        return getSelectorStats().sessions;
     }
 
     @Override
     public double getQueueAvgLength() {
-        return queueStats.getAvgLength();
+        QueueStats queueStats = getQueueStats();
+        return queueStats.sessions == 0 ? 0.0 : (double) queueStats.totalLength / queueStats.sessions;
     }
 
     @Override
     public long getQueueAvgBytes() {
-        return queueStats.getAvgBytes();
+        QueueStats queueStats = getQueueStats();
+        return queueStats.sessions == 0 ? 0 : queueStats.totalBytes / queueStats.sessions;
     }
 
     @Override
     public long getQueueMaxLength() {
-        return queueStats.getMaxLength();
+        return getQueueStats().maxLength;
     }
 
     @Override
     public long getQueueMaxBytes() {
-        return queueStats.getMaxBytes();
+        return getQueueStats().maxBytes;
     }
 
     @Override
@@ -297,6 +298,7 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
     public void reset() {
         for (AcceptorThread acceptor : acceptors) {
             acceptor.acceptedSessions = 0;
+            acceptor.rejectedSessions = 0;
         }
         for (SelectorThread selector : selectors) {
             selector.operations = 0;
@@ -311,130 +313,67 @@ public class Server implements ServerMXBean, Thread.UncaughtExceptionHandler {
         workers.execute(command);
     }
 
-    public void handleException(Session session, Throwable e) {
-        if (running) {
-            if (e instanceof SocketException) {
-                if (log.isDebugEnabled()) log.debug("Connection closed: " + session.getRemoteHost());
-            } else if (e instanceof SSLHandshakeException || e instanceof SSLProtocolException) {
-                if (log.isDebugEnabled()) log.debug("Handshake failure: " + session.getRemoteHost());
-            } else {
-                log.error("Cannot process session from " + session.getRemoteHost(), e);
-            }
-        }
-        session.close();
+    private static final class SelectorStats {
+        long expireTime;
+        long operations;
+        long sessions;
+        int maxReady;
     }
 
-    @Override
-    public void uncaughtException(Thread t, Throwable e) {
-        log.fatal("Fatal error in " + t, e);
+    private synchronized SelectorStats getSelectorStats() {
+        SelectorStats selectorStats = this.selectorStats;
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime < selectorStats.expireTime) {
+            return selectorStats;
+        }
+
+        selectorStats = new SelectorStats();
+        selectorStats.expireTime = currentTime + 1000;
+
+        for (SelectorThread selector : selectors) {
+            selectorStats.operations += selector.operations;
+            selectorStats.sessions += selector.sessions;
+            selectorStats.maxReady = Math.max(selectorStats.maxReady, selector.maxReady);
+        }
+
+        this.selectorStats = selectorStats;
+        return selectorStats;
     }
 
-    private class SelectorStats {
-        private long expireTime;
-        private long operations;
-        private long sessions;
-        private int maxReady;
-
-        synchronized long getOperations() {
-            ensureRecent();
-            return operations;
-        }
-
-        synchronized long getSessions() {
-            ensureRecent();
-            return sessions;
-        }
-
-        synchronized double getAvgReady() {
-            ensureRecent();
-            return operations == 0 ? 0 : ((double) sessions) / operations;
-        }
-
-        synchronized int getMaxReady() {
-            ensureRecent();
-            return maxReady;
-        }
-
-        private void ensureRecent() {
-            long currentTime = System.currentTimeMillis();
-            if (currentTime < expireTime) {
-                return;
-            }
-
-            long operations = 0;
-            long sessions = 0;
-            int maxSelected = 0;
-            for (SelectorThread selector : selectors) {
-                operations += selector.operations;
-                sessions += selector.sessions;
-                maxSelected = Math.max(maxSelected, selector.maxReady);
-            }
-
-            this.operations = operations;
-            this.sessions = sessions;
-            this.maxReady = maxSelected;
-            this.expireTime = currentTime + 1000;
-        }
+    private static final class QueueStats {
+        long expireTime;
+        long totalLength;
+        long totalBytes;
+        long maxLength;
+        long maxBytes;
+        int sessions;
     }
 
-    private class QueueStats {
-        private long expireTime;
-        private long totalLength;
-        private long totalBytes;
-        private long maxLength;
-        private long maxBytes;
-        private int sessions;
+    private synchronized QueueStats getQueueStats() {
+        QueueStats queueStats = this.queueStats;
 
-        synchronized double getAvgLength() {
-            ensureRecent();
-            return sessions == 0 ? 0.0 : ((double) totalLength) / sessions;
+        long currentTime = System.currentTimeMillis();
+        if (currentTime < queueStats.expireTime) {
+            return queueStats;
         }
 
-        synchronized long getAvgBytes() {
-            ensureRecent();
-            return sessions == 0 ? 0 : totalBytes / sessions;
-        }
+        queueStats = new QueueStats();
+        queueStats.expireTime = currentTime + 1000;
 
-        synchronized long getMaxLength() {
-            ensureRecent();
-            return maxLength;
-        }
-
-        synchronized long getMaxBytes() {
-            ensureRecent();
-            return maxBytes;
-        }
-
-        private void ensureRecent() {
-            long currentTime = System.currentTimeMillis();
-            if (currentTime < expireTime) {
-                return;
+        long[] stats = new long[2];
+        for (SelectorThread selector : selectors) {
+            for (Session session : selector.selector) {
+                session.getQueueStats(stats);
+                queueStats.sessions++;
+                queueStats.totalLength += stats[0];
+                queueStats.totalBytes += stats[1];
+                if (stats[0] > queueStats.maxLength) queueStats.maxLength = stats[0];
+                if (stats[1] > queueStats.maxBytes) queueStats.maxBytes = stats[1];
             }
-
-            int sessions = 0;
-            long totalLength = 0;
-            long totalBytes = 0;
-            long maxLength = 0;
-            long maxBytes = 0;
-            long[] stats = new long[2];
-
-            for (SelectorThread selector : selectors) {
-                for (Session session : selector.selector) {
-                    session.getQueueStats(stats);
-                    sessions++;
-                    totalLength += stats[0];
-                    totalBytes += stats[1];
-                    if (stats[0] > maxLength) maxLength = stats[0];
-                    if (stats[1] > maxBytes) maxBytes = stats[1];
-                }
-            }
-
-            this.totalLength = totalLength;
-            this.totalBytes = totalBytes;
-            this.maxLength = maxLength;
-            this.maxBytes = maxBytes;
-            this.sessions = sessions;
-            this.expireTime = currentTime + 1000;
         }
+
+        this.queueStats = queueStats;
+        return queueStats;
     }
 }

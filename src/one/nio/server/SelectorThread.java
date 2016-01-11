@@ -20,17 +20,12 @@ import one.nio.net.Selector;
 import one.nio.net.Session;
 import one.nio.os.Proc;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.IOException;
 import java.util.Iterator;
 
 final class SelectorThread extends Thread {
-    private static final Log log = LogFactory.getLog(SelectorThread.class);
     private static final int BUFFER_SIZE = 64000;
 
-    final Server server;
     final Selector selector;
     final long affinity;
 
@@ -38,10 +33,8 @@ final class SelectorThread extends Thread {
     long sessions;
     int maxReady;
 
-    SelectorThread(Server server, int num, long affinity) throws IOException {
+    SelectorThread(int num, long affinity) throws IOException {
         super("NIO Selector #" + num);
-        setUncaughtExceptionHandler(server);
-        this.server = server;
         this.selector = Selector.create();
         this.affinity = affinity;
     }
@@ -63,14 +56,14 @@ final class SelectorThread extends Thread {
 
         final byte[] buffer = new byte[BUFFER_SIZE];
 
-        while (server.isRunning()) {
+        while (selector.isOpen()) {
             int ready = 0;
             for (Iterator<Session> selectedSessions = selector.select(); selectedSessions.hasNext(); ready++) {
                 Session session = selectedSessions.next();
                 try {
                     session.process(buffer);
                 } catch (Throwable e) {
-                    server.handleException(session, e);
+                    session.handleException(e);
                 }
             }
 

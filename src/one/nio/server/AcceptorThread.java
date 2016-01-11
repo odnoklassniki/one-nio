@@ -38,11 +38,11 @@ final class AcceptorThread extends Thread {
     final Socket serverSocket;
 
     long acceptedSessions;
+    long rejectedSessions;
 
     AcceptorThread(Server server, InetAddress address, int port, SslContext sslContext,
                    int backlog, int recvBuf, int sendBuf, boolean defer, boolean noDelay) throws IOException {
         super("NIO Acceptor " + address + ":" + port);
-        setUncaughtExceptionHandler(server);
 
         this.server = server;
         this.address = address;
@@ -73,7 +73,7 @@ final class AcceptorThread extends Thread {
 
     @Override
     public void run() {
-        while (server.isRunning()) {
+        while (serverSocket.isOpen()) {
             Socket socket = null;
             try {
                 socket = serverSocket.accept();
@@ -81,13 +81,17 @@ final class AcceptorThread extends Thread {
                 Session session = server.createSession(socket);
                 getSmallestSelector().register(session);
                 acceptedSessions++;
-            } catch (Exception e) {
-                if (server.isRunning()) {
+            } catch (RejectedSessionException e) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Rejected session from " + socket.getRemoteAddress(), e);
+                }
+                rejectedSessions++;
+                socket.close();
+            } catch (Throwable e) {
+                if (serverSocket.isOpen()) {
                     log.error("Cannot accept incoming connection", e);
                 }
-                if (socket != null) {
-                    socket.close();
-                }
+                if (socket != null) socket.close();
             }
         }
     }

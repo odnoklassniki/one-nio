@@ -18,6 +18,7 @@ package one.nio.http;
 
 import one.nio.http.gen.RequestHandlerGenerator;
 import one.nio.net.ConnectionString;
+import one.nio.server.RejectedSessionException;
 import one.nio.server.Server;
 import one.nio.net.Socket;
 
@@ -38,7 +39,7 @@ public class HttpServer extends Server {
     }
 
     @Override
-    public HttpSession createSession(Socket socket) {
+    public HttpSession createSession(Socket socket) throws RejectedSessionException {
         return new HttpSession(socket, this);
     }
 
