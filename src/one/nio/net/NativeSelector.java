@@ -53,6 +53,11 @@ final class NativeSelector extends Selector {
     }
 
     @Override
+    public boolean isOpen() {
+        return closeFlag == 0;
+    }
+
+    @Override
     public final synchronized void close() {
         if (closeFlag == 0) {
             closeFlag = -1;

@@ -63,6 +63,7 @@ public abstract class Socket implements Closeable {
     public abstract InetSocketAddress getLocalAddress();
     public abstract InetSocketAddress getRemoteAddress();
     public abstract Socket ssl(SslContext context) throws IOException;
+    public abstract SslContext getSslContext();
 
     public void connect(String host, int port) throws IOException {
         connect(InetAddress.getByName(host), port);

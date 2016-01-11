@@ -16,6 +16,10 @@
 
 package one.nio.net;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import javax.net.ssl.SSLException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -23,6 +27,8 @@ import java.net.SocketException;
 import java.nio.channels.SelectionKey;
 
 public class Session implements Closeable {
+    protected static final Log log = LogFactory.getLog(Session.class);
+
     public static final int READABLE   = SelectionKey.OP_READ;
     public static final int WRITEABLE  = SelectionKey.OP_WRITE;
     public static final int CLOSING    = 0x18;
@@ -43,8 +49,12 @@ public class Session implements Closeable {
     protected volatile long lastAccessTime;
 
     public Session(Socket socket) {
+        this(socket, READABLE);
+    }
+
+    public Session(Socket socket, int eventsToListen) {
         this.socket = socket;
-        this.eventsToListen = READABLE;
+        this.eventsToListen = eventsToListen;
         this.lastAccessTime = System.currentTimeMillis();
     }
 
@@ -55,6 +65,10 @@ public class Session implements Closeable {
 
     public final long lastAccessTime() {
         return lastAccessTime;
+    }
+
+    public boolean isSsl() {
+        return socket.getSslContext() != null;
     }
 
     public int checkStatus(long currentTime, long keepAlive) {
@@ -111,6 +125,17 @@ public class Session implements Closeable {
 
     public int read(byte[] data, int offset, int count) throws IOException {
         int bytesRead = socket.read(data, offset, count);
+        if (bytesRead >= 0) {
+            listen(READABLE);
+            return bytesRead;
+        } else {
+            listen(SSL | WRITEABLE);
+            return 0;
+        }
+    }
+
+    public int readRaw(long address, int count) throws IOException {
+        int bytesRead = socket.readRaw(address, count, 0);
         if (bytesRead >= 0) {
             listen(READABLE);
             return bytesRead;
@@ -190,6 +215,17 @@ public class Session implements Closeable {
         }
 
         lastAccessTime = System.currentTimeMillis();
+    }
+
+    public void handleException(Throwable e) {
+        if (e instanceof SocketException) {
+            if (log.isDebugEnabled()) log.debug("Connection closed: " + getRemoteHost(), e);
+        } else if (e instanceof SSLException) {
+            if (log.isDebugEnabled()) log.debug("SSL/TLS failure: " + getRemoteHost(), e);
+        } else {
+            log.error("Cannot process session from " + getRemoteHost(), e);
+        }
+        close();
     }
 
     public static abstract class QueueItem {

@@ -206,4 +206,9 @@ final class JavaSocket extends Socket {
     public Socket ssl(SslContext context) {
         return this;
     }
+
+    @Override
+    public SslContext getSslContext() {
+        return null;
+    }
 }

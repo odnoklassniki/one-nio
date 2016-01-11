@@ -63,9 +63,9 @@ class NativeSslContext extends SslContext {
             } else if (protocol.equals("tlsv1")) {
                 enabled |= 0x04000000;
             } else if (protocol.equals("tlsv1.1")) {
-                enabled |= 0x08000000;
-            } else if (protocol.equals("tlsv1.2")) {
                 enabled |= 0x10000000;
+            } else if (protocol.equals("tlsv1.2")) {
+                enabled |= 0x08000000;
             }
         }
 
@@ -80,6 +80,12 @@ class NativeSslContext extends SslContext {
     @Override
     public native void setCertificate(String certFile, String privateKeyFile) throws SSLException;
 
+    @Override
+    public native void setCA(String caFile) throws SSLException;
+
+    @Override 
+    public native void setVerify(int verifyMode) throws SSLException;
+    
     @Override
     public native void setTicketKey(byte[] ticketKey) throws SSLException;
 

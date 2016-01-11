@@ -39,6 +39,11 @@ final class JavaSelector extends Selector {
     }
 
     @Override
+    public boolean isOpen() {
+        return impl.isOpen();
+    }
+
+    @Override
     public final void close() {
         try {
             impl.close();

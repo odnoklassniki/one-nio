@@ -84,6 +84,11 @@ class NativeSocket extends Socket {
     }
 
     @Override
+    public SslContext getSslContext() {
+        return null;
+    }
+
+    @Override
     public final void connect(InetAddress address, int port) throws IOException {
         connect0(address.getAddress(), port);
     }

@@ -44,6 +44,11 @@ class NativeSslSocket extends NativeSocket {
     }
 
     @Override
+    public SslContext getSslContext() {
+        return context;
+    }
+
+    @Override
     public long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
         throw new IOException("Cannot use sendFile with SSL");
     }

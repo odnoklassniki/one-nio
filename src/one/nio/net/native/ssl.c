@@ -1,3 +1,19 @@
+/*
+ * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <openssl/ssl.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
@@ -66,34 +82,10 @@ static unsigned char dh2048_g[] = { 0x02 };
 
 static void throw_ssl_exception(JNIEnv* env) {
     char buf[256];
-    const char* klass;
     unsigned long err = ERR_get_error();
     char* message = ERR_error_string(err, buf);
     ERR_clear_error();
-
-    switch (ERR_GET_REASON(err)) {
-        case SSL_R_SSL_HANDSHAKE_FAILURE:
-        case SSL_R_BAD_HANDSHAKE_LENGTH:
-        case SSL_R_NO_CIPHERS_PASSED:
-        case SSL_R_NO_SHARED_CIPHER:
-        case SSL_R_WRONG_VERSION_NUMBER:
-        case SSL_R_INAPPROPRIATE_FALLBACK:
-        case SSL_R_CCS_RECEIVED_EARLY:
-        case SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC:
-            klass = "javax/net/ssl/SSLHandshakeException";
-            break;
-        case SSL_R_UNKNOWN_PROTOCOL:
-        case SSL_R_UNSUPPORTED_PROTOCOL:
-        case SSL_R_NO_PROTOCOLS_AVAILABLE:
-        case SSL_R_PROTOCOL_IS_SHUTDOWN:
-        case SSL_R_BAD_PROTOCOL_VERSION_NUMBER:
-            klass = "javax/net/ssl/SSLProtocolException";
-            break;
-        default:
-            klass = "javax/net/ssl/SSLException";
-    }
-
-    throw_by_name(env, klass, message);
+    throw_by_name(env, "javax/net/ssl/SSLException", message);
 }
 
 static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
@@ -369,6 +361,33 @@ Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstr
             return;
         }
     }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setCA(JNIEnv* env, jobject self, jstring caFile) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+
+    if (caFile != NULL) {
+        const char* filename = (*env)->GetStringUTFChars(env, caFile, NULL);
+        int success = 0;
+
+        if (SSL_CTX_load_verify_locations(ctx, filename, NULL)) {
+            STACK_OF(X509_NAME)* cert_names = SSL_load_client_CA_file(filename);
+            if (cert_names != NULL) {
+                SSL_CTX_set_client_CA_list(ctx, cert_names);
+                success = 1;
+            }
+        }
+
+        (*env)->ReleaseStringUTFChars(env, caFile, filename);
+        if (!success) throw_ssl_exception(env);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setVerify(JNIEnv* env, jobject self, jint verifyMode) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    SSL_CTX_set_verify(ctx, verifyMode, NULL);
 }
 
 JNIEXPORT void JNICALL

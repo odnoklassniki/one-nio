@@ -24,6 +24,7 @@ import java.util.Iterator;
 
 public abstract class Selector implements Iterable<Session>, Closeable {
     public abstract int size();
+    public abstract boolean isOpen();
     public abstract void close();
     public abstract void register(Session session);
     public abstract void unregister(Session session);
