@@ -27,9 +27,9 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GeneratedSerializer extends Serializer {
@@ -38,6 +38,12 @@ public class GeneratedSerializer extends Serializer {
     static final AtomicInteger migratedFields = new AtomicInteger();
     static final AtomicInteger renamedFields = new AtomicInteger();
     static final AtomicInteger unsupportedFields = new AtomicInteger();
+    static final Set<Class<?>> generationInProcess = new ConcurrentSkipListSet<Class<?>>(new Comparator<Class<?>>() {
+        @Override
+        public int compare(Class<?> o1, Class<?> o2) {
+            return o1.getName().compareTo(o2.getName());
+        }
+    });
 
     private FieldDescriptor[] fds;
     private ArrayList<Field> defaultFields;
@@ -45,6 +51,7 @@ public class GeneratedSerializer extends Serializer {
 
     GeneratedSerializer(Class cls) {
         super(cls);
+        generationInProcess.add(cls);
 
         Field[] ownFields = getSerializableFields();
         this.fds = new FieldDescriptor[ownFields.length / 2];
@@ -53,7 +60,13 @@ public class GeneratedSerializer extends Serializer {
         }
 
         checkFieldTypes();
+        for (FieldDescriptor fd : fds) {
+            if (!generationInProcess.contains(fd.type().resolve())) {
+                Repository.get(fd.type().resolve());
+            }
+        }
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
+        generationInProcess.remove(cls);
     }
 
     @Override
