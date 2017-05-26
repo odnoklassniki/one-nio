@@ -279,11 +279,13 @@ public class SerializationTest extends TestCase {
         private long id;
         private long phone;
         private String name;
+        private UUID uuid;
 
-        public User(long id, long phone, String name) {
+        public User(long id, long phone, String name, UUID uuid) {
             this.id = id;
             this.phone = phone;
             this.name = name;
+            this.uuid = uuid;
         }
 
         @Override
@@ -296,8 +298,8 @@ public class SerializationTest extends TestCase {
             if (id != user.id) return false;
             if (phone != user.phone) return false;
             if (!name.equals(user.name)) return false;
+            return uuid != null ? uuid.equals(user.uuid) : user.uuid == null;
 
-            return true;
         }
 
         @Override
@@ -305,14 +307,15 @@ public class SerializationTest extends TestCase {
             int result = (int) (id ^ (id >>> 32));
             result = 31 * result + (int) (phone ^ (phone >>> 32));
             result = 31 * result + name.hashCode();
+            result = 31 * result + (uuid != null ? uuid.hashCode() : 0);
             return result;
         }
     }
 
     public void testMap() throws IOException, ClassNotFoundException {
         ConcurrentHashMap<Long, User> users = new ConcurrentHashMap<Long, User>();
-        users.put(1L, new User(1, 1234567890L, "My Name"));
-        users.put(2L, new User(2, 9876543210L, "Other Name"));
+        users.put(1L, new User(1, 1234567890L, "My Name", UUID.randomUUID()));
+        users.put(2L, new User(2, 9876543210L, "Other Name", UUID.randomUUID()));
         checkSerialize(users);
     }
 
