@@ -82,7 +82,6 @@ public class Repository {
         addBootstrap(new DateSerializer());
         addBootstrap(new ClassSerializer());
         addBootstrap(new BitSetSerializer());
-        addBootstrap(new UuidSerializer());
 
         addBootstrap(new BooleanArraySerializer());
         addBootstrap(new ByteArraySerializer());
