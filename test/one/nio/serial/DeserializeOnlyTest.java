@@ -22,8 +22,6 @@ public class DeserializeOnlyTest extends TestCase {
 
     public void testDeserializeFromFile() throws Exception {
         Repository.get(DeserializeDto.class);
-        Repository.get(AtomicInteger.class);
-        Repository.get(BigDecimal.class);
         Repository.get(BigInteger.class);
 
         DeserializeDto etalon = createTestData();
@@ -38,25 +36,19 @@ public class DeserializeOnlyTest extends TestCase {
         assertTrue(etalon.equals(obj));
     }
 
-    private DeserializeDto createTestData() {
-        return new DeserializeDto(new BigDecimal("42.123"), new AtomicInteger(34));
+    public DeserializeDto createTestData() {
+        return new DeserializeDto(new BigDecimal("42.123"), new AtomicInteger(34), new InnerClass(123));
     }
 
     private static class DeserializeDto implements Serializable {
         final BigDecimal decimal;
         final AtomicInteger integer;
+        final InnerClass inner;
 
-        public DeserializeDto(BigDecimal decimal, AtomicInteger integer) {
+        public DeserializeDto(BigDecimal decimal, AtomicInteger integer, InnerClass inner) {
             this.decimal = decimal;
             this.integer = integer;
-        }
-
-        public BigDecimal getDecimal() {
-            return decimal;
-        }
-
-        public AtomicInteger getInteger() {
-            return integer;
+            this.inner = inner;
         }
 
         @Override
@@ -71,5 +63,30 @@ public class DeserializeOnlyTest extends TestCase {
 
         }
     }
+
+    public static class InnerClass implements Serializable {
+        InnerInnerClass inner;
+
+        public InnerClass(int i) {
+            this.inner = new InnerInnerClass(i);
+        }
+    }
+
+    public static class InnerInnerClass implements Serializable {
+        InnerInnerInnerClass inner;
+
+        public InnerInnerClass(int i) {
+            this.inner = new InnerInnerInnerClass(i);
+        }
+    }
+
+    public static class InnerInnerInnerClass implements Serializable {
+        int i;
+
+        public InnerInnerInnerClass(int i) {
+            this.i = i;
+        }
+    }
+
 
 }

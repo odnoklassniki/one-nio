@@ -167,6 +167,10 @@ public class GeneratedSerializer extends Serializer {
         return builder.toString();
     }
 
+    public FieldDescriptor[] getFds() {
+        return fds;
+    }
+
     private boolean isException() {
         return fds.length >= 3
                 && fds[0].is("detailMessage", "java.lang.String")
