@@ -71,7 +71,7 @@ public abstract class Serializer<T> implements Externalizable {
         return prefix + '$' + Long.toHexString(uid) + '$' + simpleName;
     }
 
-    protected final void generateUid() {
+    public final void generateUid() {
         if (this.uid == 0) {
             DigestStream ds = new DigestStream("MD5");
             try {
