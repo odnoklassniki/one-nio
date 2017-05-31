@@ -44,10 +44,6 @@ public class DeserializeStream extends DataStream {
 
     @Override
     public Object readObject() throws IOException, ClassNotFoundException {
-        long prevAddress = this.address;
-        long prevLimit = this.limit;
-        long prevOffset = this.offset;
-
         Serializer serializer;
         byte b = readByte();
         if (b >= 0) {
@@ -77,12 +73,7 @@ public class DeserializeStream extends DataStream {
             return serializer.read(this);
         } catch (SerializerNotFoundException e) {
             if (findSerializerInFields(serializer, e.getUid())) {
-                // rollback
-                this.address = prevAddress;
-                this.limit = prevLimit;
-                this.offset = prevOffset;
-                // and retry
-                return readObject();
+                throw new SerializerNotFoundException(e.getUid(), true);
             } else {
                 throw e;
             }
@@ -90,7 +81,6 @@ public class DeserializeStream extends DataStream {
     }
 
     private boolean findSerializerInFields(Serializer serializer, long uid) {
-        boolean result = false;
         if (serializer instanceof GeneratedSerializer) {
             GeneratedSerializer generatedSerializer = (GeneratedSerializer) serializer;
             for (FieldDescriptor fieldDescriptor : generatedSerializer.getFds()) {
@@ -98,13 +88,14 @@ public class DeserializeStream extends DataStream {
 
                 GeneratedSerializer ser = new GeneratedSerializer(cls);
                 ser.generateUid();
+
                 if (uid == ser.uid()) {
                     Repository.get(cls);
-                    result = true;
+                    return true;
                 }
             }
         }
-        return result;
+        return false;
     }
 
     @Override

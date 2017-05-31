@@ -23,13 +23,23 @@ import java.io.ObjectOutput;
 
 public class SerializerNotFoundException extends IOException implements Externalizable {
     private long uid;
+    private boolean retry;
 
     public SerializerNotFoundException(long uid) {
+        this(uid, false);
+    }
+
+    public SerializerNotFoundException(long uid, boolean retry) {
         this.uid = uid;
+        this.retry = retry;
     }
 
     public long getUid() {
         return uid;
+    }
+
+    public boolean canRetry() {
+        return retry;
     }
 
     @Override

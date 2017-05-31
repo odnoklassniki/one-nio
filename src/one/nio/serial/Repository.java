@@ -332,6 +332,7 @@ public class Repository {
             }
 
             serializer.generateUid();
+            serializer.init();
             provideSerializer(serializer);
 
             if (cls.isAnonymousClass()) {

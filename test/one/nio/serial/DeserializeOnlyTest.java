@@ -22,7 +22,6 @@ public class DeserializeOnlyTest extends TestCase {
 
     public void testDeserializeFromFile() throws Exception {
         Repository.get(DeserializeDto.class);
-        Repository.get(BigInteger.class);
 
         DeserializeDto etalon = createTestData();
 
@@ -44,11 +43,13 @@ public class DeserializeOnlyTest extends TestCase {
         final BigDecimal decimal;
         final AtomicInteger integer;
         final InnerClass inner;
+        final DeserializeDto self;
 
         public DeserializeDto(BigDecimal decimal, AtomicInteger integer, InnerClass inner) {
             this.decimal = decimal;
             this.integer = integer;
             this.inner = inner;
+            self = this;
         }
 
         @Override
@@ -59,7 +60,8 @@ public class DeserializeOnlyTest extends TestCase {
             DeserializeDto that = (DeserializeDto) o;
 
             if (!decimal.equals(that.decimal)) return false;
-            return integer.get() == that.integer.get();
+            if (integer.get() != that.integer.get()) return false;
+            return inner.equals(that.inner);
 
         }
     }
@@ -68,23 +70,61 @@ public class DeserializeOnlyTest extends TestCase {
         InnerInnerClass inner;
 
         public InnerClass(int i) {
-            this.inner = new InnerInnerClass(i);
+            this.inner = new InnerInnerClass(i, this);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            InnerClass that = (InnerClass) o;
+
+            return inner.equals(that.inner);
+
+        }
+
     }
 
     public static class InnerInnerClass implements Serializable {
         InnerInnerInnerClass inner;
+        final InnerClass parent;
 
-        public InnerInnerClass(int i) {
-            this.inner = new InnerInnerInnerClass(i);
+        public InnerInnerClass(int i, InnerClass parent) {
+            this.parent = parent;
+            this.inner = new InnerInnerInnerClass(i, parent);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            InnerInnerClass that = (InnerInnerClass) o;
+
+            return !inner.equals(that.inner);
+
         }
     }
 
     public static class InnerInnerInnerClass implements Serializable {
         int i;
+        final InnerClass parentParent;
 
-        public InnerInnerInnerClass(int i) {
+        public InnerInnerInnerClass(int i, InnerClass parentParent) {
             this.i = i;
+            this.parentParent = parentParent;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            InnerInnerInnerClass that = (InnerInnerInnerClass) o;
+
+            return (i != that.i);
+
         }
     }
 

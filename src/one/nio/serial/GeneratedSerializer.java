@@ -53,6 +53,10 @@ public class GeneratedSerializer extends Serializer {
         }
 
         checkFieldTypes();
+    }
+
+    @Override
+    public void init() {
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
     }
 

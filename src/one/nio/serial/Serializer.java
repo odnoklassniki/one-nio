@@ -44,6 +44,10 @@ public abstract class Serializer<T> implements Externalizable {
         return cls;
     }
 
+    public void init() {
+
+    }
+
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         out.writeUTF(descriptor);
@@ -133,6 +137,14 @@ public abstract class Serializer<T> implements Externalizable {
     }
 
     public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
-        return new DeserializeStream(data).readObject();
+        try {
+            return new DeserializeStream(data).readObject();
+        } catch (SerializerNotFoundException e) {
+            if (e.canRetry()) {
+                return deserialize(data);
+            } else {
+                throw e;
+            }
+        }
     }
 }
