@@ -69,7 +69,31 @@ public class DeserializeStream extends DataStream {
             context = Arrays.copyOf(context, context.length * 2);
         }
 
-        return serializer.read(this);
+        try {
+            return serializer.read(this);
+        } catch (SerializerNotFoundException e) {
+            if (e.getFailedClass() == null) {
+                e.setFailedClass(tryToFindFailedClass(serializer, e.getUid()));
+            }
+            throw e;
+        }
+    }
+
+    private Class<?> tryToFindFailedClass(Serializer serializer, long uid) {
+        if (serializer instanceof GeneratedSerializer) {
+            GeneratedSerializer generatedSerializer = (GeneratedSerializer) serializer;
+            for (FieldDescriptor fieldDescriptor : generatedSerializer.getFds()) {
+                Class<?> cls = fieldDescriptor.type().resolve();
+
+                GeneratedSerializer ser = new GeneratedSerializer(cls);
+                ser.generateUid();
+
+                if (uid == ser.uid()) {
+                    return cls;
+                }
+            }
+        }
+        return null;
     }
 
     @Override

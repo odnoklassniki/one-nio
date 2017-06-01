@@ -23,18 +23,33 @@ import java.io.ObjectOutput;
 
 public class SerializerNotFoundException extends IOException implements Externalizable {
     private long uid;
+    private Class<?> failedClass;
 
     public SerializerNotFoundException(long uid) {
+        this(uid, null);
+    }
+
+    public SerializerNotFoundException(long uid, Class<?> failedClass) {
         this.uid = uid;
+        this.failedClass = failedClass;
     }
 
     public long getUid() {
         return uid;
     }
 
+    public Class<?> getFailedClass() {
+        return failedClass;
+    }
+
+    public void setFailedClass(Class<?> failedClass) {
+        this.failedClass = failedClass;
+    }
+
     @Override
     public String toString() {
-        return getClass().getName() + ": " + Long.toHexString(uid);
+        return getClass().getName() + ": " + Long.toHexString(uid) +
+                (failedClass == null ? "" : " (" + String.valueOf(failedClass) + ")");
     }
 
     @Override

@@ -53,6 +53,10 @@ public class GeneratedSerializer extends Serializer {
         }
 
         checkFieldTypes();
+    }
+
+    @Override
+    public void init() {
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
     }
 
@@ -165,6 +169,10 @@ public class GeneratedSerializer extends Serializer {
         }
 
         return builder.toString();
+    }
+
+    public FieldDescriptor[] getFds() {
+        return fds;
     }
 
     private boolean isException() {

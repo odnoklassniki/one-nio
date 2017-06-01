@@ -44,6 +44,10 @@ public abstract class Serializer<T> implements Externalizable {
         return cls;
     }
 
+    public void init() {
+
+    }
+
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         out.writeUTF(descriptor);
@@ -71,7 +75,7 @@ public abstract class Serializer<T> implements Externalizable {
         return prefix + '$' + Long.toHexString(uid) + '$' + simpleName;
     }
 
-    protected final void generateUid() {
+    public final void generateUid() {
         if (this.uid == 0) {
             DigestStream ds = new DigestStream("MD5");
             try {
@@ -133,6 +137,15 @@ public abstract class Serializer<T> implements Externalizable {
     }
 
     public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
-        return new DeserializeStream(data).readObject();
+        try {
+            return new DeserializeStream(data).readObject();
+        } catch (SerializerNotFoundException e) {
+            if (e.getFailedClass() != null) {
+                Repository.provideSerializer(Repository.get(e.getFailedClass()));
+                return deserialize(data);
+            } else {
+                throw e;
+            }
+        }
     }
 }
