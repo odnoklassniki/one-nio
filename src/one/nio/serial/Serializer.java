@@ -140,7 +140,8 @@ public abstract class Serializer<T> implements Externalizable {
         try {
             return new DeserializeStream(data).readObject();
         } catch (SerializerNotFoundException e) {
-            if (e.canRetry()) {
+            if (e.getFailedClass() != null) {
+                Repository.provideSerializer(Repository.get(e.getFailedClass()));
                 return deserialize(data);
             } else {
                 throw e;

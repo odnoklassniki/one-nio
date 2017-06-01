@@ -72,15 +72,14 @@ public class DeserializeStream extends DataStream {
         try {
             return serializer.read(this);
         } catch (SerializerNotFoundException e) {
-            if (findSerializerInFields(serializer, e.getUid())) {
-                throw new SerializerNotFoundException(e.getUid(), true);
-            } else {
-                throw e;
+            if (e.getFailedClass() == null) {
+                e.setFailedClass(tryToFindFailedClass(serializer, e.getUid()));
             }
+            throw e;
         }
     }
 
-    private boolean findSerializerInFields(Serializer serializer, long uid) {
+    private Class<?> tryToFindFailedClass(Serializer serializer, long uid) {
         if (serializer instanceof GeneratedSerializer) {
             GeneratedSerializer generatedSerializer = (GeneratedSerializer) serializer;
             for (FieldDescriptor fieldDescriptor : generatedSerializer.getFds()) {
@@ -90,12 +89,11 @@ public class DeserializeStream extends DataStream {
                 ser.generateUid();
 
                 if (uid == ser.uid()) {
-                    Repository.get(cls);
-                    return true;
+                    return cls;
                 }
             }
         }
-        return false;
+        return null;
     }
 
     @Override
