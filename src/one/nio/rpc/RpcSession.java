@@ -25,19 +25,23 @@ import one.nio.serial.SerializeStream;
 import one.nio.serial.SerializerNotFoundException;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.concurrent.RejectedExecutionException;
 
-public class RpcSession<S> extends Session {
+public class RpcSession<S, M> extends Session {
     private static final int BUFFER_SIZE = 8000;
 
     protected final RpcServer<S> server;
-    private byte[] buffer;
-    private int bytesRead;
-    private int requestSize;
+    protected final InetSocketAddress peer;
+    protected byte[] buffer;
+    protected int bytesRead;
+    protected int requestSize;
+    protected long requestStartTime;
 
     public RpcSession(Socket socket, RpcServer<S> server) {
         super(socket);
         this.server = server;
+        this.peer = socket.getRemoteAddress();
         this.buffer = new byte[BUFFER_SIZE];
     }
 
@@ -60,6 +64,7 @@ public class RpcSession<S> extends Session {
             if (requestSize > buffer.length) {
                 buffer = this.buffer = new byte[requestSize];
             }
+            this.requestStartTime = selector.lastWakeupTime();
         }
 
         // Read request
@@ -70,6 +75,7 @@ public class RpcSession<S> extends Session {
         }
 
         // Request is complete - deserialize it
+        M meta = onRequestRead();
         this.bytesRead = 0;
         this.requestSize = 0;
 
@@ -92,19 +98,24 @@ public class RpcSession<S> extends Session {
         // Perform the invocation
         if (server.getWorkersUsed()) {
             try {
-                server.asyncExecute(new AsyncRequest(request));
+                server.asyncExecute(new AsyncRequest(request, meta));
                 server.incRequestsProcessed();
             } catch (RejectedExecutionException e) {
                 handleRejectedExecution(e, request);
                 server.incRequestsRejected();
             }
         } else {
-            writeResponse(invoke(request));
+            invoke(request, meta);
             server.incRequestsProcessed();
         }
     }
 
-    protected void writeResponse(Object response) throws IOException {
+    // To be overridden
+    protected M onRequestRead() {
+        return null;
+    }
+
+    protected int writeResponse(Object response) throws IOException {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(response);
         int responseSize = css.count();
@@ -115,11 +126,13 @@ public class RpcSession<S> extends Session {
         ds.writeObject(response);
 
         super.write(buffer, 0, buffer.length);
+        return responseSize;
     }
 
-    protected Object invoke(Object request) throws Exception {
+    protected void invoke(Object request, M meta) throws Exception {
         RemoteCall remoteCall = (RemoteCall) request;
-        return remoteCall.method().invoke(server.service, remoteCall.args());
+        Object response = remoteCall.method().invoke(server.service, remoteCall.args());
+        writeResponse(response);
     }
 
     protected void handleDeserializationException(Exception e) throws IOException {
@@ -134,15 +147,17 @@ public class RpcSession<S> extends Session {
 
     private class AsyncRequest implements Runnable {
         private final Object request;
+        private final M meta;
 
-        AsyncRequest(Object request) {
+        AsyncRequest(Object request, M meta) {
             this.request = request;
+            this.meta = meta;
         }
 
         @Override
         public void run() {
             try {
-                writeResponse(invoke(request));
+                invoke(request, meta);
             } catch (Throwable e) {
                 handleException(e);
             }
