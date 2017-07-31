@@ -25,13 +25,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class HttpProvider implements ServiceProvider {
     private final HttpClient client;
-    private final String host;
     private final AtomicBoolean available;
     private final AtomicInteger failures;
 
-    public HttpProvider(ConnectionString conn) throws IOException {
-        this.client = new HttpClient(conn);
-        this.host = conn.getHost();
+    public HttpProvider(ConnectionString conn) {
+        this(new HttpClient(conn));
+    }
+
+    public HttpProvider(HttpClient client) {
+        this.client = client;
         this.available = new AtomicBoolean(true);
         this.failures = new AtomicInteger();
     }
@@ -42,10 +44,6 @@ public class HttpProvider implements ServiceProvider {
             throw new IOException(this + " call failed with status " + response.getHeaders()[0]);
         }
         return response;
-    }
-
-    public String getHost() {
-        return host;
     }
 
     public AtomicInteger getFailures() {
@@ -89,6 +87,6 @@ public class HttpProvider implements ServiceProvider {
 
     @Override
     public String toString() {
-        return "HttpProvider[" + getHost() + "]";
+        return "HttpProvider[" + client.name() + "]";
     }
 }

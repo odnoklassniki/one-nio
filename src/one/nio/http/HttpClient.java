@@ -30,13 +30,17 @@ import java.util.ArrayList;
 public class HttpClient extends SocketPool {
     private static final int BUFFER_SIZE = 8000;
 
-    protected String hostHeader;
-    protected String connectionHeader;
+    protected String[] permanentHeaders;
 
     public HttpClient(ConnectionString conn) {
+        this(conn,
+                "Host: " + conn.getHost(),
+                conn.getBooleanParam("keepalive", true) ? "Connection: Keep-Alive" : "Connection: close");
+    }
+
+    public HttpClient(ConnectionString conn, String... permanentHeaders) {
         super(conn);
-        this.hostHeader = "Host: " + conn.getHost();
-        this.connectionHeader = conn.getBooleanParam("keepalive", true) ? "Connection: Keep-Alive" : "Connection: close";
+        this.permanentHeaders = permanentHeaders;
     }
 
     @Override
@@ -91,15 +95,26 @@ public class HttpClient extends SocketPool {
         return invoke(createRequest(Request.METHOD_POST, uri, headers));
     }
 
+    public Response post(String uri, byte[] body, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        Request request = createRequest(Request.METHOD_POST, uri, headers);
+        if (body != null) {
+            request.addHeader("Content-Length: " + body.length);
+            request.setBody(body);
+        }
+        return invoke(request);
+    }
+
     public Response head(String uri, String... headers)
             throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_HEAD, uri, headers));
     }
 
-    private Request createRequest(int method, String uri, String... headers) {
+    public Request createRequest(int method, String uri, String... headers) {
         Request request = new Request(method, uri, true);
-        request.addHeader(hostHeader);
-        request.addHeader(connectionHeader);
+        for (String header : permanentHeaders) {
+            request.addHeader(header);
+        }
         for (String header : headers) {
             request.addHeader(header);
         }
@@ -168,7 +183,7 @@ public class HttpClient extends SocketPool {
         }
 
         byte[] readChunkedBody() throws IOException, HttpException {
-            ArrayList<byte[]> chunks = new ArrayList<byte[]>(4);
+            ArrayList<byte[]> chunks = new ArrayList<>(4);
             int totalBytes = 0;
 
             for (;;) {
