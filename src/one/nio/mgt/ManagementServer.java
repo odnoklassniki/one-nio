@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import one.nio.http.Param;
 import one.nio.http.Path;
 import one.nio.http.Request;
 import one.nio.http.Response;
-import one.nio.net.ConnectionString;
+import one.nio.server.ServerConfig;
 import one.nio.util.Utf8;
 
 import javax.management.JMException;
@@ -32,12 +32,12 @@ import java.util.Set;
 
 public class ManagementServer extends HttpServer {
 
-    public ManagementServer(ConnectionString conn, Object... routers) throws IOException {
-        super(conn, routers);
+    public ManagementServer(ServerConfig config, Object... routers) throws IOException {
+        super(config, routers);
     }
 
     public ManagementServer(String address, Object... routers) throws IOException {
-        super(new ConnectionString(address + "?selectors=1&jmx=false"), routers);
+        super(ServerConfig.from(address + "?selectors=1"), routers);
     }
 
     @Override
