@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include <sys/resource.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <errno.h>
@@ -26,6 +27,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <jni.h>
 #include "jni_util.h"
 
@@ -34,6 +36,16 @@ static jfieldID f_fd;
 static pthread_t* fd_table;
 static int use_IPv6;
 
+// sys/un.h does not have it by either reason
+#define UNIX_PATH_MAX 108
+
+#ifndef SO_REUSEPORT
+#define SO_REUSEPORT 15
+#endif
+
+#ifndef TCP_FASTOPEN
+#define TCP_FASTOPEN 23
+#endif
 
 static int check_IPv6(JNIEnv* env) {
     int s = socket(PF_INET6, SOCK_STREAM, 0);
@@ -99,17 +111,6 @@ static inline void wakeup_blocking_call(int fd) {
     }
 }
 
-static inline int is_io_exception(int fd) {
-    if (errno == EINTR) {
-        // Blocking call was interrupted by a signal; the operation can be restarted
-        return 0;
-    } else if (errno == EWOULDBLOCK && (fcntl(fd, F_GETFL) & O_NONBLOCK)) {
-        // Non-blocking operation is is progress; this is not an error
-        return 0;
-    }
-    return 1;
-}
-
 
 JNIEXPORT jint JNICALL
 JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -143,6 +144,15 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls) {
     int result = socket(use_IPv6 ? PF_INET6 : PF_INET, SOCK_STREAM, 0);
+    if (result == -1) {
+        throw_io_exception(env);
+    }
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_socket1(JNIEnv* env, jclass cls) {
+    int result = socket(PF_UNIX, SOCK_STREAM, 0);
     if (result == -1) {
         throw_io_exception(env);
     }
@@ -193,16 +203,62 @@ Java_one_nio_net_NativeSocket_connect0(JNIEnv* env, jobject self, jbyteArray add
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_bind0(JNIEnv* env, jobject self, jbyteArray address, jint port, jint backlog) {
+Java_one_nio_net_NativeSocket_connect1(JNIEnv* env, jobject self, jstring path) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else {
+        struct sockaddr_un sun;
+        const char* npath = (*env)->GetStringUTFChars(env, path, NULL);
+        sun.sun_family = AF_UNIX;
+        strncpy(sun.sun_path, npath, UNIX_PATH_MAX);
+        (*env)->ReleaseStringUTFChars(env, path, npath);
+        
+        if (connect(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
+            throw_io_exception(env);
+        }
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_bind0(JNIEnv* env, jobject self, jbyteArray address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
     } else {
         struct sockaddr_storage sa;
         int len = sockaddr_from_java(env, address, port, &sa);
-        if (bind(fd, (struct sockaddr*)&sa, len) != 0 || listen(fd, backlog) != 0) {
+        if (bind(fd, (struct sockaddr*)&sa, len) != 0) {
             throw_io_exception(env);
         }
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_bind1(JNIEnv* env, jobject self, jstring path) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else {
+        struct sockaddr_un sun;
+        const char* npath = (*env)->GetStringUTFChars(env, path, NULL);
+        sun.sun_family = AF_UNIX;
+        strncpy(sun.sun_path, npath, UNIX_PATH_MAX);
+        (*env)->ReleaseStringUTFChars(env, path, npath);
+
+        if (bind(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
+            throw_io_exception(env);
+        }
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_listen(JNIEnv* env, jobject self, jint backlog) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else if (listen(fd, backlog) != 0) {
+        throw_io_exception(env);
     }
 }
 
@@ -408,6 +464,13 @@ Java_one_nio_net_NativeSocket_setNoDelay(JNIEnv* env, jobject self, jboolean noD
 }
 
 JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_setTcpFastOpen(JNIEnv* env, jobject self, jboolean tcpFastOpen) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    int value = tcpFastOpen ? 128 : 0;
+    setsockopt(fd, SOL_TCP, TCP_FASTOPEN, &value, sizeof(value));
+}
+
+JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setDeferAccept(JNIEnv* env, jobject self, jboolean deferAccept) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     int value = (int) deferAccept;
@@ -419,6 +482,7 @@ Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean r
     int fd = (*env)->GetIntField(env, self, f_fd);
     int value = (int) reuseAddr;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
+    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
 }
 
 JNIEXPORT void JNICALL

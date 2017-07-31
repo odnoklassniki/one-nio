@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,8 +95,11 @@ class NativeSocket extends Socket {
 
     @Override
     public final void bind(InetAddress address, int port, int backlog) throws IOException {
-        bind0(address.getAddress(), port, backlog);
+        bind0(address.getAddress(), port);
     }
+
+    @Override
+    public final native void listen(int backlog) throws IOException;
 
     @Override
     public native void close();
@@ -137,6 +140,9 @@ class NativeSocket extends Socket {
     public final native void setNoDelay(boolean noDelay);
 
     @Override
+    public final native void setTcpFastOpen(boolean tcpFastOpen);
+
+    @Override
     public final native void setDeferAccept(boolean deferAccept);
 
     @Override
@@ -154,10 +160,17 @@ class NativeSocket extends Socket {
     @Override
     public final native boolean setOption(int level, int option, byte[] value);
 
+    // PF_INET
     static native int socket0() throws IOException;
-    native int accept0() throws IOException;
     native void connect0(byte[] address, int port) throws IOException;
-    native void bind0(byte[] address, int port, int backlog) throws IOException;
+    native void bind0(byte[] address, int port) throws IOException;
+
+    // PF_UNIX
+    static native int socket1() throws IOException;
+    native void connect1(String path) throws IOException;
+    native void bind1(String path) throws IOException;
+
+    native int accept0() throws IOException;
     native long sendFile0(int sourceFD, long offset, long count) throws IOException;
     native int getsockname(byte[] buffer);
     native int getpeername(byte[] buffer);

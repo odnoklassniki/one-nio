@@ -21,6 +21,7 @@ import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.StandardSocketOptions;
 import java.nio.channels.ServerSocketChannel;
 
 final class JavaServerSocket extends Socket {
@@ -56,7 +57,12 @@ final class JavaServerSocket extends Socket {
 
     @Override
     public final void bind(InetAddress address, int port, int backlog) throws IOException {
-        ch.socket().bind(new InetSocketAddress(address, port), backlog);
+        ch.bind(new InetSocketAddress(address, port), backlog);
+    }
+
+    @Override
+    public final void listen(int backlog) throws IOException {
+        // Java Socket starts listening in bind()
     }
 
     @Override
@@ -123,6 +129,11 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
+    public final void setTcpFastOpen(boolean tcpFastOpen) {
+        // Ignore
+    }
+
+    @Override
     public final void setDeferAccept(boolean deferAccept) {
         // Ignore
     }
@@ -130,8 +141,8 @@ final class JavaServerSocket extends Socket {
     @Override
     public final void setReuseAddr(boolean reuseAddr) {
         try {
-            ch.socket().setReuseAddress(reuseAddr);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
+        } catch (IOException e) {
             // Ignore
         }
     }
@@ -139,8 +150,8 @@ final class JavaServerSocket extends Socket {
     @Override
     public final void setRecvBuffer(int recvBuf) {
         try {
-            ch.socket().setReceiveBufferSize(recvBuf);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.SO_RCVBUF, recvBuf);
+        } catch (IOException e) {
             // Ignore
         }
     }
@@ -151,18 +162,22 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
-    public byte[] getOption(int level, int option) {
+    public final byte[] getOption(int level, int option) {
         return null;
     }
 
     @Override
-    public boolean setOption(int level, int option, byte[] value) {
+    public final boolean setOption(int level, int option, byte[] value) {
         return false;
     }
 
     @Override
     public final InetSocketAddress getLocalAddress() {
-        return (InetSocketAddress) ch.socket().getLocalSocketAddress();
+        try {
+            return (InetSocketAddress) ch.getLocalAddress();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @Override

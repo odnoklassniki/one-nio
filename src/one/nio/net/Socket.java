@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package one.nio.net;
 import one.nio.os.NativeLibrary;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
@@ -43,6 +44,7 @@ public abstract class Socket implements Closeable {
     public abstract Socket accept() throws IOException;
     public abstract void connect(InetAddress address, int port) throws IOException;
     public abstract void bind(InetAddress address, int port, int backlog) throws IOException;
+    public abstract void listen(int backlog) throws IOException;
     public abstract int writeRaw(long buf, int count, int flags) throws IOException;
     public abstract int write(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void writeFully(byte[] data, int offset, int count) throws IOException;
@@ -54,6 +56,7 @@ public abstract class Socket implements Closeable {
     public abstract void setTimeout(int timeout);
     public abstract void setKeepAlive(boolean keepAlive);
     public abstract void setNoDelay(boolean noDelay);
+    public abstract void setTcpFastOpen(boolean tcpFastOpen);
     public abstract void setDeferAccept(boolean deferAccept);
     public abstract void setReuseAddr(boolean reuseAddr);
     public abstract void setRecvBuffer(int recvBuf);
@@ -79,6 +82,40 @@ public abstract class Socket implements Closeable {
 
     public static Socket createServerSocket() throws IOException {
         return NativeLibrary.IS_SUPPORTED ? new NativeSocket() : new JavaServerSocket();
+    }
+
+    public static Socket connectInet(InetAddress address, int port) throws IOException {
+        Socket sock = create();
+        sock.connect(address, port);
+        return sock;
+    }
+
+    public static Socket bindInet(InetAddress address, int port, int backlog) throws IOException {
+        Socket sock = createServerSocket();
+        sock.bind(address, port, backlog);
+        sock.listen(backlog);
+        return sock;
+    }
+
+    public static Socket connectUnix(File unixPath) throws IOException {
+        if (!NativeLibrary.IS_SUPPORTED) {
+            throw new IOException("Unix sockets are supported in native mode only");
+        }
+
+        NativeSocket sock = new NativeSocket(NativeSocket.socket1());
+        sock.connect1(unixPath.getAbsolutePath());
+        return sock;
+    }
+
+    public static Socket bindUnix(File unixPath, int backlog) throws IOException {
+        if (!NativeLibrary.IS_SUPPORTED) {
+            throw new IOException("Unix sockets are supported in native mode only");
+        }
+
+        NativeSocket sock = new NativeSocket(NativeSocket.socket1());
+        sock.bind1(unixPath.getAbsolutePath());
+        sock.listen(backlog);
+        return sock;
     }
 
     public static Socket fromFD(int fd) throws IOException {
