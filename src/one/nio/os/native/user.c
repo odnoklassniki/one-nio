@@ -15,6 +15,7 @@
  */
 
 #include <sys/types.h>
+#include <grp.h>
 #include <errno.h>
 #include <unistd.h>
 #include <jni.h>
@@ -35,5 +36,13 @@ Java_one_nio_os_User_setgroups(JNIEnv* env, jclass cls, jintArray gids) {
     jint* list = (*env)->GetIntArrayElements(env, gids, NULL);
     int result = setgroups(length, (gid_t*)list);
     (*env)->ReleaseIntArrayElements(env, gids, list, JNI_ABORT);
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_User_chown(JNIEnv* env, jclass cls, jstring fileName, jint uid, jint gid) {
+    const char* path = (*env)->GetStringUTFChars(env, fileName, NULL);
+    int result = lchown(path, (uid_t)uid, (gid_t)gid);
+    (*env)->ReleaseStringUTFChars(env, fileName, path);
     return result;
 }

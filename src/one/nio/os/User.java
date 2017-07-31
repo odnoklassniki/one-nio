@@ -50,6 +50,7 @@ public final class User {
     public static native int setuid(int uid);
     public static native int setgid(int gid);
     public static native int setgroups(int[] gids);
+    public static native int chown(String fileName, int uid, int gid);
 
     public static String[] findUser(String user) {
         return find(PASSWD, user);
@@ -70,19 +71,14 @@ public final class User {
     }
 
     public static List<String[]> findSupplementaryGroups(String user) {
-        List<String[]> groupInfos = new ArrayList<String[]>();
+        List<String[]> groupInfos = new ArrayList<>();
         Pattern userPattern = Pattern.compile("\\b\\Q" + user + "\\E\\b");
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(GROUP));
-            try {
-                for (String s; (s = reader.readLine()) != null; ) {
-                    String[] groupInfo = s.split(":");
-                    if (groupInfo.length > G_USER_LIST && userPattern.matcher(groupInfo[G_USER_LIST]).find()) {
-                        groupInfos.add(groupInfo);
-                    }
+        try (BufferedReader reader = new BufferedReader(new FileReader(GROUP))) {
+            for (String s; (s = reader.readLine()) != null; ) {
+                String[] groupInfo = s.split(":");
+                if (groupInfo.length > G_USER_LIST && userPattern.matcher(groupInfo[G_USER_LIST]).find()) {
+                    groupInfos.add(groupInfo);
                 }
-            } finally {
-                reader.close();
             }
         } catch (IOException e) {
             log.warn("Cannot read " + GROUP, e);
@@ -101,16 +97,11 @@ public final class User {
 
     private static String[] find(String file, String account) {
         String searchString = account + ':';
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-            try {
-                for (String s; (s = reader.readLine()) != null; ) {
-                    if (s.startsWith(searchString)) {
-                        return s.split(":");
-                    }
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            for (String s; (s = reader.readLine()) != null; ) {
+                if (s.startsWith(searchString)) {
+                    return s.split(":");
                 }
-            } finally {
-                reader.close();
             }
         } catch (IOException e) {
             log.warn("Cannot read " + file, e);
