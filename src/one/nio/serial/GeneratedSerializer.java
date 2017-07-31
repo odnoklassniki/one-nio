@@ -86,25 +86,9 @@ public class GeneratedSerializer extends Serializer {
         }
 
         Field[] ownFields = getSerializableFields();
-        for (FieldDescriptor fd : fds) {
-            int found = findField(ownFields, fd);
-            if (found >= 0) {
-                fd.assignField(ownFields[found], ownFields[found + 1]);
-                ownFields[found] = null;
-            }
-        }
-
-        this.defaultFields = new ArrayList<Field>();
-        for (int i = 0; i < ownFields.length; i += 2) {
-            Field f = ownFields[i];
-            if (f != null) {
-                logFieldMismatch("Local field is missed in stream", f.getType(), f.getDeclaringClass(), f.getName());
-                missedLocalFields.incrementAndGet();
-                if (f.getAnnotation(Default.class) != null) {
-                    defaultFields.add(f);
-                }
-            }
-        }
+        assignFields(ownFields, true);
+        assignFields(ownFields, false);
+        assignDefaultFields(ownFields);
 
         checkFieldTypes();
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
@@ -174,7 +158,34 @@ public class GeneratedSerializer extends Serializer {
                 && fds[2].is("stackTrace",    "[Ljava.lang.StackTraceElement;");
     }
 
-    private int findField(Field[] ownFields, FieldDescriptor fd) {
+    private void assignFields(Field[] ownFields, boolean exactType) {
+        for (FieldDescriptor fd : fds) {
+            if (fd.ownField() == null) {
+                int found = findField(fd, ownFields, exactType);
+                if (found >= 0) {
+                    fd.assignField(ownFields[found], ownFields[found + 1]);
+                    ownFields[found] = null;
+                }
+            }
+        }
+    }
+
+    private void assignDefaultFields(Field[] ownFields) {
+        defaultFields = new ArrayList<>();
+
+        for (int i = 0; i < ownFields.length; i += 2) {
+            Field f = ownFields[i];
+            if (f != null) {
+                logFieldMismatch("Local field is missed in stream", f.getType(), f.getDeclaringClass(), f.getName());
+                missedLocalFields.incrementAndGet();
+                if (f.getAnnotation(Default.class) != null) {
+                    defaultFields.add(f);
+                }
+            }
+        }
+    }
+
+    private int findField(FieldDescriptor fd, Field[] ownFields, boolean exactType) {
         String name = fd.name();
         Class type = fd.type().resolve();
         String oldName = null;
@@ -185,65 +196,68 @@ public class GeneratedSerializer extends Serializer {
             name = name.substring(0, p);
         }
 
-        // 1. Find exact match
-        for (int i = 0; i < ownFields.length; i += 2) {
-            Field f = ownFields[i];
-            if (f != null && f.getType() == type && f.getName().equals(name)) {
-                return i;
-            }
-        }
-
-        // 2. Find exact match by locally old name
-        for (int i = 0; i < ownFields.length; i += 2) {
-            Field f = ownFields[i];
-            if (f != null && f.getType() == type) {
-                Renamed renamed = f.getAnnotation(Renamed.class);
-                if (renamed != null && renamed.from().equals(name)) {
-                    logFieldMismatch("Local field renamed from " + renamed.from(), f.getType(), f.getDeclaringClass(), f.getName());
-                    renamedFields.incrementAndGet();
-                    return i;
-                }
-            }
-        }
-
-        // 3. Find exact match by remotely old name
-        if (oldName != null) {
+        if (exactType) {
+            // 1. Find exact match
             for (int i = 0; i < ownFields.length; i += 2) {
                 Field f = ownFields[i];
-                if (f != null && f.getType() == type && f.getName().equals(oldName)) {
-                    logFieldMismatch("Remote field renamed from " + oldName, f.getType(), f.getDeclaringClass(), f.getName());
-                    renamedFields.incrementAndGet();
+                if (f != null && f.getType() == type && f.getName().equals(name)) {
                     return i;
                 }
             }
-        }
 
-        // 4. Find match by name only
-        for (int i = 0; i < ownFields.length; i += 2) {
-            Field f = ownFields[i];
-            if (f != null && (f.getName().equals(name) || f.getName().equals(oldName))) {
-                logFieldMismatch("Field type migrated from " + type.getName(), f.getType(), f.getDeclaringClass(), f.getName());
-                migratedFields.incrementAndGet();
-                return i;
+            // 2. Find exact match by locally old name
+            for (int i = 0; i < ownFields.length; i += 2) {
+                Field f = ownFields[i];
+                if (f != null && f.getType() == type) {
+                    Renamed renamed = f.getAnnotation(Renamed.class);
+                    if (renamed != null && renamed.from().equals(name)) {
+                        logFieldMismatch("Local field renamed from " + renamed.from(), f.getType(), f.getDeclaringClass(), f.getName());
+                        renamedFields.incrementAndGet();
+                        return i;
+                    }
+                }
             }
+
+            // 3. Find exact match by remotely old name
+            if (oldName != null) {
+                for (int i = 0; i < ownFields.length; i += 2) {
+                    Field f = ownFields[i];
+                    if (f != null && f.getType() == type && f.getName().equals(oldName)) {
+                        logFieldMismatch("Remote field renamed from " + oldName, f.getType(), f.getDeclaringClass(), f.getName());
+                        renamedFields.incrementAndGet();
+                        return i;
+                    }
+                }
+            }
+        } else {
+            // 4. Find match by name only
+            for (int i = 0; i < ownFields.length; i += 2) {
+                Field f = ownFields[i];
+                if (f != null && (f.getName().equals(name) || f.getName().equals(oldName))) {
+                    logFieldMismatch("Field type migrated from " + type.getName(), f.getType(), f.getDeclaringClass(), f.getName());
+                    migratedFields.incrementAndGet();
+                    return i;
+                }
+            }
+
+            logFieldMismatch("Stream field is missed locally", type, cls, name);
+            missedStreamFields.incrementAndGet();
         }
 
-        logFieldMismatch("Stream field is missed locally", type, cls, name);
-        missedStreamFields.incrementAndGet();
         return -1;
     }
 
     private Field[] getSerializableFields() {
-        ArrayList<Field> list = new ArrayList<Field>();
+        ArrayList<Field> list = new ArrayList<>();
         getSerializableFields(cls, null, list);
-        return list.toArray(new Field[list.size()]);
+        return list.toArray(new Field[0]);
     }
 
     private void getSerializableFields(Class cls, Field parentField, ArrayList<Field> list) {
         if (cls != null) {
             getSerializableFields(cls.getSuperclass(), parentField, list);
             for (Field f : cls.getDeclaredFields()) {
-                if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) == 0) {
+                if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT | 0x1000)) == 0) {
                     list.add(f);
                     list.add(parentField);
                 } else if ((f.getModifiers() & Modifier.STATIC) == 0

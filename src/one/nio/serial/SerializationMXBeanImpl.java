@@ -82,6 +82,11 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     @Override
+    public void setOptions(String className, int options) {
+        Repository.setOptions(className, options);
+    }
+
+    @Override
     public int getAnonymousClasses() {
         return Repository.anonymousClasses.get();
     }

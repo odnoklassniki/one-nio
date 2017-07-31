@@ -26,6 +26,7 @@ public interface SerializationMXBean {
 
     int getOptions();
     void setOptions(int options);
+    void setOptions(String className, int options);
 
     int getAnonymousClasses();
     int getRenamedClasses();

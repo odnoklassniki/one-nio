@@ -78,12 +78,22 @@ public class TypeDescriptor {
             try {
                 cls = resolve(descriptor);
             } catch (ClassNotFoundException e) {
-                Repository.log.warn("Local type not found: " + descriptor);
-                unknownTypes.incrementAndGet();
-                cls = Object.class;
+                cls = resolveUnknown();
             }
         }
         return cls;
+    }
+
+    private Class resolveUnknown() {
+        Repository.log.warn("Local type not found: " + descriptor);
+        unknownTypes.incrementAndGet();
+
+        // If unknown array class is found, we must change serializer UID to facilitate Object[] -> Unknown[] conversion
+        if (descriptor.startsWith("[")) {
+            descriptor = classDescriptor(Object[].class);
+            return Object[].class;
+        }
+        return Object.class;
     }
 
     public static Class<?> resolve(String descriptor) throws ClassNotFoundException {

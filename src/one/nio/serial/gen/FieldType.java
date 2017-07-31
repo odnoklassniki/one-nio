@@ -39,7 +39,7 @@ enum FieldType implements Opcodes {
     final int dataSize;
     final int[] convertOpcodes;
 
-    private FieldType(Class cls, int bytecodeType, int dataSize, int[] convertOpcodes) {
+    FieldType(Class cls, int bytecodeType, int dataSize, int[] convertOpcodes) {
         this.cls = cls;
         this.sig = Type.getDescriptor(cls);
         this.bytecodeType = bytecodeType;

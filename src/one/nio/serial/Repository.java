@@ -25,26 +25,28 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.Externalizable;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.nio.file.StandardOpenOption.*;
+
 public class Repository {
     public static final Log log = LogFactory.getLog(Repository.class);
 
-    static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<Class, Serializer>(128);
-    static final HashMap<Long, Serializer> uidMap = new HashMap<Long, Serializer>(128);
-    static final HashMap<Method, MethodSerializer> methodMap = new HashMap<Method, MethodSerializer>();
+    static final IdentityHashMap<Class, Serializer> classMap = new IdentityHashMap<>(128);
+    static final HashMap<Long, Serializer> uidMap = new HashMap<>(128);
+    static final HashMap<Method, MethodSerializer> methodMap = new HashMap<>();
     static final Serializer[] bootstrapSerializers = new Serializer[128];
-    static final IdentityHashMap<Class, Integer> serializationOptions = new IdentityHashMap<Class, Integer>();
-    static final HashMap<String, Class> renamedClasses = new HashMap<String, Class>();
+    static final IdentityHashMap<Class, Integer> serializationOptions = new IdentityHashMap<>();
+    static final HashMap<String, Class> renamedClasses = new HashMap<>();
     static final AtomicInteger anonymousClasses = new AtomicInteger();
     static final int ENUM = 0x4000;
 
@@ -183,6 +185,10 @@ public class Repository {
         return true;
     }
 
+    public static boolean hasSerializer(long uid) {
+        return uidMap.containsKey(uid);
+    }
+
     public static Serializer requestSerializer(long uid) throws SerializerNotFoundException {
         Serializer result = uidMap.get(uid);
         if (result != null) {
@@ -235,6 +241,7 @@ public class Repository {
 
     public static synchronized void setOptions(Class cls, int options) {
         serializationOptions.put(cls, options);
+        classMap.remove(cls);
     }
 
     public static boolean hasOptions(Class cls, int options) {
@@ -273,12 +280,7 @@ public class Repository {
 
     public static void saveSnapshot(String fileName) throws IOException {
         byte[] snapshot = saveSnapshot();
-        FileOutputStream fos = new FileOutputStream(fileName);
-        try {
-            fos.write(snapshot);
-        } finally {
-            fos.close();
-        }
+        Files.write(Paths.get(fileName), snapshot, WRITE, CREATE, TRUNCATE_EXISTING);
     }
 
     public static int loadSnapshot(byte[] snapshot) throws IOException, ClassNotFoundException {
@@ -292,18 +294,12 @@ public class Repository {
     }
 
     public static int loadSnapshot(String fileName) throws IOException, ClassNotFoundException {
-        FileInputStream fis = new FileInputStream(fileName);
-        try {
-            byte[] snapshot = new byte[fis.available()];
-            fis.read(snapshot);
-            return loadSnapshot(snapshot);
-        } finally {
-            fis.close();
-        }
+        byte[] snapshot = Files.readAllBytes(Paths.get(fileName));
+        return loadSnapshot(snapshot);
     }
 
     private static synchronized Serializer[] getSerializers(Map<?, ? extends Serializer> map) {
-        return map.values().toArray(new Serializer[map.size()]);
+        return map.values().toArray(new Serializer[0]);
     }
 
     private static synchronized Serializer generateFor(Class<?> cls) {
@@ -320,7 +316,11 @@ public class Repository {
                 }
                 serializer = new EnumSerializer(cls);
             } else if (Externalizable.class.isAssignableFrom(cls)) {
-                serializer = new ExternalizableSerializer(cls);
+                if (Serializer.class.isAssignableFrom(cls)) {
+                    serializer = new SerializerSerializer(cls);
+                } else {
+                    serializer = new ExternalizableSerializer(cls);
+                }
             } else if (Collection.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
                 serializer = new CollectionSerializer(cls);
             } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
