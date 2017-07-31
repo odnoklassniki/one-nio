@@ -37,7 +37,7 @@ public class AsyncExecutor {
         for (int i = 0; i < tasks.length; i++) {
             futures[i] = POOL.submit(tasks[i]);
         }
-        return new CombinedFuture<T>(futures);
+        return new CombinedFuture<>(futures);
     }
 
     public static void fork(final ParallelTask task) throws AsyncException {
@@ -45,7 +45,7 @@ public class AsyncExecutor {
     }
 
     public static void fork(final int workers, final ParallelTask task) throws AsyncException {
-        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        final AtomicReference<Exception> exception = new AtomicReference<>();
         Thread[] threads = new Thread[workers];
 
         for (int i = 0; i < threads.length; i++) {

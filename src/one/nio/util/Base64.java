@@ -60,7 +60,7 @@ public final class Base64 {
             int v = (s[i] & 0xff) << 16 | (s[i + 1] & 0xff) << 8 | (s[i + 2] & 0xff);
             result[p]     = table[v >>> 18];
             result[p + 1] = table[(v >>> 12) & 0x3f];
-            result[p + 2] = table[(v >>> 6) & 63];
+            result[p + 2] = table[(v >>> 6) & 0x3f];
             result[p + 3] = table[v & 0x3f];
         }
 
@@ -102,7 +102,7 @@ public final class Base64 {
             int v = (s[i] & 0xff) << 16 | (s[i + 1] & 0xff) << 8 | (s[i + 2] & 0xff);
             result[p]     = (char) table[v >>> 18];
             result[p + 1] = (char) table[(v >>> 12) & 0x3f];
-            result[p + 2] = (char) table[(v >>> 6) & 63];
+            result[p + 2] = (char) table[(v >>> 6) & 0x3f];
             result[p + 3] = (char) table[v & 0x3f];
         }
 

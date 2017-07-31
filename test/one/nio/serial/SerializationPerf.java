@@ -31,7 +31,7 @@ public class SerializationPerf {
     }
 
     static Object[] loadObjects(byte[] data) throws IOException, ClassNotFoundException {
-        ArrayList<Object> list = new ArrayList<Object>(100000);
+        ArrayList<Object> list = new ArrayList<>(100000);
         DeserializeStream ds = new DeserializeStream(data);
         while (ds.available() > 0) {
             Object obj = ds.readObject();

@@ -24,14 +24,16 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.nio.file.StandardOpenOption.*;
 
 public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorMXBean, Opcodes {
     private static final Log log = LogFactory.getLog(BytecodeGenerator.class);
@@ -83,10 +85,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
 
     public void dumpClass(byte[] classData, String className) {
         try {
-            File f = new File(dumpPath, className + ".class");
-            FileOutputStream fos = new FileOutputStream(f);
-            fos.write(classData);
-            fos.close();
+            Files.write(Paths.get(dumpPath, className + ".class"), classData, WRITE, CREATE, TRUNCATE_EXISTING);
         } catch (IOException e) {
             log.error("Could not dump " + className, e);
         }

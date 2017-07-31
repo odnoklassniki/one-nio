@@ -24,15 +24,14 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
     protected static final Log log = LogFactory.getLog(WeightCluster.class);
 
-    protected final Random random = new Random();
-    protected final HashMap<T, Integer> providers = new HashMap<T, Integer>();
+    protected final HashMap<T, Integer> providers = new HashMap<>();
     protected Timer monitorTimer;
     protected long monitorTimeout;
     protected volatile ProviderSelector providerSelector;
@@ -144,7 +143,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
 
         public T select() throws ServiceUnavailableException {
             if (weightRange > 0) {
-                int w = random.nextInt(weightRange);
+                int w = ThreadLocalRandom.current().nextInt(weightRange);
                 int low = 0;
                 int high = weights.length - 1;
                 while (low < high) {

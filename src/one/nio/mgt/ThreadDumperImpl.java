@@ -45,11 +45,8 @@ public class ThreadDumperImpl {
             if (out == null) {
                 vm.localDataDump();
             } else {
-                InputStream in = vm.remoteDataDump();
-                try {
+                try (InputStream in = vm.remoteDataDump()) {
                     copy(in, out);
-                } finally {
-                    in.close();
                 }
             }
         } finally {

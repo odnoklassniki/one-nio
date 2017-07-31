@@ -19,7 +19,7 @@ package one.nio.http;
 import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class Response {
@@ -68,7 +68,6 @@ public class Response {
 
     private static final byte[] HTTP11_HEADER = Utf8.toBytes("HTTP/1.1 ");
     private static final int PROTOCOL_HEADER_LENGTH = 11;
-    private static final Charset UTF8 = Charset.forName("UTF-8");
 
     private int headerCount;
     private String[] headers;
@@ -99,7 +98,7 @@ public class Response {
     }
 
     public static Response ok(String plainText) {
-        Response response = new Response(OK, plainText.getBytes(UTF8));
+        Response response = new Response(OK, plainText.getBytes(StandardCharsets.UTF_8));
         response.addHeader("Content-Type: text/plain; charset=utf-8");
         return response;
     }
@@ -149,7 +148,7 @@ public class Response {
     }
 
     public String getBodyUtf8() {
-        return body == null ? null : new String(body, UTF8);
+        return body == null ? null : new String(body, StandardCharsets.UTF_8);
     }
 
     public byte[] toBytes(boolean includeBody) {
@@ -175,6 +174,6 @@ public class Response {
 
     @Override
     public String toString() {
-        return new String(toBytes(true), UTF8);
+        return new String(toBytes(true), StandardCharsets.UTF_8);
     }
 }

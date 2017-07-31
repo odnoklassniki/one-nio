@@ -73,14 +73,13 @@ public abstract class Serializer<T> implements Externalizable {
 
     protected final void generateUid() {
         if (this.uid == 0) {
-            DigestStream ds = new DigestStream("MD5");
-            try {
+            try (DigestStream ds = new DigestStream("MD5")) {
                 ds.writeUTF(getClass().getName());
                 writeExternal(ds);
+                this.uid = ds.digest();
             } catch (IOException e) {
                 throw new IllegalStateException(e);
             }
-            this.uid = ds.digest();
         }
     }
 

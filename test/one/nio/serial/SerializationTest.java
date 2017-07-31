@@ -111,7 +111,7 @@ public class SerializationTest extends TestCase {
     }
 
     private List makeList(int length) {
-        ArrayList<Integer> result = new ArrayList<Integer>(length * 2);
+        ArrayList<Integer> result = new ArrayList<>(length * 2);
         for (int i = 0; i < length; i++) {
             Integer obj = i;
             result.add(obj);
@@ -310,7 +310,7 @@ public class SerializationTest extends TestCase {
     }
 
     public void testMap() throws IOException, ClassNotFoundException {
-        ConcurrentHashMap<Long, User> users = new ConcurrentHashMap<Long, User>();
+        ConcurrentHashMap<Long, User> users = new ConcurrentHashMap<>();
         users.put(1L, new User(1, 1234567890L, "My Name"));
         users.put(2L, new User(2, 9876543210L, "Other Name"));
         checkSerialize(users);
@@ -318,12 +318,12 @@ public class SerializationTest extends TestCase {
 
     public void testCollections() throws IOException, ClassNotFoundException {
         Random random = new Random();
-        ArrayList<Long> list = new ArrayList<Long>();
+        ArrayList<Long> list = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
             list.add(random.nextLong());
         }
 
-        HashMap<String, Integer> map = new HashMap<String, Integer>();
+        HashMap<String, Integer> map = new HashMap<>();
         map.put("first", 1);
         map.put("second", 2);
         map.put("third", 3);
@@ -333,15 +333,38 @@ public class SerializationTest extends TestCase {
         checkSerialize(Collections.emptySet());
         checkSerialize(Collections.singleton("abc"));
         checkSerialize(Collections.singletonMap("Key", "Value"));
-        checkSerialize(Collections.synchronizedSortedSet(new TreeSet<Object>(list)));
-        checkSerialize(Collections.unmodifiableSortedMap(new ConcurrentSkipListMap<Object, Object>()));
+        checkSerialize(Collections.synchronizedSortedSet(new TreeSet<>(list)));
+        checkSerialize(Collections.unmodifiableSortedMap(new ConcurrentSkipListMap<>()));
         checkSerialize(EnumSet.noneOf(SimpleEnum.class));
         checkSerialize(EnumSet.of(ComplexEnum.C3));
         checkSerialize(EnumSet.allOf(ComplexEnum.class));
-        checkSerialize(new EnumMap<SimpleEnum, Boolean>(Collections.singletonMap(SimpleEnum.A, true)));
-        checkSerialize(Collections.synchronizedSortedMap(new TreeMap<String, Integer>(map)));
+        checkSerialize(new EnumMap<>(Collections.singletonMap(SimpleEnum.A, true)));
+        checkSerialize(Collections.synchronizedSortedMap(new TreeMap<>(map)));
 
         checkSerialize(list.subList(10, 20));
         checkSerialize(map.keySet());
+    }
+
+    static class Parent implements Serializable {
+        SimpleEnum nameClash = SimpleEnum.A;
+
+        @Override
+        public boolean equals(Object o) {
+            return (o instanceof Parent) && (((Parent) o).nameClash == nameClash);
+        }
+    }
+
+    static class Child extends Parent implements Serializable {
+        ComplexEnum nameClash = ComplexEnum.A1;
+
+        @Override
+        public boolean equals(Object o) {
+            return (o instanceof Child) && (((Child) o).nameClash == nameClash);
+        }
+    }
+
+    public void testHierarchy() throws IOException, ClassNotFoundException {
+        checkSerialize(new Parent());
+        checkSerialize(new Child());
     }
 }

@@ -46,7 +46,7 @@ class ArrayListSerializer extends Serializer<ArrayList> {
     @Override
     public ArrayList read(DataStream in) throws IOException, ClassNotFoundException {
         int length = in.readInt();
-        ArrayList<Object> result = new ArrayList<Object>(length);
+        ArrayList<Object> result = new ArrayList<>(length);
         in.register(result);
         for (int i = 0; i < length; i++) {
             result.add(in.readObject());

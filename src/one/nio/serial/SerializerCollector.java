@@ -21,7 +21,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class SerializerCollector extends DataStream {
-    private final HashSet<Serializer> serializers = new HashSet<Serializer>();
+    private final HashSet<Serializer> serializers = new HashSet<>();
 
     public SerializerCollector(byte[] array) {
         super(array);

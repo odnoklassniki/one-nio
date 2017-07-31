@@ -16,16 +16,12 @@
 
 package one.nio.serial;
 
-import one.nio.util.JavaInternals;
-
 import java.io.IOException;
 import java.io.NotSerializableException;
-import java.lang.reflect.Field;
+import java.nio.LongBuffer;
 import java.util.BitSet;
 
 class BitSetSerializer extends Serializer<BitSet> {
-    private static final Field wordsField = JavaInternals.getField(BitSet.class, "words");
-    private static final Field wordsInUseField = JavaInternals.getField(BitSet.class, "wordsInUse");
 
     BitSetSerializer() {
         super(BitSet.class);
@@ -33,40 +29,24 @@ class BitSetSerializer extends Serializer<BitSet> {
 
     @Override
     public void calcSize(BitSet obj, CalcSizeStream css) {
-        try {
-            css.count += 4 + wordsInUseField.getInt(obj) * 8;
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
-        }
+        int wordCount = (obj.length() + 63) / 64;
+        css.count += 4 + wordCount * 8;
     }
 
     @Override
     public void write(BitSet obj, DataStream out) throws IOException {
-        try {
-            long[] words = (long[]) wordsField.get(obj);
-            int wordsInUse = wordsInUseField.getInt(obj);
-            out.writeInt(wordsInUse);
-            for (int i = 0; i < wordsInUse; i++) {
-                out.writeLong(words[i]);
-            }
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
+        long[] words = obj.toLongArray();
+        out.writeInt(words.length);
+        for (long word : words) {
+            out.writeLong(word);
         }
     }
 
     @Override
     public BitSet read(DataStream in) throws IOException {
-        int wordsInUse = in.readInt();
-        BitSet result = new BitSet(wordsInUse << 6);
-        try {
-            long[] words = (long[]) wordsField.get(result);
-            wordsInUseField.set(result, wordsInUse);
-            for (int i = 0; i < wordsInUse; i++) {
-                words[i] = in.readLong();
-            }
-        } catch (IllegalAccessException e) {
-            throw new IOException(e);
-        }
+        int wordCount = in.readInt();
+        LongBuffer buf = in.byteBuffer(wordCount * 8).asLongBuffer();
+        BitSet result = BitSet.valueOf(buf);
         in.register(result);
         return result;
     }

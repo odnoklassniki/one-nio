@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,8 +48,8 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
     }
 
     protected Map<HttpProvider, Integer> createProviders(String configuration) throws IOException {
-        HashMap<HttpProvider, Integer> providers = new HashMap<HttpProvider, Integer>();
-        for (StringTokenizer st = new StringTokenizer(configuration); st.hasMoreElements(); ) {
+        HashMap<HttpProvider, Integer> providers = new HashMap<>();
+        for (StringTokenizer st = new StringTokenizer(configuration); st.hasMoreTokens(); ) {
             HttpProvider provider = createProvider(st.nextToken());
             int weight = Integer.parseInt(st.nextToken());
             providers.put(provider, weight);

@@ -20,7 +20,7 @@ import one.nio.util.ByteArrayBuilder;
 import one.nio.util.URLEncoder;
 import one.nio.util.Utf8;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -47,7 +47,6 @@ public class Request {
     private static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
     private static final byte[] HTTP11_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
     private static final int PROTOCOL_HEADER_LENGTH = 13;
-    private static final Charset UTF8 = Charset.forName("UTF-8");
 
     private int method;
     private String uri;
@@ -202,7 +201,7 @@ public class Request {
     }
 
     public void setBodyUtf8(String body) {
-        this.body = body.getBytes(UTF8);
+        this.body = body.getBytes(StandardCharsets.UTF_8);
     }
 
     public byte[] toBytes() {
@@ -228,6 +227,6 @@ public class Request {
 
     @Override
     public String toString() {
-        return new String(toBytes(), UTF8);
+        return new String(toBytes(), StandardCharsets.UTF_8);
     }
 }

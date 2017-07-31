@@ -63,7 +63,7 @@ public final class JavaInternals {
         return null;
     }
 
-    public static Method getMethod(Class<?> cls, String name, Class... params) {
+    public static Method getMethod(Class<?> cls, String name, Class<?>... params) {
         try {
             Method m = cls.getDeclaredMethod(name, params);
             m.setAccessible(true);
@@ -73,7 +73,7 @@ public final class JavaInternals {
         }
     }
 
-    public static Method getMethod(String cls, String name, Class... params) {
+    public static Method getMethod(String cls, String name, Class<?>... params) {
         try {
             return getMethod(Class.forName(cls), name, params);
         } catch (ClassNotFoundException e) {
@@ -81,7 +81,7 @@ public final class JavaInternals {
         }
     }
 
-    public static Method findMethodRecursively(Class<?> cls, String name, Class... params) {
+    public static Method findMethodRecursively(Class<?> cls, String name, Class<?>... params) {
         for (; cls != null; cls = cls.getSuperclass()) {
             Method m = getMethod(cls, name, params);
             if (m != null) {
@@ -91,7 +91,7 @@ public final class JavaInternals {
         return null;
     }
 
-    public static <T> Constructor<T> getConstructor(Class<T> cls, Class... params) {
+    public static <T> Constructor<T> getConstructor(Class<T> cls, Class<?>... params) {
         try {
             Constructor<T> c = cls.getDeclaredConstructor(params);
             c.setAccessible(true);
@@ -101,7 +101,7 @@ public final class JavaInternals {
         }
     }
 
-    public static Constructor<?> getConstructor(String cls, Class... params) {
+    public static Constructor<?> getConstructor(String cls, Class<?>... params) {
         try {
             return getConstructor(Class.forName(cls), params);
         } catch (ClassNotFoundException e) {

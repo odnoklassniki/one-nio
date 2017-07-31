@@ -34,7 +34,7 @@ public class CombinedFuture<V> implements Future<List<V>>, Serializable {
 
     @SuppressWarnings("unchecked")
     public CombinedFuture(Collection<Future> futures) {
-        this.futures = futures.toArray(new Future[futures.size()]);
+        this.futures = futures.toArray(new Future[0]);
     }
 
     @Override
@@ -66,7 +66,7 @@ public class CombinedFuture<V> implements Future<List<V>>, Serializable {
 
     @Override
     public List<V> get() throws InterruptedException, ExecutionException {
-        ArrayList<V> result = new ArrayList<V>(futures.length);
+        ArrayList<V> result = new ArrayList<>(futures.length);
         for (Future<V> future : futures) {
             result.add(future.get());
         }
@@ -75,7 +75,7 @@ public class CombinedFuture<V> implements Future<List<V>>, Serializable {
 
     @Override
     public List<V> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        ArrayList<V> result = new ArrayList<V>(futures.length);
+        ArrayList<V> result = new ArrayList<>(futures.length);
         for (Future<V> future : futures) {
             result.add(future.get(timeout, unit));
         }

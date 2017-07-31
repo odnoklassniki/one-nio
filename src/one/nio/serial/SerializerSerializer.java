@@ -22,7 +22,7 @@ import static one.nio.util.JavaInternals.unsafe;
 
 class SerializerSerializer extends ExternalizableSerializer {
 
-    SerializerSerializer(Class<? extends Serializer> cls) {
+    SerializerSerializer(Class cls) {
         super(cls);
     }
 
