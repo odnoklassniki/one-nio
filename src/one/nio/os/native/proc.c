@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <sched.h>
@@ -22,7 +23,7 @@
 
 JNIEXPORT jint JNICALL
 Java_one_nio_os_Proc_gettid(JNIEnv* env, jclass cls) {
-    return (jint)gettid();
+    return syscall(SYS_gettid);
 }
 
 JNIEXPORT jint JNICALL
@@ -66,4 +67,26 @@ Java_one_nio_os_Proc_sched_1getaffinity(JNIEnv* env, jclass cls, jint pid) {
     }
 
     return mask;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_ioprio_1set(JNIEnv* env, jclass cls, jint pid, jint ioprio) {
+    return syscall(SYS_ioprio_set, 1, pid, ioprio);
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_ioprio_1get(JNIEnv* env, jclass cls, jint pid) {
+    return syscall(SYS_ioprio_get, 1, pid);
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_sched_1setscheduler(JNIEnv* env, jclass cls, jint pid, jint policy) {
+    // For each of the SCHED_OTHER, SCHED_BATCH, SCHED_IDLE policies, param->sched_priority must be 0
+    struct sched_param spar = {0};
+    return sched_setscheduler((pid_t)pid, policy, &spar) == 0 ? 0 : errno;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_sched_1getscheduler(JNIEnv* env, jclass cls, jint pid) {
+    return sched_getscheduler((pid_t)pid);
 }

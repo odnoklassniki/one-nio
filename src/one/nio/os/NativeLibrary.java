@@ -53,7 +53,7 @@ public final class NativeLibrary implements NativeLibraryMXBean {
 
             String tmpDir = System.getProperty("java.io.tmpdir", "/tmp");
             File dll = new File(tmpDir, "libonenio." + crc32(libData) + ".so");
-            if (!dll.exists()) {
+            if (!dll.exists() || dll.length() != libData.length() && dll.delete()) {
                 OutputStream out = new FileOutputStream(dll);
                 out.write(libData.buffer(), 0, libData.length());
                 out.close();

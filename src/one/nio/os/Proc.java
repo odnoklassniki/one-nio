@@ -19,10 +19,41 @@ package one.nio.os;
 public final class Proc {
     public static final boolean IS_SUPPORTED = NativeLibrary.IS_SUPPORTED;
 
+    public static final int IOPRIO_CLASS_RT   = 1 << 13;
+    public static final int IOPRIO_CLASS_BE   = 2 << 13;
+    public static final int IOPRIO_CLASS_IDLE = 3 << 13;
+
+    /*
+     * POSIX scheduling policies
+     *  SCHED_OTHER   the standard round-robin time-sharing policy;
+     *  SCHED_BATCH   for "batch" style execution of processes; and
+     *  SCHED_IDLE    for running very low priority background jobs.
+     * @see #sched_setscheduler
+     * @see bits/sched.h
+     */
+    public static final int SCHED_OTHER = 0;
+    public static final int SCHED_BATCH = 3;
+    public static final int SCHED_IDLE = 5;
+
     public static native int gettid();
     public static native int getpid();
     public static native int getppid();
 
     public static native int sched_setaffinity(int pid, long mask);
     public static native long sched_getaffinity(int pid);
+
+    public static native int ioprio_set(int pid, int ioprio);
+    public static native int ioprio_get(int pid);
+
+    /**
+     * @param pid pid or tid. 0 for current thread
+     * @return 0 on success or errno on failure
+     */
+    public static native int sched_setscheduler(int pid, int policy);
+
+    /**
+     * @param pid pid or tid. 0 for current thread
+     * @return the policy for the thread (a nonnegative integer)
+     */
+    public static native int sched_getscheduler(int pid);
 }
