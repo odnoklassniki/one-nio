@@ -158,7 +158,7 @@ public final class Utf8 {
         byte first = needle[0];
 
         lookup:
-        for (length -= needle.length; length-- > 0; offset++) {
+        for (length -= needle.length; length-- >= 0; offset++) {
             if (haystack[offset] == first) {
                 for (int i = 1; i < needle.length; i++) {
                     if (needle[i] != haystack[offset + i]) {
