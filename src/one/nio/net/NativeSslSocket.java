@@ -25,6 +25,7 @@ class NativeSslSocket extends NativeSocket {
 
     NativeSslSocket(int fd, NativeSslContext context, boolean serverMode) throws IOException {
         super(fd);
+        context.refresh();
         this.context = context;
         this.ssl = sslNew(fd, context.ctx, serverMode);
     }

@@ -17,6 +17,9 @@
 package one.nio.net;
 
 public interface SslContextMXBean {
+    void setDebug(boolean debug);
+    boolean getDebug();
+
     long getNumber();
     long getConnect();
     long getConnectGood();

@@ -14,40 +14,67 @@
  * limitations under the License.
  */
 
+#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/rand.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <jni.h>
 #include "jni_util.h"
-
-
-#define KEY_NONE      0
-#define KEY_PRIMARY   1
-#define KEY_SECONDARY 2
-#define KEY_SINGLE    3
 
 #define MAX_COUNTERS  32
 
 #define STATE_SERVER     ((char*)1)
 #define STATE_HANDSHAKED ((char*)2)
 
-
-struct SSL_ticket_key {
-    unsigned char type;
-    unsigned char padding[15];
+typedef struct {
     unsigned char name[16];
     unsigned char aes_key[16];
     unsigned char hmac_key[16];
-};
+} Ticket;
+
+typedef struct {
+    Ticket* data;
+    unsigned int len;
+} TicketArray;
+
+typedef struct {
+    unsigned char* data;
+    unsigned int len;
+} ALPNProtocols;
+
+typedef struct {
+    unsigned char* data;
+    unsigned int len;
+} OCSPResponse;
+
+typedef struct {
+    char* names;
+    jlong* contexts;
+} SNIContexts;
+
+typedef struct {
+    pthread_rwlock_t lock;
+    TicketArray tickets;
+    ALPNProtocols alpn;
+    OCSPResponse ocsp;
+    SNIContexts sni;
+    jboolean debug;
+} AppData;
 
 struct CRYPTO_dynlock_value {
     pthread_mutex_t mutex;
@@ -98,7 +125,10 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             throw_socket_closed(env);
             return 0;
         case SSL_ERROR_SYSCALL:
-            if (ret == 0) {
+            if (ERR_peek_error()) {
+                throw_ssl_exception(env);
+            } else if (ret == 0 || errno == 0) {
+                // OpenSSL 1.0 and 1.1 return different error code in case of "dirty" connection close
                 throw_socket_closed(env);
             } else {
                 throw_io_exception(env);
@@ -112,8 +142,9 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             int fd = SSL_get_fd(ssl);
             if (fd == preclosed_socket) {
                 throw_socket_closed(env);
-            } else if ((fcntl(fd, F_GETFL) & O_NONBLOCK) == 0) {
-                throw_by_name(env, "java/net/SocketTimeoutException", "Connection timed out");
+                return 0;
+            } else if (errno != 0 && is_io_exception(fd)) {
+                throw_io_exception(env);
                 return 0;
             }
             return err;
@@ -123,6 +154,37 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             throw_by_name(env, "javax/net/ssl/SSLException", buf);
             return 0;
     }
+}
+
+static char* ssl_get_peer_ip(SSL* ssl, char* buf, size_t len) {
+    int fd = SSL_get_fd(ssl);
+    if (fd == -1) {
+        return NULL;
+    }
+
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(addr);
+    if (getpeername(fd, (struct sockaddr*)&addr, &addrlen) != 0) {
+        return NULL;
+    }
+
+    if (addr.ss_family == AF_INET) {
+        inet_ntop(AF_INET, &((struct sockaddr_in*)&addr)->sin_addr, buf, len);
+    } else {
+        inet_ntop(AF_INET6, &((struct sockaddr_in6*)&addr)->sin6_addr, buf, len);
+    }
+    return buf;
+}
+
+static void ssl_debug(SSL* ssl, const char* fmt, ...) {
+    char message[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+
+    char buf[128];
+    printf("ssl_debug [%s]: %s\n", ssl_get_peer_ip(ssl, buf, sizeof(buf)), message);
 }
 
 static long get_session_counter(SSL_CTX* ctx, int key) {
@@ -156,11 +218,20 @@ static long get_session_counter(SSL_CTX* ctx, int key) {
 	}
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+static inline int DH_set0_pqg(DH* dh, BIGNUM* p, BIGNUM* q, BIGNUM* g) {
+    dh->p = p;
+    dh->q = q;
+    dh->g = g;
+}
+#endif
+
 static void setup_dh_params(SSL_CTX* ctx) {
     DH* dh = DH_new();
     if (dh != NULL) {
-        dh->p = BN_bin2bn(dh2048_p, sizeof(dh2048_p), NULL);
-        dh->g = BN_bin2bn(dh2048_g, sizeof(dh2048_g), NULL);
+        BIGNUM* p = BN_bin2bn(dh2048_p, sizeof(dh2048_p), NULL);
+        BIGNUM* g = BN_bin2bn(dh2048_g, sizeof(dh2048_g), NULL);
+        DH_set0_pqg(dh, p, NULL, g);
         SSL_CTX_set_tmp_dh(ctx, dh);
         DH_free(dh);
     }
@@ -207,37 +278,154 @@ static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value* lock, const
     }
 }
 
+static AppData* create_app_data() {
+    AppData* appData = calloc(1, sizeof(AppData));
+    if (appData != NULL) {
+        if (pthread_rwlock_init(&appData->lock, NULL)) {
+            free(appData);
+            return NULL;
+        }
+    }
+    return appData;
+}
+
+static void free_app_data(AppData* appData) {
+    pthread_rwlock_destroy(&appData->lock);
+    free(appData->sni.names);
+    free(appData->ocsp.data);
+    free(appData->alpn.data);
+    free(appData->tickets.data);
+    free(appData);
+}
+
+static void* ssl_memdup(const void* data, size_t size) {
+    if (data == NULL) {
+        return NULL;
+    }
+
+    void* copy = OPENSSL_malloc(size);
+    if (copy != NULL) {
+        memcpy(copy, data, size);
+    }
+    return copy;
+}
+
 static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned char* iv,
                                EVP_CIPHER_CTX* evp_ctx, HMAC_CTX* hmac_ctx, int new_session) {
-    struct SSL_ticket_key* key = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
-    struct SSL_ticket_key* secondary_key = NULL;
-
-    if (key == NULL) {
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    if (appData == NULL || pthread_rwlock_rdlock(&appData->lock) != 0) {
         return -1;
-    } else if (key->type == KEY_PRIMARY) {
-        secondary_key = key + 1;
-    } else if (key->type == KEY_SECONDARY) {
-        secondary_key = key++;
+    }
+
+    int result = 0;
+    TicketArray* tickets = &appData->tickets;
+    Ticket* ticket = tickets->data;
+
+    if (ticket == NULL) {
+        // No ticket keys set
+    } else if (new_session) {
+        RAND_pseudo_bytes(iv, 16);
+        memcpy(key_name, ticket->name, 16);
+        EVP_EncryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, ticket->aes_key, iv);
+        HMAC_Init_ex(hmac_ctx, ticket->hmac_key, 16, EVP_sha256(), NULL);
+        result = 1;
+    } else {
+        unsigned int i;
+        for (i = 0; i < tickets->len; i++, ticket++) {
+            if (memcmp(key_name, ticket->name, 16) == 0) {
+                HMAC_Init_ex(hmac_ctx, ticket->hmac_key, 16, EVP_sha256(), NULL);
+                EVP_DecryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, ticket->aes_key, iv);
+                result = i == 0 ? 1 : 2;
+                break;
+            }
+        }
+    }
+
+    if (appData->debug) {
+        ssl_debug(ssl, "ticket_key_callback: new_session=%d, result=%d", new_session, result);
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
+    return result;
+}
+
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+static int alpn_callback(SSL* ssl, const unsigned char** out, unsigned char* outlen,
+                         const unsigned char* in, unsigned int inlen, void* arg) {
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    if (appData == NULL || appData->alpn.data == NULL) {
+        return SSL_TLSEXT_ERR_NOACK;
+    }
+
+    int status = SSL_select_next_proto((unsigned char**)out, outlen, appData->alpn.data, appData->alpn.len, in, inlen);
+
+    if (appData->debug) {
+        ssl_debug(ssl, "alpn_callback: status=%d", status);
+    }
+
+    return status == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_NOACK;
+}
+#endif
+
+static int ocsp_callback(SSL* ssl, void* arg) {
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    if (appData == NULL || pthread_rwlock_rdlock(&appData->lock) != 0) {
+        return SSL_TLSEXT_ERR_NOACK;
+    }
+
+    int result;
+    OCSPResponse* ocsp = &appData->ocsp;
+
+    unsigned char* respcopy = ssl_memdup(ocsp->data, ocsp->len);
+    if (respcopy == NULL || SSL_set_tlsext_status_ocsp_resp(ssl, respcopy, ocsp->len) == 0) {
+        OPENSSL_free(respcopy);
+        result = SSL_TLSEXT_ERR_NOACK;
+    } else {
+        result = SSL_TLSEXT_ERR_OK;
+    }
+
+    if (appData->debug) {
+        ssl_debug(ssl, "ocsp_callback: result=%d", result);
     }
     
-    if (new_session) {
-        RAND_pseudo_bytes(iv, 16);
-        memcpy(key_name, key->name, 16);
-        EVP_EncryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, key->aes_key, iv);
-        HMAC_Init_ex(hmac_ctx, key->hmac_key, 16, EVP_sha256(), NULL);
-        return 1;
-    } else {
-        if (memcmp(key_name, key->name, 16) == 0) {
-            HMAC_Init_ex(hmac_ctx, key->hmac_key, 16, EVP_sha256(), NULL);
-            EVP_DecryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, key->aes_key, iv);
-            return 1;
-        } else if (secondary_key != NULL && memcmp(key_name, secondary_key->name, 16) == 0) {
-            HMAC_Init_ex(hmac_ctx, secondary_key->hmac_key, 16, EVP_sha256(), NULL);
-            EVP_DecryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, secondary_key->aes_key, iv);
-            return 2;
-        }
-        return 0;
+    pthread_rwlock_unlock(&appData->lock);
+    return result;
+}
+
+static int sni_callback(SSL* ssl, int* unused, void* arg) {
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    if (appData == NULL || pthread_rwlock_rdlock(&appData->lock) != 0) {
+        return SSL_TLSEXT_ERR_NOACK;
     }
+
+    char* names = appData->sni.names;
+    if (names != NULL) {
+        const char* servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+
+        if (appData->debug) {
+            ssl_debug(ssl, "sni_callback: servername=%s", servername);
+        }
+
+        if (servername != NULL) {
+            int servername_len = strlen(servername);
+            int i;
+            for (i = 0; names[0] != 0; i++) {
+                int names_len = strlen(names);
+                if (strcmp(servername, names) == 0 || names[0] == '*' && servername_len >= (names_len - 1) &&
+                    strcmp(servername + servername_len - (names_len - 1), names + 1) == 0) {
+                    SSL_CTX* newctx = (SSL_CTX*)(intptr_t)appData->sni.contexts[i];
+                    SSL_set_SSL_CTX(ssl, newctx);
+                    SSL_set_verify(ssl, SSL_CTX_get_verify_mode(newctx), NULL);
+                    SSL_set_options(ssl, SSL_CTX_get_options(newctx));
+                    break;
+                }
+                names += names_len + 1;
+            }
+        }
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
+    return SSL_TLSEXT_ERR_OK;
 }
 
 static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
@@ -250,7 +438,9 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
         if (SSL_get_app_data(ssl) == STATE_SERVER) {
             SSL_set_app_data((SSL*)ssl, STATE_HANDSHAKED);
         }
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
         ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+#endif
     }
 }
 
@@ -263,11 +453,11 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
     if (mutexes == NULL) {
         throw_by_name(env, "java/lang/OutOfMemoryError", "Unable to allocate mutexes");
         return;
-    } else {
-        int i;
-        for (i = 0; i < CRYPTO_num_locks(); i++) {
-            pthread_mutex_init(&mutexes[i], NULL);
-        }
+    }
+
+    int i;
+    for (i = 0; i < CRYPTO_num_locks(); i++) {
+        pthread_mutex_init(&mutexes[i], NULL);
     }
 
     CRYPTO_set_id_callback(id_function);
@@ -284,18 +474,28 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
 
 JNIEXPORT jlong JNICALL
 Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
+    AppData* appData = create_app_data();
+    if (appData == NULL) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate SSL app data");
+        return 0;
+    }
+
     SSL_CTX* ctx = SSL_CTX_new(SSLv23_method());
     if (ctx == NULL) {
+        free_app_data(appData);
         throw_ssl_exception(env);
         return 0;
     }
 
-    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE |
                              SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
                              SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-    SSL_CTX_set_read_ahead(ctx, 1);
+
+    // Disable read-ahead until premature socket close is fixed
+    // SSL_CTX_set_read_ahead(ctx, 1);
     SSL_CTX_set_info_callback(ctx, ssl_info_callback);
+    SSL_CTX_set_app_data(ctx, appData);
 
     setup_dh_params(ctx);
     setup_ecdh_params(ctx);
@@ -305,11 +505,25 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_ctxFree(JNIEnv* env, jclass cls, jlong ctx) {
-    struct SSL_ticket_key* key = SSL_CTX_get_app_data((SSL_CTX*)(intptr_t)ctx);
-    if (key != NULL) {
-        free(key);
+    AppData* appData = SSL_CTX_get_app_data((SSL_CTX*)(intptr_t)ctx);
+    if (appData != NULL) {
+        free_app_data(appData);
     }
     SSL_CTX_free((SSL_CTX*)(intptr_t)ctx);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setDebug(JNIEnv* env, jobject self, jboolean debug) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    appData->debug = debug;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSslContext_getDebug(JNIEnv* env, jobject self) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    return appData->debug;
 }
 
 JNIEXPORT void JNICALL
@@ -391,43 +605,165 @@ Java_one_nio_net_NativeSslContext_setVerify(JNIEnv* env, jobject self, jint veri
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSslContext_setTicketKey(JNIEnv* env, jobject self, jbyteArray ticketKey) {
+Java_one_nio_net_NativeSslContext_setTicketKeys(JNIEnv* env, jobject self, jbyteArray data) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
-    struct SSL_ticket_key* key = SSL_CTX_get_app_data(ctx);
-    
-    if (key == NULL) {
-        key = malloc(2 * sizeof(struct SSL_ticket_key));
-        key->type = KEY_NONE;
-        SSL_CTX_set_app_data(ctx, key);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    TicketArray* tickets = &appData->tickets;
+
+    Ticket* ticket = NULL;
+    unsigned int len = 0;
+
+    if (data != NULL) {
+        len = (*env)->GetArrayLength(env, data);
+        if (len % 48 != 0) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "All tickets must be 48 bytes long");
+            return;
+        }
+        ticket = malloc(len);
+        if (ticket == NULL) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate memory for tickets");
+            return;
+        }
+        (*env)->GetByteArrayRegion(env, data, 0, len, (jbyte*)ticket);
     }
 
-    if (ticketKey == NULL) {
-        SSL_CTX_set_tlsext_ticket_key_cb(ctx, NULL);
-        key->type = KEY_NONE;
-    } else if ((*env)->GetArrayLength(env, ticketKey) != 48) {
-        throw_by_name(env, "javax/net/ssl/SSLException", "Ticket key must be 48 bytes long");
-    } else {
-        struct SSL_ticket_key* new_key;
-        unsigned char new_type;
+    if (pthread_rwlock_wrlock(&appData->lock) != 0) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "Invalid state of appData lock");
+        free(ticket);
+        return;
+    }
 
-        switch (key->type) {
-            case KEY_NONE:
-                new_key = key;
-                new_type = KEY_SINGLE;
-                break;
-            case KEY_SECONDARY:
-                new_key = key;
-                new_type = KEY_PRIMARY;
-                break;
-            default:
-                new_key = key + 1;
-                new_type = KEY_SECONDARY;
+    free(tickets->data);
+    tickets->data = ticket;
+    tickets->len = len / 48;
+
+    if (ticket != NULL) {
+        SSL_CTX_set_tlsext_ticket_key_cb(ctx, ticket_key_callback);
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setApplicationProtocols0(JNIEnv* env, jobject self, jbyteArray protocols) {
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    ALPNProtocols* alpn = &appData->alpn;
+
+    if (alpn->data != NULL) {
+        // Cannot reinitialize alpn->data, because ALPN callback returns it outside
+        if (protocols == NULL || !array_equals(env, protocols, alpn->data, alpn->len)) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "ALPN data already initialized");
+        }
+        return;
+    }
+
+    if (protocols != NULL) {
+        int len = (*env)->GetArrayLength(env, protocols);
+        unsigned char* data = malloc(len);
+        if (data == NULL) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate memory for ALPN data");
+            return;
         }
 
-        (*env)->GetByteArrayRegion(env, ticketKey, 0, 48, (jbyte*)&new_key->name);
-        key->type = new_type;
-        SSL_CTX_set_tlsext_ticket_key_cb(ctx, ticket_key_callback);    
+        (*env)->GetByteArrayRegion(env, protocols, 0, len, (jbyte*)data);
+        alpn->data = data;
+        alpn->len = len;
+        SSL_CTX_set_alpn_select_cb(ctx, alpn_callback, NULL);
     }
+#endif
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setOCSP(JNIEnv* env, jobject self, jbyteArray response) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    OCSPResponse* ocsp = &appData->ocsp;
+
+    unsigned char* data = NULL;
+    unsigned int len = 0;
+
+    if (response != NULL) {
+        len = (*env)->GetArrayLength(env, response);
+        data = (unsigned char*)malloc(len);
+        if (data == NULL) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate memory for OCSP response");
+            return;
+        }
+        (*env)->GetByteArrayRegion(env, response, 0, len, (jbyte*)data);
+    }
+
+    if (pthread_rwlock_wrlock(&appData->lock) != 0) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "Invalid state of appData lock");
+        free(data);
+        return;
+    }
+
+    free(ocsp->data);
+    ocsp->data = data;
+    ocsp->len = len;
+
+    if (data != NULL) {
+        SSL_CTX_set_tlsext_status_cb(ctx, ocsp_callback);
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setSNI0(JNIEnv* env, jobject self, jbyteArray sniNames, jlongArray sniContexts) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    SNIContexts* sni = &appData->sni;
+
+    char* names = NULL;
+    jlong* contexts = NULL;
+
+    if (sniNames != NULL && sniContexts != NULL) {
+        jint names_len = (*env)->GetArrayLength(env, sniNames);
+        jint contexts_len = (*env)->GetArrayLength(env, sniContexts);
+
+        names = malloc(names_len + contexts_len * sizeof(jlong));
+        if (names == NULL) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate memory for SNI contexts");
+            return;
+        }
+        (*env)->GetByteArrayRegion(env, sniNames, 0, names_len, (jbyte*)names);
+
+        contexts = (jlong*)(names + names_len);
+        (*env)->GetLongArrayRegion(env, sniContexts, 0, contexts_len, contexts);
+    }
+    
+    if (pthread_rwlock_wrlock(&appData->lock) != 0) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "Invalid state of appData lock");
+        free(names);
+        return;
+    }
+
+    free(sni->names);
+    sni->names = names;
+    sni->contexts = contexts;
+    
+    if (names != NULL) {
+        SSL_CTX_set_tlsext_servername_callback(ctx, sni_callback);
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setSessionId(JNIEnv* env, jobject self, jbyteArray sessionId) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+
+    unsigned int len = (*env)->GetArrayLength(env, sessionId);
+    if (len > SSL_MAX_SSL_SESSION_ID_LENGTH) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "SessionId length exceeds SSL_MAX_SSL_SESSION_ID_LENGTH");
+    }
+
+    unsigned char sid_ctx[len];
+    (*env)->GetByteArrayRegion(env, sessionId, 0, len, (jbyte*)sid_ctx);
+    SSL_CTX_set_session_id_context(ctx, sid_ctx, len);
 }
 
 JNIEXPORT void JNICALL
@@ -446,7 +782,6 @@ JNIEXPORT jlongArray JNICALL
 Java_one_nio_net_NativeSslContext_getSessionCounters(JNIEnv* env, jobject self, jint keysBitmap) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     jlong raw_values[MAX_COUNTERS];
-    jlongArray values;
     int i;
 
     for (i = 0; i < MAX_COUNTERS; i++) {
@@ -455,7 +790,7 @@ Java_one_nio_net_NativeSslContext_getSessionCounters(JNIEnv* env, jobject self, 
         }
     }
 
-    values = (*env)->NewLongArray(env, MAX_COUNTERS);
+    jlongArray values = (*env)->NewLongArray(env, MAX_COUNTERS);
     (*env)->SetLongArrayRegion(env, values, 0, MAX_COUNTERS, raw_values);
     return values;
 }
@@ -481,7 +816,9 @@ Java_one_nio_net_NativeSslSocket_sslNew(JNIEnv* env, jclass cls, jint fd, jlong 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) {
     SSL* ssl = (SSL*)(intptr_t)sslptr;
-    SSL_shutdown(ssl);
+    if (!SSL_in_init(ssl)) {
+        SSL_shutdown(ssl);
+    }
     SSL_free(ssl);
 }
 
@@ -534,8 +871,7 @@ Java_one_nio_net_NativeSslSocket_writeFully(JNIEnv* env, jobject self, jbyteArra
             if (result > 0) {
                 offset += result;
                 count -= result;
-            } else {
-                check_ssl_error(env, ssl, result);
+            } else if (check_ssl_error(env, ssl, result) != SSL_ERROR_WANT_WRITE) {
                 break;
             }
         }
@@ -589,8 +925,7 @@ Java_one_nio_net_NativeSslSocket_readFully(JNIEnv* env, jobject self, jbyteArray
                 (*env)->SetByteArrayRegion(env, data, offset, result, buf);
                 offset += result;
                 count -= result;
-            } else {
-                check_ssl_error(env, ssl, result);
+            } else if (check_ssl_error(env, ssl, result) != SSL_ERROR_WANT_READ) {
                 break;
             }
         }
