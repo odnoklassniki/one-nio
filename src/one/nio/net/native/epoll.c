@@ -15,17 +15,33 @@
  */
 
 #include <sys/epoll.h>
+#include <unistd.h>
+#include <time.h>
 #include <jni.h>
+
+// See NativeSelector.java
+#define EPOLL_HEADER_SIZE 16
+#define EPOLL_MAX_EVENTS  1000
+
+
+// Returns monotonic timestamp similar to System.nanoTime()
+static inline jlong nanoTime() {
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return (jlong)tp.tv_sec * 1000000000 + tp.tv_nsec;
+}
 
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSelector_epollCreate(JNIEnv* env, jclass cls) {
-    return epoll_create(1024);
+    return epoll_create(EPOLL_MAX_EVENTS);
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSelector_epollWait(JNIEnv* env, jclass cls, jint epfd, jlong addr, jint count) {
-    return epoll_wait(epfd, (struct epoll_event*)(intptr_t)addr, count, -1);
+Java_one_nio_net_NativeSelector_epollWait(JNIEnv* env, jclass cls, jint epfd, jlong epollStruct, jint count) {
+    int result = epoll_wait(epfd, (struct epoll_event*)(intptr_t)epollStruct, count, -1);
+    *(jlong*)(intptr_t)(epollStruct - EPOLL_HEADER_SIZE) = nanoTime();
+    return result;
 }
 
 JNIEXPORT void JNICALL

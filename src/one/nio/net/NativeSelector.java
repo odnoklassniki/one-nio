@@ -27,8 +27,10 @@ final class NativeSelector extends Selector {
     private static final int EPOLL_CTL_ADD = 1;
     private static final int EPOLL_CTL_DEL = 2;
     private static final int EPOLL_CTL_MOD = 3;
-    private static final int EPOLL_MAX_EVENTS  = 1024;
+    private static final int EPOLL_HEADER_SIZE = 16;
+    private static final int EPOLL_MAX_EVENTS = 1000;
     private static final int EPOLL_STRUCT_SIZE = 12;
+    private static final int EPOLL_BUF_SIZE = EPOLL_HEADER_SIZE + EPOLL_MAX_EVENTS * EPOLL_STRUCT_SIZE;
 
     private static native int epollCreate();
     private static native void epollClose(int epollFD);
@@ -43,8 +45,8 @@ final class NativeSelector extends Selector {
 
     NativeSelector() {
         this.epollFD = epollCreate();
-        this.epollStruct = DirectMemory.allocate(EPOLL_MAX_EVENTS * EPOLL_STRUCT_SIZE, this);
-        this.sessions = new Session[EPOLL_MAX_EVENTS];
+        this.epollStruct = DirectMemory.allocate(EPOLL_BUF_SIZE, this) + EPOLL_HEADER_SIZE;
+        this.sessions = new Session[1024];  // must be power of 2, see add()
     }
 
     @Override
@@ -157,6 +159,11 @@ final class NativeSelector extends Selector {
         };
     }
 
+    @Override
+    public long lastWakeupTime() {
+        return unsafe.getLong(epollStruct - EPOLL_HEADER_SIZE);
+    }
+
     private synchronized void add(Session session) {
         if (++size > sessions.length) {
             sessions = Arrays.copyOf(sessions, sessions.length * 2);
@@ -176,6 +183,7 @@ final class NativeSelector extends Selector {
     private synchronized void remove(Session session) {
         if (sessions[session.slot] == session) {
             sessions[session.slot] = null;
+            session.selector = null;
             size--;
         }
     }

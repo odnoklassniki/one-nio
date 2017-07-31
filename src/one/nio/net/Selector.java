@@ -31,6 +31,7 @@ public abstract class Selector implements Iterable<Session>, Closeable {
     public abstract void listen(Session session, int events);
     public abstract Iterator<Session> iterator();
     public abstract Iterator<Session> select();
+    public abstract long lastWakeupTime();
 
     public static Selector create() throws IOException {
         return NativeLibrary.IS_SUPPORTED ? new NativeSelector() : new JavaSelector();

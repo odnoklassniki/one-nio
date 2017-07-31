@@ -16,8 +16,13 @@
 
 package one.nio.net;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.IOException;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
 import java.util.Collections;
 import java.util.Iterator;
@@ -25,12 +30,15 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 final class JavaSelector extends Selector {
+    private static final Log log = LogFactory.getLog(JavaSelector.class);
+
     private final java.nio.channels.Selector impl;
     private final ConcurrentLinkedQueue<Session> pendingSessions;
+    private long lastWakeupTime;
 
     JavaSelector() throws IOException {
         this.impl = java.nio.channels.Selector.open();
-        this.pendingSessions = new ConcurrentLinkedQueue<Session>();
+        this.pendingSessions = new ConcurrentLinkedQueue<>();
     }
 
     @Override
@@ -61,7 +69,11 @@ final class JavaSelector extends Selector {
 
     @Override
     public final void unregister(Session session) {
-        ((JavaSocket) session.socket).ch.keyFor(impl).cancel();
+        SelectionKey key = ((JavaSocket) session.socket).ch.keyFor(impl);
+        if (key != null) {
+            key.cancel();
+        }
+        session.selector = null;
     }
 
     @Override
@@ -81,19 +93,32 @@ final class JavaSelector extends Selector {
             do {
                 registerPendingSessions();
             } while (impl.select() == 0);
+        } catch (ClosedSelectorException e) {
+            return iteratorFor(Collections.<SelectionKey>emptySet());
         } catch (Exception e) {
+            log.warn("Unexpected exception while selecting", e);
             return iteratorFor(Collections.<SelectionKey>emptySet());
         }
 
+        lastWakeupTime = System.nanoTime();
         Set<SelectionKey> selectedKeys = impl.selectedKeys();
         Iterator<Session> result = iteratorFor(selectedKeys);
         selectedKeys.clear();
         return result;
     }
 
+    @Override
+    public long lastWakeupTime() {
+        return lastWakeupTime;
+    }
+
     private void registerPendingSessions() throws ClosedChannelException {
         for (Session session; (session = pendingSessions.poll()) != null; ) {
-            ((JavaSocket) session.socket).ch.register(impl, session.eventsToListen, session);
+            try {
+                ((JavaSocket) session.socket).ch.register(impl, session.eventsToListen, session);
+            } catch (CancelledKeyException key) {
+                log.warn("Cannot register session: " + session.toString(), key);
+            }
         }
     }
 
