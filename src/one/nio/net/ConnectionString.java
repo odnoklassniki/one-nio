@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.channels.DatagramChannel;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -90,8 +91,8 @@ public class ConnectionString {
         return path;
     }
 
-    public String[] getHosts() {
-        return host.indexOf('|') >= 0 ? host.split("\\|") : new String[] { host };
+    public Map<String, String> getParams() {
+        return params;
     }
 
     public String getStringParam(String key) {
@@ -133,7 +134,10 @@ public class ConnectionString {
             if (interfaceName.startsWith("auto:")) {
                 interfaceAddress = getRoutingAddress(interfaceName.substring(5));
             } else {
-                interfaceAddress = getInterfaceAddress(interfaceName);
+                interfaceAddress = getAddressFromProperty(interfaceName);
+                if (interfaceAddress == null) {
+                    interfaceAddress = getInterfaceAddress(interfaceName);
+                }
             }
 
             if (interfaceAddress != null) {
@@ -147,15 +151,22 @@ public class ConnectionString {
         return sb.append(url, lastPosition, url.length()).toString();
     }
 
-    public static String getRoutingAddress(String targetIP) {
+    public static String getAddressFromProperty(String interfaceName) {
+        String address = System.getProperty(interfaceName, System.getenv(interfaceName));
+        if (address == null)
+            return null;
+
         try {
-            DatagramChannel ch = DatagramChannel.open();
-            try {
-                ch.connect(new InetSocketAddress(targetIP, 7));
-                return ch.socket().getLocalAddress().getHostAddress();
-            } finally {
-                ch.close();
-            }
+            return InetAddress.getByName(address).getHostAddress();
+        } catch (UnknownHostException e) {
+            return null;
+        }
+    }
+
+    public static String getRoutingAddress(String targetIP) {
+        try (DatagramChannel ch = DatagramChannel.open()) {
+            ch.connect(new InetSocketAddress(targetIP, 7));
+            return ch.socket().getLocalAddress().getHostAddress();
         } catch (IOException e) {
             throw new IllegalArgumentException(e);
         }
@@ -184,8 +195,8 @@ public class ConnectionString {
     }
 
     private static Map<String, String> parseParameters(String parameters) {
-        HashMap<String, String> result = new HashMap<String, String>();
-        for (StringTokenizer tokenizer = new StringTokenizer(parameters, "&"); tokenizer.hasMoreElements(); ) {
+        HashMap<String, String> result = new HashMap<>();
+        for (StringTokenizer tokenizer = new StringTokenizer(parameters, "&"); tokenizer.hasMoreTokens(); ) {
             String param = tokenizer.nextToken();
             int p = param.indexOf('=');
             if (p > 0) {

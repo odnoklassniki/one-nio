@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,150 +16,124 @@
 
 package one.nio.server;
 
-import one.nio.net.ConnectionString;
+import one.nio.net.Selector;
 import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.mgt.Management;
-import one.nio.net.SslContext;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Server implements ServerMXBean {
     private static final Log log = LogFactory.getLog(Server.class);
 
-    private final AtomicLong requestsProcessed;
-    private final AtomicLong requestsRejected;
+    private final AtomicLong requestsProcessed = new AtomicLong();
+    private final AtomicLong requestsRejected = new AtomicLong();
 
     private volatile SelectorStats selectorStats;
     private volatile QueueStats queueStats;
 
-    protected ConnectionString conn;
-    protected AcceptorThread[] acceptors;
-    protected SelectorThread[] selectors;
-    protected WorkerPool workers;
-    protected CleanupThread cleanup;
+    protected final int port;
+    protected final AcceptorThread[] acceptors;
+    protected volatile SelectorThread[] selectors;
+    protected final WorkerPool workers;
     protected boolean useWorkers;
+    protected final CleanupThread cleanup;
 
-    public Server(ConnectionString conn) throws IOException {
-        this.conn = conn;
+    public Server(ServerConfig config) throws IOException {
+        if (config.acceptors == null || config.acceptors.length == 0) {
+            throw new IllegalArgumentException("No configured acceptors");
+        }
 
-        String[] hosts = conn.getHosts();
-        int port = conn.getPort();
-        SslContext sslContext = getSslContext(conn);
+        this.port = config.acceptors[0].port;
+        this.acceptors = new AcceptorThread[config.acceptors.length];
+        for (int i = 0; i < acceptors.length; i++) {
+            acceptors[i] = new AcceptorThread(this, config.acceptors[i]);
+        }
+
         int processors = Runtime.getRuntime().availableProcessors();
-
-        int backlog = conn.getIntParam("backlog", 128);
-        int buffers = conn.getIntParam("buffers", 0);
-        int recvBuf = conn.getIntParam("recvBuf", buffers);
-        int sendBuf = conn.getIntParam("sendBuf", buffers);
-        boolean defer = conn.getBooleanParam("defer", false);
-        boolean noDelay = conn.getBooleanParam("noDelay", true);
-        int selectorCount = conn.getIntParam("selectors", processors);
-        boolean affinity = conn.getBooleanParam("affinity", false);
-        int minWorkers = conn.getIntParam("minWorkers", 0);
-        int maxWorkers = conn.getIntParam("maxWorkers", 1000);
-        long queueTime = conn.getLongParam("queueTime", 0);
-        int keepAlive = conn.getIntParam("keepalive", 0);
-
-        this.acceptors = new AcceptorThread[hosts.length];
-        for (int i = 0; i < hosts.length; i++) {
-            InetAddress address = InetAddress.getByName(hosts[i]);
-            acceptors[i] = new AcceptorThread(this, address, port, sslContext, backlog, recvBuf, sendBuf, defer, noDelay);
+        SelectorThread[] selectors = new SelectorThread[config.selectors != 0 ? config.selectors : processors];
+        for (int i = 0; i < selectors.length; i++) {
+            selectors[i] = new SelectorThread(i, config.affinity ? 1L << (i % processors) : 0);
+            selectors[i].setPriority(config.threadPriority);
         }
+        this.selectors = selectors;
 
-        this.selectors = new SelectorThread[selectorCount];
-        for (int i = 0; i < selectorCount; i++) {
-            this.selectors[i] = new SelectorThread(i, affinity ? 1L << (i % processors) : 0);
-        }
+        this.useWorkers = config.maxWorkers > 0;
+        this.workers = new WorkerPool(config.minWorkers, Math.max(config.maxWorkers, 1), config.queueTime, config.threadPriority);
 
-        this.workers = new WorkerPool(minWorkers, maxWorkers, queueTime);
-        this.useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
-
-        if (keepAlive > 0) {
-            this.cleanup = new CleanupThread(this, keepAlive);
-        }
+        this.cleanup = new CleanupThread(selectors, config.keepAlive);
 
         this.selectorStats = new SelectorStats();
         this.queueStats = new QueueStats();
-        this.requestsProcessed = new AtomicLong();
-        this.requestsRejected = new AtomicLong();
-
-        if (conn.getBooleanParam("jmx", true)) {
-            Management.registerMXBean(this, "one.nio.server:type=Server,port=" + port);
-        }
     }
 
-    public boolean reconfigure(ConnectionString conn) throws IOException {
-        if (conn.getProtocol() == null) {
-            if (this.conn.getProtocol() != null) return false;
-        } else if (!conn.getProtocol().equals(this.conn.getProtocol())) {
-            return false;
-        }
-        if (conn.getPort() != this.conn.getPort()) {
-            return false;
-        }
+    public synchronized void reconfigure(ServerConfig config) throws IOException {
+        workers.setCorePoolSize(config.minWorkers);
 
-        this.conn = conn;
+        useWorkers = config.maxWorkers > 0;
+        workers.setMaximumPoolSize(Math.max(config.maxWorkers, 1));
 
-        workers.setCorePoolSize(conn.getIntParam("minWorkers", 0));
-        workers.setMaximumPoolSize(conn.getIntParam("maxWorkers", 1000));
-        workers.setQueueTime(conn.getLongParam("queueTime", 0));
-        useWorkers = conn.getStringParam("minWorkers") != null || conn.getStringParam("maxWorkers") != null;
+        workers.setQueueTime(config.queueTime);
+
+        for (AcceptorConfig ac : config.acceptors) {
+            for (AcceptorThread acceptor : acceptors) {
+                if (acceptor.port == ac.port && acceptor.address.equals(ac.address)) {
+                    acceptor.reconfigure(ac);
+                    break;
+                }
+            }
+        }
 
         int processors = Runtime.getRuntime().availableProcessors();
-        int selectorCount = conn.getIntParam("selectors", processors);
-        if (selectorCount > selectors.length) {
-            boolean affinity = conn.getBooleanParam("affinity", false);
-            SelectorThread[] newSelectors = Arrays.copyOf(selectors, selectorCount);
-            for (int i = selectors.length; i < selectorCount; i++) {
-                newSelectors[i] = new SelectorThread(i, affinity ? 1L << (i % processors) : 0);
+        SelectorThread[] selectors = this.selectors;
+        if (config.selectors > selectors.length) {
+            SelectorThread[] newSelectors = Arrays.copyOf(selectors, config.selectors);
+            for (int i = selectors.length; i < config.selectors; i++) {
+                newSelectors[i] = new SelectorThread(i, config.affinity ? 1L << (i % processors) : 0);
+                newSelectors[i].setPriority(config.threadPriority);
                 newSelectors[i].start();
             }
-            selectors = newSelectors;
+            this.selectors = newSelectors;
         }
 
-        return true;
+        cleanup.update(this.selectors, config.keepAlive);
     }
 
-    public void start() {
+    public synchronized void start() {
+        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selector.start();
         }
-        for (AcceptorThread acceptor : acceptors) {
+
+        for (AcceptorThread acceptor : this.acceptors) {
             acceptor.start();
         }
-        if (cleanup != null) {
-            cleanup.start();
-        }
+        cleanup.start();
+
+        Management.registerMXBean(this, "one.nio.server:type=Server,port=" + port);
     }
 
-    public void stop() {
-        if (cleanup != null) {
-            cleanup.shutdown();
-            cleanup = null;
+    public synchronized void stop() {
+        Management.unregisterMXBean("one.nio.server:type=Server,port=" + port);
+
+        cleanup.shutdown();
+
+        for (AcceptorThread acceptor : this.acceptors) {
+            acceptor.shutdown();
         }
-        if (acceptors != null) {
-            for (AcceptorThread acceptor : acceptors) {
-                acceptor.shutdown();
-            }
-            acceptors = null;
+
+        SelectorThread[] selectors = this.selectors;
+        for (SelectorThread selector : selectors) {
+            selector.shutdown();
         }
-        if (selectors != null) {
-            for (SelectorThread selector : selectors) {
-                selector.shutdown();
-            }
-            selectors = null;
-        }
-        if (workers != null) {
-            workers.gracefulShutdown(30000L);
-            workers = null;
-        }
+
+        workers.gracefulShutdown(30000L);
     }
 
     public void registerShutdownHook() {
@@ -173,13 +147,21 @@ public class Server implements ServerMXBean {
         });
     }
 
-    protected SslContext getSslContext(ConnectionString conn) {
-        String protocol = conn.getProtocol();
-        return "ssl".equals(protocol) || "https".equals(protocol) ? SslContext.getDefault() : null;
-    }
-
     protected Session createSession(Socket socket) throws RejectedSessionException {
         return new Session(socket);
+    }
+
+    protected void register(Session session) {
+        getSmallestSelector().register(session);
+    }
+
+    private Selector getSmallestSelector() {
+        SelectorThread[] selectors = this.selectors;
+
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        Selector a = selectors[r.nextInt(selectors.length)].selector;
+        Selector b = selectors[r.nextInt(selectors.length)].selector;
+        return a.size() < b.size() ? a : b;
     }
 
     public final long incRequestsProcessed() {
@@ -190,17 +172,19 @@ public class Server implements ServerMXBean {
         return requestsRejected.incrementAndGet();
     }
 
-    public final ConnectionString getConnectionString() {
-        return conn;
-    }
-
     @Override
     public int getConnections() {
         int result = 0;
+        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             result += selector.selector.size();
         }
         return result;
+    }
+
+    @Override
+    public long getKeepAlive() {
+        return cleanup.getKeepAlive();
     }
 
     @Override
@@ -295,16 +279,19 @@ public class Server implements ServerMXBean {
     }
 
     @Override
-    public void reset() {
+    public synchronized void reset() {
         for (AcceptorThread acceptor : acceptors) {
             acceptor.acceptedSessions = 0;
             acceptor.rejectedSessions = 0;
         }
+
+        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selector.operations = 0;
             selector.sessions = 0;
             selector.maxReady = 0;
         }
+
         requestsProcessed.set(0);
         requestsRejected.set(0);
     }
@@ -331,6 +318,7 @@ public class Server implements ServerMXBean {
         selectorStats = new SelectorStats();
         selectorStats.expireTime = currentTime + 1000;
 
+        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selectorStats.operations += selector.operations;
             selectorStats.sessions += selector.sessions;

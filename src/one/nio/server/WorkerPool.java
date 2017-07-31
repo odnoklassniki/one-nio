@@ -29,15 +29,17 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
     private static final Log log = LogFactory.getLog(WorkerPool.class);
 
     private final AtomicInteger index;
+    private final int threadPriority;
 
-    WorkerPool(int minThreads, int maxThreads, long queueTime) {
-        super(minThreads, maxThreads, 60L, TimeUnit.SECONDS, new WaitingSynchronousQueue<Runnable>(queueTime));
+    WorkerPool(int minThreads, int maxThreads, long queueTime, int threadPriority) {
+        super(minThreads, maxThreads, 60L, TimeUnit.SECONDS, new WaitingSynchronousQueue(queueTime));
         setThreadFactory(this);
         this.index = new AtomicInteger();
+        this.threadPriority = threadPriority;
     }
 
     void setQueueTime(long queueTime) {
-        ((WaitingSynchronousQueue) getQueue()).queueTime = queueTime;
+        ((WaitingSynchronousQueue) getQueue()).setQueueTime(queueTime);
     }
 
     void gracefulShutdown(long timeout) {
@@ -54,6 +56,7 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
     public Thread newThread(Runnable r) {
         Thread thread = new Thread(r, "NIO Worker #" + index.incrementAndGet());
         thread.setUncaughtExceptionHandler(this);
+        thread.setPriority(threadPriority);
         return thread;
     }
 
@@ -62,17 +65,25 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
         log.error("Uncaught exception in " + t, e);
     }
 
-    private static final class WaitingSynchronousQueue<E> extends SynchronousQueue<E> {
-        long queueTime;
+    private static final class WaitingSynchronousQueue extends SynchronousQueue<Runnable> {
+        volatile long queueTime;
 
         WaitingSynchronousQueue(long queueTime) {
+            setQueueTime(queueTime);
+        }
+
+        void setQueueTime(long queueTime) {
+            if (queueTime > 1000) {
+                log.warn("Suspicious queueTime! Consider specifying time units (ms, s)");
+                queueTime /= 1000;
+            }
             this.queueTime = queueTime;
         }
 
         @Override
-        public boolean offer(E element) {
+        public boolean offer(Runnable r) {
             try {
-                return super.offer(element, queueTime, TimeUnit.MICROSECONDS);
+                return super.offer(r, queueTime, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;

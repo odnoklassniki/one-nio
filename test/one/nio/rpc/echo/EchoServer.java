@@ -16,8 +16,8 @@
 
 package one.nio.rpc.echo;
 
-import one.nio.net.ConnectionString;
 import one.nio.rpc.RpcServer;
+import one.nio.server.ServerConfig;
 
 import java.io.IOException;
 
@@ -29,9 +29,9 @@ public class EchoServer implements EchoService {
     }
 
     public static void main(String[] args) throws IOException {
-        ConnectionString conn = new ConnectionString(args[0]);
+        ServerConfig config = ServerConfig.from(args[0]);
         EchoService service = new EchoServer();
-        new RpcServer<EchoService>(conn, service).start();
+        new RpcServer<>(config, service).start();
         System.out.println("Server started");
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package one.nio.server;
 
-import one.nio.net.Selector;
 import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.net.SslContext;
@@ -25,41 +24,59 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.util.Random;
 
 final class AcceptorThread extends Thread {
     private static final Log log = LogFactory.getLog(AcceptorThread.class);
-    
-    final Server server;
-    final InetAddress address;
+
+    final String address;
     final int port;
-    final Random random;
+    final int backlog;
+    final Server server;
     final Socket serverSocket;
 
-    long acceptedSessions;
-    long rejectedSessions;
+    volatile long acceptedSessions;
+    volatile long rejectedSessions;
 
-    AcceptorThread(Server server, InetAddress address, int port, SslContext sslContext,
-                   int backlog, int recvBuf, int sendBuf, boolean defer, boolean noDelay) throws IOException {
-        super("NIO Acceptor " + address + ":" + port);
-
+    AcceptorThread(Server server, AcceptorConfig config) throws IOException {
+        super("NIO Acceptor " + config.address + ":" + config.port);
+        this.address = config.address;
+        this.port = config.port;
+        this.backlog = config.backlog;
         this.server = server;
-        this.address = address;
-        this.port = port;
-        this.random = new Random();
 
         Socket serverSocket = Socket.createServerSocket();
-        if (sslContext != null) serverSocket = serverSocket.ssl(sslContext);
+        if (config.ssl != null) {
+            SslContext sslContext = SslContext.create();
+            sslContext.configure(config.ssl);
+            serverSocket = serverSocket.ssl(sslContext);
+        }
         this.serverSocket = serverSocket;
 
-        if (recvBuf != 0) serverSocket.setRecvBuffer(recvBuf);
-        if (sendBuf != 0) serverSocket.setSendBuffer(sendBuf);
-        if (defer) serverSocket.setDeferAccept(true);
+        if (config.recvBuf != 0) serverSocket.setRecvBuffer(config.recvBuf);
+        if (config.sendBuf != 0) serverSocket.setSendBuffer(config.sendBuf);
+        if (config.deferAccept) serverSocket.setDeferAccept(true);
 
-        serverSocket.setNoDelay(noDelay);
+        serverSocket.setNoDelay(config.noDelay);
+        serverSocket.setTcpFastOpen(config.tcpFastOpen);
         serverSocket.setReuseAddr(true);
         serverSocket.bind(address, port, backlog);
+    }
+
+    void reconfigure(AcceptorConfig config) throws IOException {
+        if (config.recvBuf != 0) {
+            serverSocket.setRecvBuffer(config.recvBuf);
+        }
+        if (config.sendBuf != 0) {
+            serverSocket.setSendBuffer(config.sendBuf);
+        }
+        serverSocket.setDeferAccept(config.deferAccept);
+        serverSocket.setNoDelay(config.noDelay);
+        serverSocket.setTcpFastOpen(config.tcpFastOpen);
+
+        SslContext sslContext = serverSocket.getSslContext();
+        if (sslContext != null && config.ssl != null) {
+            sslContext.configure(config.ssl);
+        }
     }
 
     void shutdown() {
@@ -73,13 +90,20 @@ final class AcceptorThread extends Thread {
 
     @Override
     public void run() {
+        try {
+            serverSocket.listen(backlog);
+        } catch (IOException e) {
+            log.error("Cannot start listening at " + port);
+            return;
+        }
+
         while (serverSocket.isOpen()) {
             Socket socket = null;
             try {
                 socket = serverSocket.accept();
                 socket.setBlocking(false);
                 Session session = server.createSession(socket);
-                getSmallestSelector().register(session);
+                server.register(session);
                 acceptedSessions++;
             } catch (RejectedSessionException e) {
                 if (log.isDebugEnabled()) {
@@ -94,12 +118,5 @@ final class AcceptorThread extends Thread {
                 if (socket != null) socket.close();
             }
         }
-    }
-
-    private Selector getSmallestSelector() {
-        SelectorThread[] selectors = server.selectors;
-        Selector a = selectors[random.nextInt(selectors.length)].selector;
-        Selector b = selectors[random.nextInt(selectors.length)].selector;
-        return a.size() < b.size() ? a : b;
     }
 }

@@ -16,8 +16,8 @@
 
 package one.nio.rpc.cache;
 
-import one.nio.net.ConnectionString;
 import one.nio.rpc.RpcServer;
+import one.nio.server.ServerConfig;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,7 +26,7 @@ public class RemoteCacheServer implements CacheService<Entity> {
     private Map<Long, Entity> cacheImpl;
 
     private RemoteCacheServer() {
-        this.cacheImpl = new ConcurrentHashMap<Long, Entity>();
+        this.cacheImpl = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -40,8 +40,8 @@ public class RemoteCacheServer implements CacheService<Entity> {
     }
 
     public static void main(String[] args) throws Exception {
-        ConnectionString conn = new ConnectionString("0.0.0.0:" + DEFAULT_PORT);
-        RpcServer<CacheService> server = new RpcServer<CacheService>(conn, new RemoteCacheServer());
+        ServerConfig config = ServerConfig.from("0.0.0.0:" + DEFAULT_PORT);
+        RpcServer<CacheService> server = new RpcServer<CacheService>(config, new RemoteCacheServer());
         server.start();
     }
 }

@@ -23,23 +23,23 @@ import one.nio.os.Proc;
 import java.io.IOException;
 import java.util.Iterator;
 
-final class SelectorThread extends Thread {
+public final class SelectorThread extends Thread {
     private static final int BUFFER_SIZE = 64000;
 
-    final Selector selector;
-    final long affinity;
+    public final Selector selector;
+    public final long affinity;
 
     long operations;
     long sessions;
     int maxReady;
 
-    SelectorThread(int num, long affinity) throws IOException {
+    public SelectorThread(int num, long affinity) throws IOException {
         super("NIO Selector #" + num);
         this.selector = Selector.create();
         this.affinity = affinity;
     }
 
-    void shutdown() {
+    public void shutdown() {
         selector.close();
         try {
             join();

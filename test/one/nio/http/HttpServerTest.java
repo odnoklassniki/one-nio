@@ -16,15 +16,15 @@
 
 package one.nio.http;
 
-import one.nio.net.ConnectionString;
+import one.nio.server.ServerConfig;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
 
 public class HttpServerTest extends HttpServer {
 
-    public HttpServerTest(ConnectionString conn) throws IOException {
-        super(conn);
+    public HttpServerTest(ServerConfig config) throws IOException {
+        super(config);
     }
 
     @Path("/simple")
@@ -35,7 +35,7 @@ public class HttpServerTest extends HttpServer {
     @Path({"/multi1", "/multi2"})
     public void handleMultiple(Request request, HttpSession session) throws IOException {
         Response response = Response.ok("Multiple: " + request.getPath());
-        session.writeResponse(response);
+        session.sendResponse(response);
     }
 
     @Override
@@ -43,7 +43,7 @@ public class HttpServerTest extends HttpServer {
         try {
             super.handleRequest(request, session);
         } catch (RuntimeException e) {
-            session.writeError(Response.BAD_REQUEST, e.toString());
+            session.sendError(Response.BAD_REQUEST, e.toString());
         }
     }
 
@@ -64,12 +64,12 @@ public class HttpServerTest extends HttpServer {
     public void handleDefault(Request request, HttpSession session) throws IOException {
         Response response = Response.ok(Utf8.toBytes("<html><body><pre>Default</pre></body></html>"));
         response.addHeader("Content-Type: text/html");
-        session.writeResponse(response);
+        session.sendResponse(response);
     }
 
     public static void main(String[] args) throws Exception {
         String url = args.length > 0 ? args[0] : "socket://0.0.0.0:8080";
-        HttpServerTest server = new HttpServerTest(new ConnectionString(url));
+        HttpServerTest server = new HttpServerTest(ServerConfig.from(url));
         server.start();
     }
 }

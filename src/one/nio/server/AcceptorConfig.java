@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-package one.nio.net;
+package one.nio.server;
 
-import one.nio.server.Server;
+import one.nio.config.Config;
+import one.nio.config.Converter;
+import one.nio.net.SslConfig;
 
-public class MultiServerTest {
-
-    public static void main(String[] args) throws Exception {
-        Server server = new Server(new ConnectionString("localhost|127.0.0.2:8080?keepalive=10"));
-        server.start();
-
-        while (server.getAcceptedSessions() < 3) {
-            Thread.sleep(10);
-        }
-
-        server.stop();
-    }
+@Config
+public class AcceptorConfig {
+    public String address = "0.0.0.0";
+    public int port;
+    @Converter(method = "size")
+    public int recvBuf;
+    @Converter(method = "size")
+    public int sendBuf;
+    public int backlog = 128;
+    public boolean noDelay = true;
+    public boolean tcpFastOpen = true;
+    public boolean deferAccept;
+    public SslConfig ssl;
 }

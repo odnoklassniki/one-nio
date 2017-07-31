@@ -21,6 +21,7 @@ public interface ServerMXBean {
     boolean getWorkersUsed();
     int getWorkers();
     int getWorkersActive();
+    long getKeepAlive();
     long getAcceptedSessions();
     long getRejectedSessions();
     int getSelectorCount();
