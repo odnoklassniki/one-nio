@@ -24,6 +24,18 @@ jfieldID cache_field(JNIEnv* env, const char* holder, const char* field, const c
     return (*env)->GetFieldID(env, cls, field, signature);
 }
 
+int array_equals(JNIEnv* env, jbyteArray array, void* buf, int buflen) {
+    int len = (*env)->GetArrayLength(env, array);
+    if (len != buflen) {
+        return 0;
+    }
+
+    jbyte* data = (*env)->GetByteArrayElements(env, array, NULL);
+    int result = memcmp(data, buf, buflen);
+    (*env)->ReleaseByteArrayElements(env, array, data, JNI_ABORT);
+    return result == 0;
+}
+
 void throw_by_name(JNIEnv* env, const char* exception, const char* msg) {
     jclass cls = (*env)->FindClass(env, exception);
     if (cls != NULL) {
@@ -32,7 +44,7 @@ void throw_by_name(JNIEnv* env, const char* exception, const char* msg) {
 }
 
 void throw_socket_closed(JNIEnv* env) {
-    throw_by_name(env, "java/net/SocketException", "Socket closed");
+    throw_by_name(env, "one/nio/net/SocketClosedException", "Socket closed");
 }
 
 void throw_io_exception(JNIEnv* env) {

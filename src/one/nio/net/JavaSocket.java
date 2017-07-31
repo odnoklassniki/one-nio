@@ -23,6 +23,7 @@ import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
@@ -58,11 +59,16 @@ final class JavaSocket extends Socket {
 
     @Override
     public final void connect(InetAddress address, int port) throws IOException {
-        ch.connect(new InetSocketAddress(address, port));
+        ch.socket().connect(new InetSocketAddress(address, port), ch.socket().getSoTimeout());
     }
 
     @Override
     public final void bind(InetAddress address, int port, int backlog) throws IOException {
+        ch.bind(new InetSocketAddress(address, port));
+    }
+
+    @Override
+    public final void listen(int backlog) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -85,7 +91,7 @@ final class JavaSocket extends Socket {
     public final int readRaw(long buf, int count, int flags) throws IOException {
         int result = ch.read(DirectMemory.wrap(buf, count));
         if (result < 0) {
-            throw new SocketException("Socket closed");
+            throw new SocketClosedException();
         }
         return result;
     }
@@ -94,7 +100,7 @@ final class JavaSocket extends Socket {
     public final int read(byte[] data, int offset, int count) throws IOException {
         int result = ch.read(ByteBuffer.wrap(data, offset, count));
         if (result < 0) {
-            throw new SocketException("Socket closed");
+            throw new SocketClosedException();
         }
         return result;
     }
@@ -104,7 +110,7 @@ final class JavaSocket extends Socket {
         ByteBuffer buffer = ByteBuffer.wrap(data, offset, count);
         while (buffer.hasRemaining()) {
             if (ch.read(buffer) < 0) {
-                throw new SocketException("Socket closed");
+                throw new SocketClosedException();
             }
         }
     }
@@ -127,7 +133,7 @@ final class JavaSocket extends Socket {
     public final void setTimeout(int timeout) {
         try {
             ch.socket().setSoTimeout(timeout);
-        } catch (Exception e) {
+        } catch (SocketException e) {
             // Ignore
         }
     }
@@ -135,8 +141,8 @@ final class JavaSocket extends Socket {
     @Override
     public final void setKeepAlive(boolean keepAlive) {
         try {
-            ch.socket().setKeepAlive(keepAlive);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.SO_KEEPALIVE, keepAlive);
+        } catch (IOException e) {
             // Ignore
         }
     }
@@ -144,10 +150,15 @@ final class JavaSocket extends Socket {
     @Override
     public final void setNoDelay(boolean noDelay) {
         try {
-            ch.socket().setTcpNoDelay(noDelay);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.TCP_NODELAY, noDelay);
+        } catch (IOException e) {
             // Ignore
         }
+    }
+
+    @Override
+    public final void setTcpFastOpen(boolean tcpFastOpen) {
+        // Ignore
     }
 
     @Override
@@ -158,8 +169,8 @@ final class JavaSocket extends Socket {
     @Override
     public final void setReuseAddr(boolean reuseAddr) {
         try {
-            ch.socket().setReuseAddress(reuseAddr);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
+        } catch (IOException e) {
             // Ignore
         }
     }
@@ -167,8 +178,8 @@ final class JavaSocket extends Socket {
     @Override
     public final void setRecvBuffer(int recvBuf) {
         try {
-            ch.socket().setReceiveBufferSize(recvBuf);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.SO_RCVBUF, recvBuf);
+        } catch (IOException e) {
             // Ignore
         }
     }
@@ -176,30 +187,38 @@ final class JavaSocket extends Socket {
     @Override
     public final void setSendBuffer(int sendBuf) {
         try {
-            ch.socket().setSendBufferSize(sendBuf);
-        } catch (SocketException e) {
+            ch.setOption(StandardSocketOptions.SO_SNDBUF, sendBuf);
+        } catch (IOException e) {
             // Ignore
         }
     }
 
     @Override
-    public byte[] getOption(int level, int option) {
+    public final byte[] getOption(int level, int option) {
         return null;
     }
 
     @Override
-    public boolean setOption(int level, int option, byte[] value) {
+    public final boolean setOption(int level, int option, byte[] value) {
         return false;
     }
 
     @Override
     public final InetSocketAddress getLocalAddress() {
-        return (InetSocketAddress) ch.socket().getLocalSocketAddress();
+        try {
+            return (InetSocketAddress) ch.getLocalAddress();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @Override
     public final InetSocketAddress getRemoteAddress() {
-        return (InetSocketAddress) ch.socket().getRemoteSocketAddress();
+        try {
+            return (InetSocketAddress) ch.getRemoteAddress();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @Override

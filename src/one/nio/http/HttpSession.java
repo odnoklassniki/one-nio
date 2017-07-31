@@ -18,6 +18,7 @@ package one.nio.http;
 
 import one.nio.net.Session;
 import one.nio.net.Socket;
+import one.nio.net.SocketClosedException;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
@@ -28,8 +29,10 @@ public class HttpSession extends Session {
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;
 
+    protected static final Request FIN = new Request(0, "", false);
+
     protected final HttpServer server;
-    protected final LinkedList<Request> pipeline = new LinkedList<Request>();
+    protected final LinkedList<Request> pipeline = new LinkedList<>();
     protected final byte[] fragment = new byte[MAX_FRAGMENT_LENGTH];
     protected int fragmentLength;
     protected Request parsing;
@@ -59,7 +62,12 @@ public class HttpSession extends Session {
         if (length > 0) {
             System.arraycopy(fragment, 0, buffer, 0, length);
         }
-        length += super.read(buffer, length, buffer.length - length);
+        try {
+            length += super.read(buffer, length, buffer.length - length);
+        } catch (SocketClosedException e) {
+            handleSocketClosed();
+            return;
+        }
 
         try {
             int processed = processHttpBuffer(buffer, length);
@@ -75,11 +83,25 @@ public class HttpSession extends Session {
             if (log.isDebugEnabled()) {
                 log.debug("Bad request", e);
             }
-            writeError(Response.BAD_REQUEST, e.getMessage());
+            sendError(Response.BAD_REQUEST, e.getMessage());
         }
     }
 
-    protected synchronized int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
+    protected void handleSocketClosed() {
+        if (closing) {
+            return;
+        }
+        // Unsubscribe from read events
+        listen(queueHead == null ? 0 : WRITEABLE);
+
+        if (handling == null) {
+            scheduleClose();
+        } else {
+            pipeline.addLast(FIN);
+        }
+    }
+
+    protected int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
         int lineStart = 0;
         for (int i = 0; i < length; i++) {
             if (buffer[i] != '\n') continue;
@@ -125,7 +147,7 @@ public class HttpSession extends Session {
         throw new HttpException("Invalid request");
     }
 
-    public synchronized void writeResponse(Response response) throws IOException {
+    public synchronized void sendResponse(Response response) throws IOException {
         if (handling == null) {
             throw new IOException("Out of order response");
         }
@@ -138,22 +160,30 @@ public class HttpSession extends Session {
                 : "Keep-Alive".equalsIgnoreCase(connection);
         response.addHeader(keepAlive ? "Connection: Keep-Alive" : "Connection: close");
 
-        byte[] bytes = response.toBytes(handling.getMethod() != Request.METHOD_HEAD);
-        super.write(bytes, 0, bytes.length);
+        writeResponse(response, handling.getMethod() != Request.METHOD_HEAD);
         if (!keepAlive) scheduleClose();
 
         if ((handling = pipeline.pollFirst()) != null) {
-            server.handleRequest(handling, this);
+            if (handling == FIN) {
+                scheduleClose();
+            } else {
+                server.handleRequest(handling, this);
+            }
         }
     }
 
-    public void writeError(String code, String message) throws IOException {
+    public synchronized void sendError(String code, String message) throws IOException {
         server.incRequestsRejected();
 
         Response response = new Response(code, message == null ? Response.EMPTY : Utf8.toBytes(message));
         response.addHeader("Connection: close");
-        byte[] bytes = response.toBytes(true);
-        super.write(bytes, 0, bytes.length);
+
+        writeResponse(response, true);
         scheduleClose();
+    }
+
+    protected void writeResponse(Response response, boolean includeBody) throws IOException {
+        byte[] bytes = response.toBytes(includeBody);
+        super.write(bytes, 0, bytes.length);
     }
 }

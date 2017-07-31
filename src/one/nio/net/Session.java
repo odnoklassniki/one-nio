@@ -73,26 +73,22 @@ public class Session implements Closeable {
 
     public int checkStatus(long currentTime, long keepAlive) {
         long lastAccessTime = this.lastAccessTime;
-        if (lastAccessTime < currentTime - keepAlive) {
-            if (queueHead == null) {
-                return IDLE;
-            } else if (lastAccessTime < currentTime - keepAlive * 8) {
-                return STALE;
-            }
+        if (lastAccessTime < currentTime - keepAlive && queueHead == null) {
+            return IDLE;
         }
         return ACTIVE;
     }
 
     @Override
     public synchronized void close() {
-        for (QueueItem item = queueHead; item != null; item = item.next) {
-            item.release();
-        }
+        QueueItem.releaseChain(queueHead);
         queueHead = null;
 
         if (socket.isOpen()) {
             closing = true;
-            selector.unregister(this);
+            if (selector != null) {
+                selector.unregister(this);
+            }
             socket.close();
         }
     }
@@ -145,33 +141,37 @@ public class Session implements Closeable {
         }
     }
 
-    public void write(byte[] data, int offset, int count) throws IOException {
+    public final void write(byte[] data, int offset, int count) throws IOException {
         write(data, offset, count, 0);
     }
 
-    public void write(byte[] data, int offset, int count, int flags) throws IOException {
+    public final void write(byte[] data, int offset, int count, int flags) throws IOException {
         write(new ArrayQueueItem(data, offset, count, flags));
     }
 
-    public synchronized void write(QueueItem item) throws IOException {
-        if (closing) {
-            throw new SocketException("Socket closed");
-        }
-
-        if (queueHead == null) {
-            int written = item.write(socket);
-            if (item.remaining() > 0) {
-                queueHead = item;
-                listen(written >= 0 ? WRITEABLE : SSL | READABLE);
+    public final synchronized void write(QueueItem item) throws IOException {
+        try {
+            if (closing) {
+                throw new SocketException("Socket closed");
+            }
+            if (queueHead == null) {
+                while (item != null) {
+                    int written = item.write(socket);
+                    if (item.remaining() > 0) {
+                        queueHead = item;
+                        listen(written >= 0 ? WRITEABLE : SSL | READABLE);
+                        break;
+                    } else {
+                        item.release();
+                    }
+                    item = item.next;
+                }
             } else {
-                item.release();
+                queueHead.append(item);
             }
-        } else {
-            QueueItem tail = queueHead;
-            while (tail.next != null) {
-                tail = tail.next;
-            }
-            tail.next = item;
+        } catch (IOException e) {
+            QueueItem.releaseChain(item);
+            throw e;
         }
     }
 
@@ -179,7 +179,11 @@ public class Session implements Closeable {
         read(buffer, 0, buffer.length);
     }
 
-    protected synchronized void processWrite() throws Exception {
+    protected void processWrite() throws Exception {
+        if (eventsToListen == READABLE || eventsToListen == (SSL | WRITEABLE)) {
+            throw new IOException("Illegal subscription state: " + eventsToListen);
+        }
+
         for (QueueItem item = queueHead; item != null; queueHead = item = item.next) {
             int written = item.write(socket);
             if (item.remaining() > 0) {
@@ -196,10 +200,12 @@ public class Session implements Closeable {
         }
     }
 
-    public void process(byte[] buffer) throws Exception {
+    public synchronized void process(byte[] buffer) throws Exception {
         lastAccessTime = Long.MAX_VALUE;
 
-        if (eventsToListen >= SSL) {
+        if ((events & CLOSING) != 0) {
+            close();
+        } else if (eventsToListen >= SSL) {
             // At any time during SSL connection a renegotiation may occur, that is,
             // a write operation may require a readable socket, and a read operation
             // may require a writable socket. In this case eventsToListen will have SSL flag set.
@@ -210,18 +216,14 @@ public class Session implements Closeable {
             if ((events & READABLE) != 0) processRead(buffer);
         }
 
-        if ((events & CLOSING) != 0) {
-            close();
-        }
-
         lastAccessTime = System.currentTimeMillis();
     }
 
     public void handleException(Throwable e) {
         if (e instanceof SocketException) {
-            if (log.isDebugEnabled()) log.debug("Connection closed: " + getRemoteHost(), e);
+            if (log.isDebugEnabled()) log.debug("Connection closed: " + getRemoteHost());
         } else if (e instanceof SSLException) {
-            if (log.isDebugEnabled()) log.debug("SSL/TLS failure: " + getRemoteHost(), e);
+            if (log.isDebugEnabled()) log.debug("SSL/TLS failure: " + getRemoteHost());
         } else {
             log.error("Cannot process session from " + getRemoteHost(), e);
         }
@@ -231,12 +233,27 @@ public class Session implements Closeable {
     public static abstract class QueueItem {
         protected QueueItem next;
 
+        public QueueItem append(QueueItem next) {
+            QueueItem tail = this;
+            while (tail.next != null) {
+                tail = tail.next;
+            }
+            tail.next = next;
+            return this;
+        }
+
         public int remaining() {
             return 0;
         }
 
         public void release() {
             // Override in subclasses to release associated resources
+        }
+
+        public static void releaseChain(QueueItem item) {
+            for (; item != null; item = item.next) {
+                item.release();
+            }
         }
 
         public abstract int write(Socket socket) throws IOException;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2016 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@
 package one.nio.http;
 
 import one.nio.http.gen.RequestHandlerGenerator;
-import one.nio.net.ConnectionString;
 import one.nio.server.RejectedSessionException;
 import one.nio.server.Server;
 import one.nio.net.Socket;
+import one.nio.server.ServerConfig;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -28,10 +28,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class HttpServer extends Server {
-    protected final HashMap<String, RequestHandler> requestHandlers = new HashMap<String, RequestHandler>();
+    protected final HashMap<String, RequestHandler> requestHandlers = new HashMap<>();
 
-    public HttpServer(ConnectionString conn, Object... routers) throws IOException {
-        super(conn);
+    public HttpServer(ServerConfig config, Object... routers) throws IOException {
+        super(config);
         addRequestHandlers(this);
         for (Object router : routers) {
             addRequestHandlers(router);
@@ -54,11 +54,11 @@ public class HttpServer extends Server {
 
     public void handleDefault(Request request, HttpSession session) throws IOException {
         Response response = new Response(Response.NOT_FOUND, Response.EMPTY);
-        session.writeResponse(response);
+        session.sendResponse(response);
     }
 
     public void addRequestHandlers(Object router) {
-        ArrayList<Class> supers = new ArrayList<Class>(4);
+        ArrayList<Class> supers = new ArrayList<>(4);
         for (Class cls = router.getClass(); cls != Object.class; cls = cls.getSuperclass()) {
             supers.add(cls);
         }

@@ -20,6 +20,19 @@
 
 jfieldID cache_field(JNIEnv* env, const char* holder, const char* field, const char* signature);
 
+int array_equals(JNIEnv* env, jbyteArray array, void* buf, int buflen);
+
 void throw_by_name(JNIEnv* env, const char* exception, const char* msg);
 void throw_socket_closed(JNIEnv* env);
 void throw_io_exception(JNIEnv* env);
+
+static inline int is_io_exception(int fd) {
+    if (errno == EINTR) {
+        // Blocking call was interrupted by a signal; the operation can be restarted
+        return 0;
+    } else if (errno == EWOULDBLOCK && (fcntl(fd, F_GETFL) & O_NONBLOCK)) {
+        // Non-blocking operation is is progress; this is not an error
+        return 0;
+    }
+    return 1;
+}
