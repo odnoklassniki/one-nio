@@ -16,28 +16,25 @@
 
 package one.nio.lock;
 
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 
-public class RWLock extends Semaphore {
-    private static final int WRITE_PERMITS = 65536;
+public class RWLock extends AbstractQueuedSynchronizer {
+    private static final int READ = 1;
+    private static final int WRITE = 65535;
+    private static final long MILLIS = 1000000;
 
     public RWLock() {
-        super(WRITE_PERMITS);
-    }
-
-    public RWLock(boolean fair) {
-        super(WRITE_PERMITS, fair);
+        setState(WRITE);
     }
 
     public final RWLock lockRead() {
-        super.acquireUninterruptibly();
+        super.acquireShared(READ);
         return this;
     }
 
     public final boolean lockRead(long timeout) {
         try {
-            return super.tryAcquire(timeout, TimeUnit.MILLISECONDS);
+            return super.tryAcquireSharedNanos(READ, timeout * MILLIS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -45,17 +42,17 @@ public class RWLock extends Semaphore {
     }
 
     public final void unlockRead() {
-        super.release();
+        super.releaseShared(READ);
     }
 
     public final RWLock lockWrite() {
-        super.acquireUninterruptibly(WRITE_PERMITS);
+        super.acquireShared(WRITE);
         return this;
     }
 
     public final boolean lockWrite(long timeout) {
         try {
-            return super.tryAcquire(WRITE_PERMITS, timeout, TimeUnit.MILLISECONDS);
+            return super.tryAcquireSharedNanos(WRITE, timeout * MILLIS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -63,23 +60,36 @@ public class RWLock extends Semaphore {
     }
 
     public final void unlockWrite() {
-        super.release(WRITE_PERMITS);
+        super.releaseShared(WRITE);
     }
 
-    public final void upgrade() {
-        super.acquireUninterruptibly(WRITE_PERMITS - 1);
-    }
-
-    public final boolean upgrade(long timeout) {
-        try {
-            return super.tryAcquire(WRITE_PERMITS - 1, timeout, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
+    public final void unlock(boolean write) {
+        super.releaseShared(write ? WRITE : READ);
     }
 
     public final void downgrade() {
-        super.release(WRITE_PERMITS - 1);
+        super.releaseShared(WRITE - READ);
+    }
+
+    @Override
+    protected int tryAcquireShared(int acquires) {
+        for (;;) {
+            int state = getState();
+            int remaining = state - acquires;
+            if (remaining < 0 || compareAndSetState(state, remaining)) {
+                return remaining;
+            }
+        }
+    }
+
+    @Override
+    protected final boolean tryReleaseShared(int releases) {
+        for (;;) {
+            int state = getState();
+            int remaining = state + releases;
+            if (compareAndSetState(state, remaining)) {
+                return true;
+            }
+        }
     }
 }

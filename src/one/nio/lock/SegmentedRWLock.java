@@ -30,7 +30,7 @@ public class SegmentedRWLock {
 
         this.locks = new RWLock[count];
         for (int i = 0; i < locks.length; i++) {
-            locks[i] = new RWLock(fair);
+            locks[i] = fair ? new FairRWLock() : new RWLock();
         }
     }
 
