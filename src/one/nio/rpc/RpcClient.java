@@ -33,9 +33,13 @@ import java.lang.reflect.Method;
 import java.net.SocketException;
 
 public class RpcClient extends SocketPool implements InvocationHandler {
+    protected final Object[] uidLocks = new Object[64];
 
     public RpcClient(ConnectionString conn) {
         super(conn);
+        for (int i = 0; i < uidLocks.length; i++) {
+            uidLocks[i] = new Object();
+        }
     }
 
     public Object invoke(Object request) throws Exception {
@@ -47,7 +51,11 @@ public class RpcClient extends SocketPool implements InvocationHandler {
                 response = new DeserializeStream(buffer).readObject();
             } catch (SerializerNotFoundException e) {
                 long uid = e.getUid();
-                Repository.provideSerializer(requestSerializer(uid));
+                synchronized (uidLockFor(uid)) {
+                    if (!Repository.hasSerializer(uid)) {
+                        Repository.provideSerializer(requestSerializer(uid));
+                    }
+                }
                 continue;
             }
 
@@ -66,6 +74,10 @@ public class RpcClient extends SocketPool implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object... args) throws Exception {
         return invoke(new RemoteCall(method, args));
+    }
+
+    protected Object uidLockFor(long uid) {
+        return uidLocks[(int) uid & (uidLocks.length - 1)];
     }
 
     protected void provideSerializer(Serializer serializer) throws Exception {
