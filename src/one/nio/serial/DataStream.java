@@ -16,11 +16,13 @@
 
 package one.nio.serial;
 
+import one.nio.mem.DirectMemory;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.nio.ByteBuffer;
 
 import static one.nio.util.JavaInternals.*;
 
@@ -43,8 +45,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
         this(array, byteArrayOffset, array.length);
     }
 
-    public DataStream(long address, int capacity) {
-        this(null, address, capacity);
+    public DataStream(long address, long length) {
+        this(null, address, length);
     }
 
     protected DataStream(byte[] array, long address, long length) {
@@ -270,6 +272,15 @@ public class DataStream implements ObjectInput, ObjectOutput {
 
     public void readTo(long address, int len) {
         unsafe.copyMemory(array, alloc(len), null, address, len);
+    }
+
+    public ByteBuffer byteBuffer(int len) {
+        long offset = alloc(len);
+        if (array != null) {
+            return ByteBuffer.wrap(array, (int) (offset - byteArrayOffset), len);
+        } else {
+            return DirectMemory.wrap(offset, len);
+        }
     }
 
     public int available() {

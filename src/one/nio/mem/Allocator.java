@@ -17,13 +17,19 @@
 package one.nio.mem;
 
 /**
- * Unit tests for {@link Malloc}
+ * Memory allocator
  *
  * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
  */
-public class MallocTest extends AbstractMallocTest {
-    @Override
-    protected Malloc newInstance(long capacity) {
-        return new Malloc(capacity);
-    }
+public interface Allocator {
+    long malloc(int size);
+
+    long calloc(int size);
+
+    void free(long address);
+
+    /**
+     * Verify the layout of the heap. Expensive operation, used only for debugging purposes.
+     */
+    void verify();
 }

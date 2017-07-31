@@ -32,8 +32,8 @@ import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements SharedMemoryMapMXBean {
-    protected static final long SIGNATURE_CLEAR = 0xa1091e4c436d6873L;
-    protected static final long SIGNATURE_DIRTY = 0xa1091f49446d6873L;
+    protected static final long SIGNATURE_CLEAR = 0xa10a1e4c436d6873L;
+    protected static final long SIGNATURE_DIRTY = 0xa10a1f49446d6873L;
 
     protected static final long SIGNATURE_OFFSET   = 0;
     protected static final long TIMESTAMP_OFFSET   = 8;
@@ -59,7 +59,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected SharedMemoryMap(int capacity, String fileName, long fileSize, long expirationTime) throws IOException {
         super(capacity);
 
-        if (fileName == null) {
+        if (fileName == null || fileName.isEmpty()) {
             this.mmap = new MappedFile(fileSize);
             this.name = "anon." + Long.toHexString(mmap.getAddr());
         } else {
@@ -92,7 +92,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
 
     private void init(long expirationTime) {
         if (needCleanup(expirationTime)) {
-            unsafe.setMemory(mmap.getAddr(), mmap.getSize(), (byte) 0);
+            DirectMemory.clear(mmap.getAddr(), mmap.getSize());
             setHeader(CAPACITY_OFFSET, capacity);
         }
 
@@ -108,7 +108,12 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     }
 
     protected boolean needCleanup(long expirationTime) {
-        if (getHeader(SIGNATURE_OFFSET) != SIGNATURE_CLEAR) {
+        long signature = getHeader(SIGNATURE_OFFSET);
+        if (signature == SIGNATURE_DIRTY) {
+            log.info("Resetting dirty " + className + "...");
+            return true;
+        }
+        if (signature != SIGNATURE_CLEAR) {
             log.info("Initial cleanup of " + className + "...");
             return true;
         }
@@ -179,9 +184,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
         try {
             long valueAddress = entry + headerSize(entry);
             return serializer.read(new DeserializeStream(valueAddress, Integer.MAX_VALUE));
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        } catch (ClassNotFoundException e) {
+        } catch (IOException | ClassNotFoundException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -257,19 +260,19 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected void loadSchema() throws IOException {
         log.info("Loading serialization schema for " + className + "...");
 
+        Repository.get(serializer.getClass());
+
         long metadataSize = getHeader(CUSTOM_SIZE_OFFSET);
         if (metadataSize < 0 || metadataSize > MAX_CUSTOM_DATA_SIZE) {
             throw new IllegalStateException("Invalid metadata size: " + metadataSize);
         }
 
         int count = 0;
-        DeserializeStream ds = new DeserializeStream(mmap.getAddr() + CUSTOM_DATA_OFFSET, (int) metadataSize);
+        DeserializeStream ds = new DeserializeStream(mmap.getAddr() + CUSTOM_DATA_OFFSET, metadataSize);
         while (ds.available() > 0) {
             try {
                 Repository.provideSerializer((Serializer) ds.readObject());
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            } catch (ClassNotFoundException e) {
+            } catch (IOException | ClassNotFoundException e) {
                 throw new IllegalStateException(e);
             }
             count++;
@@ -288,7 +291,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
 
         log.info("Saving serialization schema for " + className + "...");
 
-        final HashSet<Serializer> serializers = new HashSet<Serializer>();
+        final HashSet<Serializer> serializers = new HashSet<>();
         if (serializer.uid() >= 0) {
             serializers.add(serializer);
         }

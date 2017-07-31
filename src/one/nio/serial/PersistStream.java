@@ -33,6 +33,10 @@ public class PersistStream extends SerializeStream {
         super(array);
     }
 
+    public PersistStream(long address, long length) {
+        super(address, length);
+    }
+
     public byte[] toByteArray() {
         return Arrays.copyOf(array, count());
     }

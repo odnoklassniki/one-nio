@@ -38,7 +38,7 @@ public class MallocAnalyzer extends MallocMT {
         out.println("=== Segment Info ===");
         out.println("Segment Total\t" + Long.toHexString(base) + "\t" +
                     getTotalMemory() + "\t" + getUsedMemory() + "\t" + getFreeMemory());
-        for (int i = 0; i < SEGMENT_COUNT; i++) {
+        for (int i = 0; i < segments(); i++) {
             Malloc segment = segment(i);
             out.println("Segment " + i + "\t" + Long.toHexString(segment.base) + "\t" +
                         segment.getTotalMemory() + "\t" + segment.getUsedMemory() + "\t" + segment.getFreeMemory());
@@ -47,11 +47,11 @@ public class MallocAnalyzer extends MallocMT {
     }
 
     public void chunkInfo() {
-        BinStats[] usedStats = new BinStats[SEGMENT_COUNT];
-        BinStats[] freeStats = new BinStats[SEGMENT_COUNT];
-        BinStats[] altStats = new BinStats[SEGMENT_COUNT];
+        BinStats[] usedStats = new BinStats[segments()];
+        BinStats[] freeStats = new BinStats[segments()];
+        BinStats[] altStats = new BinStats[segments()];
 
-        for (int i = 0; i < SEGMENT_COUNT; i++) {
+        for (int i = 0; i < segments(); i++) {
             long start = segment(i).base + BIN_SPACE;
             long end = segment(i).base + segment(i).capacity - HEADER_SIZE * 2;
             BinStats used = usedStats[i] = new BinStats();
@@ -89,7 +89,7 @@ public class MallocAnalyzer extends MallocMT {
 
             int counter = 0;
             long total = 0;
-            for (int i = 0; i < SEGMENT_COUNT; i++) {
+            for (int i = 0; i < segments(); i++) {
                 out.print("\t" + stats[i].counter[bin]);
                 counter += stats[i].counter[bin];
                 total += stats[i].total[bin];
@@ -143,7 +143,7 @@ public class MallocAnalyzer extends MallocMT {
         }
 
         void addChunk(int size) {
-            addChunk(getBin(size), size);
+            addChunk(chooseBin(size), size);
         }
 
         void addChunk(int bin, int size) {

@@ -16,6 +16,8 @@
 
 package one.nio.mem;
 
+import java.io.IOException;
+
 import static one.nio.util.JavaInternals.*;
 
 public class MappedFileTest extends Thread {
@@ -59,7 +61,7 @@ public class MappedFileTest extends Thread {
         System.out.println(getName() + ": " + (endTime - startTime));
     }
 
-    public void testWriteBlock(int size) {
+    public void testWriteBlock(int size) throws IOException {
         final byte[] block = new byte[size];
         final long base = mmap.getAddr();
         final long mask = mmap.getSize() - size;
@@ -75,6 +77,8 @@ public class MappedFileTest extends Thread {
         }
 
         long endTime = System.currentTimeMillis();
+
+        mmap.sync();
 
         System.out.println(getName() + ": " + (endTime - startTime));
     }

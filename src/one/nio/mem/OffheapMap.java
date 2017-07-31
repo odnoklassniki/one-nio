@@ -27,7 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import sun.misc.Unsafe;
 
 import java.util.Arrays;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeoutException;
@@ -65,7 +65,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
     protected OffheapMap(int capacity, long address) {
         this(capacity);
-        this.mapBase = address != 0 ? address : DirectMemory.allocateAndFill(this.capacity * 8L, this, (byte) 0);
+        this.mapBase = address != 0 ? address : DirectMemory.allocateAndClear(this.capacity * 8L, this);
     }
 
     private static RWLock[] createLocks() {
@@ -175,7 +175,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         try {
             for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
                 if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {
-                    return isExpired(entry) ? null : valueAt(entry);
+                    return isExpired(entry, true) ? null : valueAt(entry);
                 }
             }
         } finally {
@@ -224,16 +224,23 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     public boolean putIfAbsent(K key, V value) throws OutOfMemoryException {
         long hashCode = hashCode(key);
         long currentPtr = bucketFor(hashCode);
+        int newSize = sizeOf(value);
 
         RWLock lock = lockFor(hashCode).lockWrite();
         try {
             for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
                 if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {
+                    if (isExpired(entry, false)) {
+                        unsafe.putAddress(currentPtr, unsafe.getAddress(entry + NEXT_OFFSET));
+                        destroyEntry(entry);
+                        count.decrementAndGet();
+                        break;
+                    }
                     return false;
                 }
             }
 
-            long entry = allocateEntry(key, hashCode, sizeOf(value));
+            long entry = allocateEntry(key, hashCode, newSize);
             unsafe.putLong(entry + HASH_OFFSET, hashCode);
             unsafe.putAddress(entry + NEXT_OFFSET, 0);
             setTimeAt(entry);
@@ -269,9 +276,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             lock.unlockWrite();
         }
 
+        final boolean expired = isExpired(entry, false);
         destroyEntry(entry);
         count.decrementAndGet();
-        return true;
+        return !expired;
     }
 
     public void touch(K key) {
@@ -311,8 +319,8 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
             if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {
-                if (isExpired(entry)) break;
-                return new Record<K, V>(this, lock, entry);
+                if (isExpired(entry, true)) break;
+                return new Record<>(this, lock, entry);
             }
         }
 
@@ -323,7 +331,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     public WritableRecord<K, V> lockRecordForWrite(K key, long timeout, boolean create) throws TimeoutException {
         long hashCode = hashCode(key);
         RWLock lock = lockFor(hashCode);
-        if (!lock.lockWrite(timeout)){
+        if (!lock.lockWrite(timeout)) {
             throw new TimeoutException();
         }
         return createWritableRecord(key, hashCode, lock, create);
@@ -340,12 +348,12 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
             if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {
-                return new WritableRecord<K, V>(this, lock, entry, key, currentPtr);
+                return new WritableRecord<>(this, lock, entry, key, currentPtr);
             }
         }
 
         if (create) {
-            return new WritableRecord<K, V>(this, lock, 0, key, currentPtr);
+            return new WritableRecord<>(this, lock, 0, key, currentPtr);
         }
 
         lock.unlockWrite();
@@ -435,7 +443,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             RWLock lock = locks[i & (CONCURRENCY_LEVEL - 1)].lockRead();
             try {
                 for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
-                    visitor.visit(new Record<K, V>(this, lock, entry));
+                    visitor.visit(new Record<>(this, lock, entry));
                 }
             } finally {
                 lock.unlockRead();
@@ -462,7 +470,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             RWLock lock = locks[i & (CONCURRENCY_LEVEL - 1)].lockWrite();
             try {
                 for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; ) {
-                    WritableRecord<K, V> record = new WritableRecord<K, V>(this, lock, entry, keyAt(entry), currentPtr);
+                    WritableRecord<K, V> record = new WritableRecord<>(this, lock, entry, keyAt(entry), currentPtr);
                     visitor.visit(record);
                     if (record.entry != 0) {
                         currentPtr = record.entry + NEXT_OFFSET;
@@ -490,19 +498,25 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         unsafe.putLong(entry + TIME_OFFSET, System.currentTimeMillis());
     }
 
-    protected boolean isExpired(long entry) {
+    protected void setTimeAt(long entry, long time) {
+        unsafe.putLong(entry + TIME_OFFSET, time);
+    }
+
+    protected boolean isExpired(long entry, boolean touch) {
         long currentTime = System.currentTimeMillis();
         if (currentTime - unsafe.getLong(entry + TIME_OFFSET) > timeToLive) {
             return true;
         }
-        unsafe.putLong(entry + TIME_OFFSET, currentTime);
+        if (touch) {
+            unsafe.putLong(entry + TIME_OFFSET, currentTime);
+        }
         return false;
     }
 
     // Called from CleanupThread. Returns true if the entry should be removed.
     // Can be used to perform custom logic on entry eviction.
     protected boolean shouldCleanup(long entry, long expirationTime) {
-        return unsafe.getLong(entry + TIME_OFFSET) <= expirationTime;
+        return timeAt(entry) <= expirationTime;
     }
 
     protected K keyAt(long entry) {
@@ -519,15 +533,20 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected abstract int sizeOf(V value);
 
     public static class Record<K, V> {
-        final OffheapMap<K, V> map;
-        final RWLock lock;
-        long entry;
+        protected final OffheapMap<K, V> map;
+        protected final RWLock lock;
+        protected long entry;
 
-        Record(OffheapMap<K, V> map, RWLock lock, long entry) {
+        protected Record(OffheapMap<K, V> map, RWLock lock, long entry) {
             this.map = map;
             this.lock = lock;
             this.entry = entry;
         }
+
+
+        public OffheapMap<K, V> map() { return map; }
+
+        public RWLock lock() { return lock; }
 
         public long entry() {
             return entry;
@@ -535,10 +554,6 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         public long hash() {
             return unsafe.getLong(entry + HASH_OFFSET);
-        }
-
-        public boolean isNull() {
-            return entry == 0;
         }
 
         public K key() {
@@ -567,10 +582,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     public static class WritableRecord<K, V> extends Record<K, V> {
-        K key;
-        long currentPtr;
+        protected K key;
+        protected long currentPtr;
 
-        WritableRecord(OffheapMap<K, V> map, RWLock lock, long entry, K key, long currentPtr) {
+        protected WritableRecord(OffheapMap<K, V> map, RWLock lock, long entry, K key, long currentPtr) {
             super(map, lock, entry);
             this.key = key;
             this.currentPtr = currentPtr;
@@ -610,6 +625,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             entry = 0;
         }
 
+        public boolean isNullOrExpired() {
+            return entry == 0 || map.isExpired(entry, false);
+        }
+
         public long currentPtr() {
             return currentPtr;
         }
@@ -625,11 +644,11 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         }
     }
 
-    public static interface Visitor<K, V> {
+    public interface Visitor<K, V> {
         void visit(Record<K, V> record);
     }
 
-    public static interface WritableVisitor<K, V> {
+    public interface WritableVisitor<K, V> {
         void visit(WritableRecord<K, V> record);
     }
 
@@ -676,7 +695,6 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     public class SamplingCleanup extends BasicCleanup {
-        private final Random random = new Random();
 
         public SamplingCleanup(String name) {
             super(name);
@@ -710,7 +728,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         private int collectSamples(long[] timestamps) {
             int samples = 0;
-            int startBucket = random.nextInt(CONCURRENCY_LEVEL);
+            int startBucket = ThreadLocalRandom.current().nextInt(CONCURRENCY_LEVEL);
             int bucket = startBucket;
 
             do {
@@ -719,7 +737,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     for (int i = bucket; i < capacity; i += CONCURRENCY_LEVEL) {
                         long currentPtr = mapBase + (long) i * 8;
                         for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
-                            timestamps[samples++] = unsafe.getLong(entry + TIME_OFFSET);
+                            timestamps[samples++] = timeAt(entry);
                             if (samples == timestamps.length) return samples;
                         }
                     }

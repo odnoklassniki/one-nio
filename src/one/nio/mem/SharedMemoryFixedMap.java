@@ -67,6 +67,16 @@ public abstract class SharedMemoryFixedMap<K, V> extends SharedMemoryMap<K, V> {
     }
 
     @Override
+    protected void loadSchema() {
+        // Standard schemas are not supported; CUSTOM_DATA_OFFSET is already used
+    }
+
+    @Override
+    protected void storeSchema() {
+        // Standard schemas are not supported; CUSTOM_DATA_OFFSET is already used
+    }
+
+    @Override
     protected void relocate(long delta) {
         super.relocate(delta);
         FixedSizeAllocator.relocate(mmap.getAddr() + ALLOCATOR_HEAD_OFFSET, delta);

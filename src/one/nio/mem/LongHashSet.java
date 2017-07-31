@@ -38,7 +38,7 @@ public class LongHashSet {
         }
         this.capacity = capacity;
         this.maxSteps = (int) Math.sqrt(capacity);
-        this.keys = DirectMemory.allocateAndFill(sizeInBytes(capacity), this, (byte) 0);
+        this.keys = DirectMemory.allocateAndClear(sizeInBytes(capacity), this);
     }
 
     public LongHashSet(int capacity, long keys) {
@@ -109,11 +109,11 @@ public class LongHashSet {
     }
 
     public final long keyAt(int index) {
-        return unsafe.getLong(keys + (long) index * 8);
+        return unsafe.getLongVolatile(null, keys + (long) index * 8);
     }
 
     public final void setKeyAt(int index, long value) {
-        unsafe.putLong(keys + (long) index * 8, value);
+        unsafe.putOrderedLong(null, keys + (long) index * 8, value);
     }
 
     public void clear() {

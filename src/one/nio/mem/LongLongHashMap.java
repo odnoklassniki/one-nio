@@ -21,7 +21,7 @@ public class LongLongHashMap extends LongHashSet {
 
     public LongLongHashMap(int capacity) {
         super(capacity);
-        this.values = DirectMemory.allocateAndFill((long) this.capacity * 8, this, (byte) 0);
+        this.values = DirectMemory.allocateAndClear((long) this.capacity * 8, this);
     }
 
     public LongLongHashMap(int capacity, long keys, long values) {
@@ -83,17 +83,17 @@ public class LongLongHashMap extends LongHashSet {
     }
 
     public final long valueAt(int index) {
-        return unsafe.getLong(values + (long) index * 8);
+        return unsafe.getLongVolatile(null, values + (long) index * 8);
     }
 
     public final void setValueAt(int index, long value) {
-        unsafe.putLong(values + (long) index * 8, value);
+        unsafe.putOrderedLong(null, values + (long) index * 8, value);
     }
 
     public final long replaceValueAt(int index, long newValue) {
         long address = values + (long) index * 8;
         for (;;) {
-            long oldValue = unsafe.getLong(address);
+            long oldValue = unsafe.getLongVolatile(null, address);
             if (unsafe.compareAndSwapLong(null, address, oldValue, newValue)) {
                 return oldValue;
             }
@@ -103,7 +103,7 @@ public class LongLongHashMap extends LongHashSet {
     public final long adjustValueAt(int index, long delta) {
         long address = values + (long) index * 8;
         for (;;) {
-            long oldValue = unsafe.getLong(address);
+            long oldValue = unsafe.getLongVolatile(null, address);
             long newValue = oldValue + delta;
             if (unsafe.compareAndSwapLong(null, address, oldValue, newValue)) {
                 return newValue;

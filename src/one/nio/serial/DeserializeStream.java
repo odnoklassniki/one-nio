@@ -37,8 +37,8 @@ public class DeserializeStream extends DataStream {
         this.context = new Object[INITIAL_CAPACITY];
     }
 
-    public DeserializeStream(long address, int capacity) {
-        super(address, capacity);
+    public DeserializeStream(long address, long length) {
+        super(address, length);
         this.context = new Object[INITIAL_CAPACITY];
     }
 

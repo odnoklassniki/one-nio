@@ -28,7 +28,11 @@ import static one.nio.util.JavaInternals.unsafe;
 public final class DirectMemory {
     private static final long addressOffset = JavaInternals.fieldOffset(Buffer.class, "address");
     private static final long capacityOffset = JavaInternals.fieldOffset(Buffer.class, "capacity");
-    private static final ByteBuffer prototype = ByteBuffer.allocateDirect(0);
+
+    static final ByteBuffer prototype = ByteBuffer.allocateDirect(0);
+
+    // Too long Unsafe.setMemory may prevent JVM safepoint from happening
+    private static final long MAX_SETMEMORY_BYTES = 2 * 1024 * 1024;
 
     public static long allocate(long size, Object holder) {
         final long address = unsafe.allocateMemory(size);
@@ -41,15 +45,15 @@ public final class DirectMemory {
         return address;
     }
 
-    public static long allocateAndFill(long size, Object holder, byte filler) {
+    public static long allocateAndClear(long size, Object holder) {
         long address = allocate(size, holder);
-        unsafe.setMemory(address, size, filler);
+        clear(address, size);
         return address;
     }
 
     public static long allocateRaw(long size) {
         long address = unsafe.allocateMemory(size);
-        unsafe.setMemory(address, size, (byte) 0);
+        clear(address, size);
         return address;
     }
 
@@ -57,8 +61,31 @@ public final class DirectMemory {
         unsafe.freeMemory(address);
     }
 
-    public static void clear(long address, long length) {
-        unsafe.setMemory(address, length, (byte) 0);
+    public static void clear(long address, long size) {
+        for (; size > MAX_SETMEMORY_BYTES; size -= MAX_SETMEMORY_BYTES) {
+            unsafe.setMemory(address, MAX_SETMEMORY_BYTES, (byte) 0);
+            address += MAX_SETMEMORY_BYTES;
+        }
+        unsafe.setMemory(address, size, (byte) 0);
+    }
+
+    // Faster than Unsafe.setMemory for small arrays
+    public static void clearSmall(long address, int size) {
+        for (; size >= 8; size -= 8) {
+            unsafe.putLong(address, 0);
+            address += 8;
+        }
+        if ((size & 4) != 0) {
+            unsafe.putInt(address, 0);
+            address += 4;
+        }
+        if ((size & 2) != 0) {
+            unsafe.putShort(address, (short) 0);
+            address += 2;
+        }
+        if ((size & 1) != 0) {
+            unsafe.putByte(address, (byte) 0);
+        }
     }
 
     public static long getAddress(ByteBuffer buffer) {
@@ -68,7 +95,7 @@ public final class DirectMemory {
     public static ByteBuffer wrap(long address, int count) {
         ByteBuffer result = prototype.duplicate();
         unsafe.putLong(result, addressOffset, address);
-        unsafe.putLong(result, capacityOffset, count);
+        unsafe.putInt(result, capacityOffset, count);
         result.limit(count);
         return result;
     }

@@ -17,13 +17,16 @@
 package one.nio.mem;
 
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+
+import static one.nio.util.JavaInternals.unsafe;
 
 public class MallocPerfTest extends Thread {
     private static final int MEM_CAPACITY    = 1024*1024*1024;
     private static final int ARRAY_LENGTH    = 4096;
     private static final int ALLOCATION_SIZE = 16384;
     private static final int RUN_COUNT       = 100000000;
-    private static final int THREAD_COUNT    = 1;
+    private static final int THREAD_COUNT    = 4;
 
     private final Allocator allocator;
 
@@ -35,7 +38,7 @@ public class MallocPerfTest extends Thread {
     @Override
     public void run() {
         Allocator allocator = this.allocator;
-        Random random = new Random(0);
+        Random random = ThreadLocalRandom.current();
         long[] addr = new long[ARRAY_LENGTH];
 
         long startTime = System.currentTimeMillis();
@@ -51,7 +54,10 @@ public class MallocPerfTest extends Thread {
         long endTime = System.currentTimeMillis();
 
         allocator.verify();
-        System.out.println(getName() + ": " + (endTime - startTime));
+        System.out.printf(
+                "%s: %d ms\n",
+                getName(),
+                (endTime - startTime));
     }
 
     public static void runTest(Allocator allocator) throws Exception {
@@ -70,17 +76,46 @@ public class MallocPerfTest extends Thread {
     }
 
     public static void main(String[] args) throws Exception {
-        new MallocPerfTest(new Allocator.Malloc(MEM_CAPACITY)).run();
-        new MallocPerfTest(new Allocator.MallocMT(MEM_CAPACITY)).run();
-        new MallocPerfTest(new Allocator.Unsafe()).run();
+        new MallocPerfTest(new Malloc(MEM_CAPACITY)).run();
+        new MallocPerfTest(new MallocMT(MEM_CAPACITY)).run();
+        new MallocPerfTest(new Unsafe()).run();
 
-        runTest(new Allocator.Malloc(MEM_CAPACITY));
-        runTest(new Allocator.MallocMT(MEM_CAPACITY));
-        runTest(new Allocator.Unsafe());
-        runTest(new Allocator.Malloc(MEM_CAPACITY));
-        runTest(new Allocator.MallocMT(MEM_CAPACITY));
-        runTest(new Allocator.Unsafe());
+        runTest(new Malloc(MEM_CAPACITY));
+        runTest(new MallocMT(MEM_CAPACITY));
+        runTest(new Unsafe());
+        runTest(new Malloc(MEM_CAPACITY));
+        runTest(new MallocMT(MEM_CAPACITY));
+        runTest(new Unsafe());
 
         System.out.println("Tests finished");
+    }
+
+    /**
+     * {@code Unsafe}-based direct memory allocator
+     *
+     * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+     */
+    public static class Unsafe implements Allocator {
+        @Override
+        public long malloc(int size) {
+            return unsafe.allocateMemory(size);
+        }
+
+        @Override
+        public long calloc(int size) {
+            long address = malloc(size);
+            DirectMemory.clearSmall(address, size);
+            return address;
+        }
+
+        @Override
+        public void free(long address) {
+            unsafe.freeMemory(address);
+        }
+
+        @Override
+        public void verify() {
+            // Nothing to do
+        }
     }
 }

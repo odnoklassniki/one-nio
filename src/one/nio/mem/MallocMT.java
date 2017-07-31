@@ -18,54 +18,67 @@ package one.nio.mem;
 
 import one.nio.mgt.Management;
 
-import java.util.Random;
-
-import static one.nio.util.JavaInternals.unsafe;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * MT-friendly version of Malloc.
- * Divides the whole memory space into 8 thread-local areas.
+ * Concurrent implementation of {@link Malloc}.
+ * Divides the whole memory space into several synchronized {@link Malloc}-segments to reduce lock contention.
+ *
+ * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
  */
 public class MallocMT extends Malloc {
-    static final int SEGMENT_COUNT = 8;
-    static final int SEGMENT_MASK  = SEGMENT_COUNT - 1;
+    public static final int DEFAULT_CONCURRENCY_LEVEL = 8;
 
-    private Malloc[] segments;
-    private Random random;
+    private Malloc[] segments; // segments.length is a power of 2
+    private long segmentSize;
+
+    public MallocMT(long capacity, int concurrencyLevel) {
+        super(capacity);
+        initSegments(concurrencyLevel);
+    }
 
     public MallocMT(long capacity) {
-        super(capacity);
+        this(capacity, DEFAULT_CONCURRENCY_LEVEL);
+    }
+
+    public MallocMT(long base, long capacity, int concurrencyLevel) {
+        super(base, capacity);
+        initSegments(concurrencyLevel);
     }
 
     public MallocMT(long base, long capacity) {
-        super(base, capacity);
+        this(base, capacity, DEFAULT_CONCURRENCY_LEVEL);
+    }
+
+    public MallocMT(MappedFile mmap, int concurrencyLevel) {
+        super(mmap);
+        initSegments(concurrencyLevel);
     }
 
     public MallocMT(MappedFile mmap) {
-        super(mmap);
+        this(mmap, DEFAULT_CONCURRENCY_LEVEL);
     }
 
-    public final int segments() {
+    public int segments() {
         return segments.length;
     }
 
-    public final Malloc segment(int index) {
+    public Malloc segment(int index) {
         return segments[index];
     }
 
-    public Malloc segmentFor(int n) {
-        return segments[n & SEGMENT_MASK];
-    }
-
+    /**
+     * Deterministically get one of the segments by some {@code long} value
+     */
     public Malloc segmentFor(long n) {
-        return segments[(int) n & SEGMENT_MASK];
+        return segments[(int) n & (segments.length - 1)];
     }
 
     @Override
     public long getFreeMemory() {
         long result = 0;
         for (Malloc segment : segments) {
-            result += segment.freeMemory;
+            result += segment.getFreeMemory();
         }
         return result;
     }
@@ -74,26 +87,36 @@ public class MallocMT extends Malloc {
     public long malloc(int size) {
         int alignedSize = (Math.max(size, 16) + (HEADER_SIZE + 7)) & ~7;
         int bin = getBin(alignedSize);
+        int adjustedSize = binSize(bin);
 
-        Malloc startSegment = segments[random.nextInt() & SEGMENT_MASK];
-        Malloc segment = startSegment;
-
+        int start = ThreadLocalRandom.current().nextInt(segments.length);
+        int i = start;
         do {
-            if (segment.freeMemory >= alignedSize) {
-                long address = segment.mallocImpl(bin, alignedSize);
+            Malloc segment = segments[i];
+            if (segment.getFreeMemory() >= alignedSize) {
+                long address = segment.mallocImpl(bin, adjustedSize);
                 if (address != 0) {
                     return address;
                 }
             }
-        } while ((segment = segment.next) != startSegment);
+            i = (i + 5) % segments.length;
+        } while (i != start);
 
         throw new OutOfMemoryException("Failed to allocate " + size + " bytes");
     }
 
+    private Malloc segmentByAddress(long address) {
+        return segments[(int) ((address - base) / segmentSize)];
+    }
+
     @Override
     public void free(long address) {
-        Malloc segment = segments[unsafe.getInt(address - HEADER_SIZE + SIZE_OFFSET) & SEGMENT_MASK];
-        segment.free(address);
+        segmentByAddress(address).free(address);
+    }
+
+    @Override
+    public int allocatedSize(long address) {
+        return segmentByAddress(address).allocatedSize(address);
     }
 
     @Override
@@ -105,19 +128,28 @@ public class MallocMT extends Malloc {
 
     @Override
     void init() {
-        long segmentSize = (capacity / SEGMENT_COUNT) & ~7;
-        segments = new Malloc[SEGMENT_COUNT];
+        // The parent has to do nothing, because we initialize through initSegments()
+    }
+
+    private void initSegments(int concurrencyLevel) {
+        if (concurrencyLevel < 1) {
+            throw new IllegalArgumentException("Nonpositive concurrencyLevel");
+        }
+
+        if (Integer.bitCount(concurrencyLevel) != 1) {
+            throw new IllegalArgumentException("Only power of 2 concurrencyLevel's are supported");
+        }
+
+        if (capacity % concurrencyLevel != 0) {
+            throw new IllegalArgumentException("capacity is not divisible by concurrencyLevel");
+        }
+
+        this.segments = new Malloc[concurrencyLevel];
+        this.segmentSize = capacity / concurrencyLevel;
 
         for (int i = 0; i < segments.length; i++) {
             segments[i] = new Malloc(base + i * segmentSize, segmentSize);
         }
-
-        for (int i = 0; i < segments.length; i++) {
-            segments[i].next = segments[(i + 5) & SEGMENT_MASK];
-            segments[i].mask |= i;
-        }
-
-        random = new Random();
 
         Management.registerMXBean(this, "one.nio.mem:type=MallocMT,base=" + Long.toHexString(base));
     }

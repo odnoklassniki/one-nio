@@ -17,23 +17,28 @@
 package one.nio.mem;
 
 import one.nio.os.Mem;
+import one.nio.serial.DataStream;
 import one.nio.util.JavaInternals;
 
 import sun.nio.ch.FileChannelImpl;
 
 import java.io.Closeable;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 
 public class MappedFile implements Closeable {
     private static final Method map0 = JavaInternals.getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
     private static final Method unmap0 = JavaInternals.getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
+    private static final Method force0 = JavaInternals.getMethod(MappedByteBuffer.class, "force0", FileDescriptor.class, long.class, long.class);
 
     private static final int STATE_CLOSED = 0;
     private static final int STATE_MALLOC = 1;
-    private static final int STATE_MMAP   = 2;
+    private static final int STATE_MMAP = 2;
 
     public static final int MAP_RO = 0;
     public static final int MAP_RW = 1;
@@ -42,12 +47,14 @@ public class MappedFile implements Closeable {
     private final RandomAccessFile file;
     private final long addr;
     private final long size;
+    private int mode;
     private int state;
 
     public MappedFile(long size) {
         this.file = null;
         this.addr = DirectMemory.allocateRaw(size);
         this.size = size;
+        this.mode = MAP_RW;
         this.state = STATE_MALLOC;
     }
 
@@ -66,11 +73,48 @@ public class MappedFile implements Closeable {
 
             this.addr = map(file, mode, 0, size);
             this.size = size;
+            this.mode = mode;
             this.state = STATE_MMAP;
         } catch (IOException e) {
             file.close();
             throw e;
         }
+    }
+
+    public void sync() throws IOException {
+        if (state != STATE_MMAP || mode != MAP_RW) {
+            return;
+        }
+
+        if (Mem.IS_SUPPORTED) {
+            int err = Mem.msync(addr, size, Mem.MS_SYNC);
+            if (err != 0) {
+                throw new IOException("msync failed: " + err);
+            }
+        } else {
+            try {
+                force0.invoke(DirectMemory.prototype, file.getFD(), addr, size);
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            } catch (InvocationTargetException e) {
+                Throwable target = e.getTargetException();
+                throw (target instanceof IOException) ? (IOException) target : new IOException(target);
+            }
+        }
+    }
+
+    public void makeReadonly() throws IOException {
+        if (state != STATE_MMAP || mode != MAP_RW) {
+            throw new IllegalStateException();
+        }
+
+        if (Mem.IS_SUPPORTED) {
+            int err = Mem.mprotect(addr, size, Mem.PROT_READ);
+            if (err != 0) {
+                throw new IOException("mprotect failed: " + err);
+            }
+        }
+        this.mode = MAP_RO;
     }
 
     public void close() {
@@ -96,6 +140,17 @@ public class MappedFile implements Closeable {
 
     public final long getSize() {
         return size;
+    }
+
+    public int getMode() {
+        return mode;
+    }
+
+    public DataStream dataStream(ByteOrder order) {
+        if (ByteOrder.nativeOrder().equals(order)) {
+            throw new UnsupportedOperationException("Native byte order is not implemeneted");
+        }
+        return new DataStream(addr, size);
     }
 
     public static long map(RandomAccessFile f, int mode, long start, long size) throws IOException {
@@ -127,10 +182,8 @@ public class MappedFile implements Closeable {
 
         try {
             unmap0.invoke(null, start, size);
-        } catch (IllegalAccessException e) {
+        } catch (IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException(e);
-        } catch (InvocationTargetException e) {
-            // Should not happen
         }
     }
 }

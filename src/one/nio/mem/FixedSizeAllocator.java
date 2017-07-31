@@ -21,7 +21,7 @@ import one.nio.util.JavaInternals;
 import static one.nio.util.JavaInternals.unsafe;
 
 // Fast lock-free allocator that manages entries of the fixed size in a linked list
-public class FixedSizeAllocator {
+public class FixedSizeAllocator implements Allocator {
     protected static final long headOffset = JavaInternals.fieldOffset(FixedSizeAllocator.class, "head");
 
     // These constants help to go around ABA problem of the lock-free linked list
@@ -106,12 +106,31 @@ public class FixedSizeAllocator {
         }
     }
 
+    @Override
+    public long malloc(int size) {
+        assert size == entrySize;
+        return malloc();
+    }
+
+    @Override
+    public long calloc(int size) {
+        long address = malloc(size);
+        DirectMemory.clearSmall(address, size);
+        return address;
+    }
+
+    @Override
     public void free(long entry) {
         long head;
         do {
             head = this.head;
             unsafe.putAddress(entry, head & ADDR_MASK);
         } while (!unsafe.compareAndSwapLong(this, headOffset, head, entry + (head & COUNTER_MASK) + COUNTER_INC));
+    }
+
+    @Override
+    public void verify() {
+        // Do nothing
     }
 
     // Ask system for a large chunk of memory and divide it internally into small entries

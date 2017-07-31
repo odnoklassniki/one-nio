@@ -17,13 +17,13 @@
 package one.nio.mem;
 
 /**
- * Unit tests for {@link Malloc}
+ * Unit tests for {@link MallocMT}
  *
  * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
  */
-public class MallocTest extends AbstractMallocTest {
+public class MallocMTTest extends AbstractMallocTest {
     @Override
     protected Malloc newInstance(long capacity) {
-        return new Malloc(capacity);
+        return new MallocMT(capacity, 1);
     }
 }
