@@ -17,9 +17,7 @@
 package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
-import one.nio.serial.Default;
-import one.nio.serial.FieldDescriptor;
-import one.nio.serial.Repository;
+import one.nio.serial.*;
 import one.nio.util.JavaInternals;
 
 import org.objectweb.asm.ClassVisitor;
@@ -276,11 +274,20 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
+
             if (ownField == null) {
                 continue;
             }
 
-            String fieldName = "\"" + ownField.getName() + "\":";
+            String name = ownField.getName();
+
+            JsonName jsonName = ownField.getAnnotation(JsonName.class);
+
+            if (jsonName != null) {
+                name = jsonName.name();
+            }
+
+            String fieldName = "\"" + name + "\":";
             mv.visitLdcInsn(firstWritten ? ',' + fieldName : '{' + fieldName);
             mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;");
             firstWritten = true;
