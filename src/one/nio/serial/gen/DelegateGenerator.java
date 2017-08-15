@@ -17,9 +17,7 @@
 package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
-import one.nio.serial.Default;
-import one.nio.serial.FieldDescriptor;
-import one.nio.serial.Repository;
+import one.nio.serial.*;
 import one.nio.util.JavaInternals;
 
 import org.objectweb.asm.ClassVisitor;
@@ -165,7 +163,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitVarInsn(ASTORE, 2);
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V");
 
-        ArrayList<Field> parents = new ArrayList<Field>(1);
+        ArrayList<Field> parents = new ArrayList<>(1);
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
             Field parentField = fd.parentField();
@@ -276,11 +274,20 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
+
             if (ownField == null) {
                 continue;
             }
 
-            String fieldName = "\"" + ownField.getName() + "\":";
+            String name = ownField.getName();
+
+            JsonName jsonName = ownField.getAnnotation(JsonName.class);
+
+            if (jsonName != null) {
+                name = jsonName.name();
+            }
+
+            String fieldName = "\"" + name + "\":";
             mv.visitLdcInsn(firstWritten ? ',' + fieldName : '{' + fieldName);
             mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;");
             firstWritten = true;
@@ -391,12 +398,6 @@ public class DelegateGenerator extends BytecodeGenerator {
             return;
         }
 
-        // Type widening
-        if (src.isAssignableFrom(dst)) {
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
-            return;
-        }
-
         // Primitive -> Primitive
         if (src.isPrimitive() && dst.isPrimitive()) {
             FieldType srcType = FieldType.valueOf(src);
@@ -427,10 +428,16 @@ public class DelegateGenerator extends BytecodeGenerator {
             return;
         }
 
+        // Type widening
+        if (src.isAssignableFrom(dst)) {
+            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
+            return;
+        }
+
         // Number -> Number
         if (src.getSuperclass() == Number.class && dst.getSuperclass() == Number.class) {
             for (Method m : dst.getMethods()) {
-                if (m.getParameterTypes().length == 0 && m.getReturnType() == dst &&
+                if (m.getParameterTypes().length == 1 && m.getReturnType() == dst &&
                         Modifier.isStatic(m.getModifiers()) && "valueOf".equals(m.getName())) {
                     Class param = m.getParameterTypes()[0];
                     if (param.isPrimitive() && param != boolean.class && param != char.class) {
