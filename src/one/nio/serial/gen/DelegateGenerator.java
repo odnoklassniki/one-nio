@@ -284,7 +284,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             JsonName jsonName = ownField.getAnnotation(JsonName.class);
 
             if (jsonName != null) {
-                name = jsonName.name();
+                name = jsonName.value();
             }
 
             String fieldName = "\"" + name + "\":";
