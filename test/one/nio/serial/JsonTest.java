@@ -39,7 +39,7 @@ public class JsonTest implements Serializable {
 
     public static class TestObject implements Serializable {
 
-        @JsonName(name = "test_name")
+        @JsonName("test_name")
         public String name;
     }
 
