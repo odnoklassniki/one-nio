@@ -80,7 +80,7 @@ public class HttpSession extends Session {
                 System.arraycopy(buffer, processed, fragment, 0, length);
             }
             fragmentLength = length;
-        } catch (HttpException e) {
+        } catch (IllegalArgumentException | HttpException e) {
             if (log.isDebugEnabled()) {
                 log.debug("Bad request", e);
             }
