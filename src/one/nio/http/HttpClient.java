@@ -90,6 +90,11 @@ public class HttpClient extends SocketPool {
         return invoke(createRequest(Request.METHOD_GET, uri, headers));
     }
 
+    public Response delete(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(createRequest(Request.METHOD_DELETE, uri, headers));
+    }
+
     public Response post(String uri, String... headers)
             throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_POST, uri, headers));
@@ -105,9 +110,54 @@ public class HttpClient extends SocketPool {
         return invoke(request);
     }
 
+    public Response put(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(createRequest(Request.METHOD_PUT, uri, headers));
+    }
+
+    public Response put(String uri, byte[] body, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        Request request = createRequest(Request.METHOD_PUT, uri, headers);
+        if (body != null) {
+            request.addHeader("Content-Length: " + body.length);
+            request.setBody(body);
+        }
+        return invoke(request);
+    }
+
+    public Response patch(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(createRequest(Request.METHOD_PATCH, uri, headers));
+    }
+
+    public Response patch(String uri, byte[] body, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        Request request = createRequest(Request.METHOD_PATCH, uri, headers);
+        if (body != null) {
+            request.addHeader("Content-Length: " + body.length);
+            request.setBody(body);
+        }
+        return invoke(request);
+    }
+
     public Response head(String uri, String... headers)
             throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_HEAD, uri, headers));
+    }
+
+    public Response options(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(createRequest(Request.METHOD_OPTIONS, uri, headers));
+    }
+
+    public Response trace(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(createRequest(Request.METHOD_TRACE, uri, headers));
+    }
+
+    public Response connect(String uri, String... headers)
+            throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(createRequest(Request.METHOD_CONNECT, uri, headers));
     }
 
     public Request createRequest(int method, String uri, String... headers) {

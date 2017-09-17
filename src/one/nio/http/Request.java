@@ -30,18 +30,33 @@ public class Request {
     public static final int METHOD_POST    = 2;
     public static final int METHOD_HEAD    = 3;
     public static final int METHOD_OPTIONS = 4;
+    public static final int METHOD_PUT     = 5;
+    public static final int METHOD_DELETE  = 6;
+    public static final int METHOD_TRACE   = 7;
+    public static final int METHOD_CONNECT = 8;
+    public static final int METHOD_PATCH   = 9;
 
     public static final byte[] VERB_GET     = Utf8.toBytes("GET ");
     public static final byte[] VERB_POST    = Utf8.toBytes("POST ");
     public static final byte[] VERB_HEAD    = Utf8.toBytes("HEAD ");
     public static final byte[] VERB_OPTIONS = Utf8.toBytes("OPTIONS ");
+    public static final byte[] VERB_PUT     = Utf8.toBytes("PUT ");
+    public static final byte[] VERB_DELETE  = Utf8.toBytes("DELETE ");
+    public static final byte[] VERB_TRACE   = Utf8.toBytes("TRACE ");
+    public static final byte[] VERB_CONNECT = Utf8.toBytes("CONNECT ");
+    public static final byte[] VERB_PATCH   = Utf8.toBytes("PATCH ");
 
     private static final byte[][] VERBS = {
             new byte[0],
             VERB_GET,
             VERB_POST,
             VERB_HEAD,
-            VERB_OPTIONS
+            VERB_OPTIONS,
+            VERB_PUT,
+            VERB_DELETE,
+            VERB_TRACE,
+            VERB_CONNECT,
+            VERB_PATCH
     };
 
     private static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
