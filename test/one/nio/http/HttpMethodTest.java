@@ -19,7 +19,7 @@ import static org.junit.Assert.assertNull;
  */
 public class HttpMethodTest {
     private static final String URL = "http://0.0.0.0:8181";
-    private static final String ENDPOINT = "/methodCode";
+    private static final String ENDPOINT = "/echoMethod";
 
     private static HttpServer server;
     private static HttpClient client;
@@ -104,7 +104,7 @@ public class HttpMethodTest {
         }
 
         @Path(ENDPOINT)
-        public Response mirrorMethod(Request request) throws IOException {
+        public Response echoMethod(Request request) throws IOException {
             return Response.ok(Integer.toString(request.getMethod()));
         }
     }
