@@ -21,7 +21,7 @@ import one.nio.mgt.Management;
 import static one.nio.util.JavaInternals.unsafe;
 
 /**
- * A simplified implementation of <a href="See http://g.oswego.edu/dl/html/malloc.html">Doug Lea's Memory Allocator</a>.
+ * A simplified implementation of <a href="http://g.oswego.edu/dl/html/malloc.html">Doug Lea's Memory Allocator</a>.
  * Allocates up to 25% larger memory chunks rounded to bin size.
  * <p>
  * Memory format:
@@ -79,7 +79,7 @@ import static one.nio.util.JavaInternals.unsafe;
  * {@link #malloc(int)}:
  * <ol>
  * <li>Round the user requested size up to the nearest bin size</li>
- * <li>Start looking for the first chunk starting from the corresponding bin up to the last bin</li>
+ * <li>Start looking for the first chunk starting from the corresponding bin up to the last bin:
  * <ul>
  * <li>If there is no chunk in the current bin, go to the next bin</li>
  * <li>If the first chunk is appropriately sized, remove it from the list of chunks and return it to
@@ -87,18 +87,17 @@ import static one.nio.util.JavaInternals.unsafe;
  * <li>If the first chunk is too large, split it, insert the tail into the list of chunks in
  * the corresponding bin and return the head to the user</li>
  * <li>If nothing is found, throw {@link OutOfMemoryException}</li>
- * </ul>
+ * </ul></li>
  * </ol>
  * <p>
  * {@link #free(long)}:
  * <ol>
  * <li>Try to coalesce with left and right neighbours if they are free</li>
  * <li>Insert the resulting chunk into the corresponding bin</li>
- * </ul>
  * </ol>
  *
- * @author Andrey Pangin <andrey.pangin@corp.mail.ru>
- * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+ * @author Andrey Pangin
+ * @author Vadim Tsesko
  */
 public class Malloc implements Allocator, MallocMXBean {
     // Format magic

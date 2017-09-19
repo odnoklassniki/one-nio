@@ -19,7 +19,7 @@ package one.nio.mem;
 /**
  * Memory allocator
  *
- * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+ * @author Vadim Tsesko
  */
 public interface Allocator {
     long malloc(int size);

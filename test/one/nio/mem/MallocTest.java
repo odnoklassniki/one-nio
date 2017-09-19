@@ -19,7 +19,7 @@ package one.nio.mem;
 /**
  * Unit tests for {@link Malloc}
  *
- * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+ * @author Vadim Tsesko
  */
 public class MallocTest extends AbstractMallocTest {
     @Override
