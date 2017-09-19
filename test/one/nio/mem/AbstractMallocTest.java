@@ -26,7 +26,7 @@ import static junit.framework.Assert.*;
 /**
  * Abstract unit tests for different {@link Malloc} descendants
  *
- * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+ * @author Vadim Tsesko
  */
 public abstract class AbstractMallocTest {
     protected abstract Malloc newInstance(long capacity);

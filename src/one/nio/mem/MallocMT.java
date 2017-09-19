@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * Concurrent implementation of {@link Malloc}.
  * Divides the whole memory space into several synchronized {@link Malloc}-segments to reduce lock contention.
  *
- * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+ * @author Vadim Tsesko
  */
 public class MallocMT extends Malloc {
     public static final int DEFAULT_CONCURRENCY_LEVEL = 8;

@@ -93,7 +93,7 @@ public class MallocPerfTest extends Thread {
     /**
      * {@code Unsafe}-based direct memory allocator
      *
-     * @author Vadim Tsesko <vadim.tsesko@corp.mail.ru>
+     * @author Vadim Tsesko
      */
     public static class Unsafe implements Allocator {
         @Override

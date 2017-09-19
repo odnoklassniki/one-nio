@@ -27,7 +27,7 @@ import static one.nio.util.JavaInternals.unsafe;
  * concurrently. However it can be read concurrently. Current implementation
  * supports only reversed byte order (i.e. Big endian on x86).
  *
- * @author Oleg Anastasyev<oa@odnoklassniki.ru>
+ * @author Oleg Anastasyev
  * @see BitSet
  */
 public class OffheapBitSet implements Closeable {
