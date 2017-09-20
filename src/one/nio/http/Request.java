@@ -46,7 +46,7 @@ public class Request {
     public static final byte[] VERB_CONNECT = Utf8.toBytes("CONNECT ");
     public static final byte[] VERB_PATCH   = Utf8.toBytes("PATCH ");
 
-    private static final byte[][] VERBS = {
+    static final byte[][] VERBS = {
             new byte[0],
             VERB_GET,
             VERB_POST,
