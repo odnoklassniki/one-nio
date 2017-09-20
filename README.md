@@ -1,3 +1,5 @@
+[![one-nio](https://maven-badges.herokuapp.com/maven-central/ru.odnoklassniki/one-nio/badge.svg)](https://maven-badges.herokuapp.com/maven-central/ru.odnoklassniki/one-nio)
+
 one-nio
 =======
 
