@@ -28,6 +28,7 @@ public class HttpSession extends Session {
     private static final int MAX_HEADERS = 48;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;
+    private static final int HTTP_VERSION_LENGTH = " HTTP/1.0".length();
 
     protected static final Request FIN = new Request(0, "", false);
 
@@ -134,15 +135,19 @@ public class HttpSession extends Session {
     }
 
     protected Request parseRequest(byte[] buffer, int start, int length) throws HttpException {
-        boolean http11 = length > 13 && buffer[start + length - 1] == '1';
-        if (length > 13 && Utf8.startsWith(Request.VERB_GET, buffer, start)) {
-            return new Request(Request.METHOD_GET, Utf8.read(buffer, start + 4, length - 13), http11);
-        } else if (length > 14 && Utf8.startsWith(Request.VERB_POST, buffer, start)) {
-            return new Request(Request.METHOD_POST, Utf8.read(buffer, start + 5, length - 14), http11);
-        } else if (length > 14 && Utf8.startsWith(Request.VERB_HEAD, buffer, start)) {
-            return new Request(Request.METHOD_HEAD, Utf8.read(buffer, start + 5, length - 14), http11);
-        } else if (length > 17 && Utf8.startsWith(Request.VERB_OPTIONS, buffer, start)) {
-            return new Request(Request.METHOD_OPTIONS, Utf8.read(buffer, start + 8, length - 17), http11);
+        // <VERB> <PATH> HTTP/1.{0|1}
+        for (int i = 1; i < Request.VERBS.length; i++) {
+            final byte[] verb = Request.VERBS[i]; // Includes space
+            final int auxLength = verb.length + HTTP_VERSION_LENGTH; // Everything except path
+            if (length > auxLength && Utf8.startsWith(verb, buffer, start)) {
+                return new Request(
+                        i,
+                        Utf8.read(
+                                buffer,
+                                start + verb.length,
+                                length - auxLength),
+                        buffer[start + length - 1] == '1');
+            }
         }
         throw new HttpException("Invalid request");
     }
