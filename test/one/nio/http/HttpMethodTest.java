@@ -1,6 +1,7 @@
 package one.nio.http;
 
 import one.nio.net.ConnectionString;
+import one.nio.net.Socket;
 import one.nio.server.ServerConfig;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -8,6 +9,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.SocketException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -96,6 +98,41 @@ public class HttpMethodTest {
         assertEquals(
                 Integer.toString(Request.METHOD_PATCH),
                 client.patch(ENDPOINT).getBodyUtf8());
+    }
+
+    @Test
+    public void malformed() throws Exception {
+        byte[] rawRequest = "GET /\r\n\r\n".getBytes();
+
+        // Based on HttpClient.invoke()
+
+        HttpClient.ResponseReader responseReader;
+
+        Socket socket = client.borrowObject();
+        boolean keepAlive = false;
+        try {
+            try {
+                socket.writeFully(rawRequest, 0, rawRequest.length);
+                responseReader = new HttpClient.ResponseReader(socket, 1024);
+            } catch (SocketException e) {
+                // Stale connection? Retry on a fresh socket
+                client.destroyObject(socket);
+                socket = client.createObject();
+                socket.writeFully(rawRequest, 0, rawRequest.length);
+                responseReader = new HttpClient.ResponseReader(socket, 1024);
+            }
+
+            Response response = responseReader.readResponse(Request.METHOD_GET);
+            keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection: "));
+            assertEquals(400, response.getStatus());
+        } finally {
+            if (keepAlive) {
+                client.returnObject(socket);
+            } else {
+                client.invalidateObject(socket);
+            }
+        }
+
     }
 
     public static class TestServer extends HttpServer {
