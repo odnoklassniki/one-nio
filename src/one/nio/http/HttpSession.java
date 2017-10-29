@@ -22,6 +22,7 @@ import one.nio.net.SocketClosedException;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
 import java.util.LinkedList;
 
 public class HttpSession extends Session {
@@ -29,6 +30,7 @@ public class HttpSession extends Session {
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;
     private static final int HTTP_VERSION_LENGTH = " HTTP/1.0".length();
+    static final int MAX_REQUEST_BODY_LENGTH = 65536;
 
     protected static final Request FIN = new Request(0, "", false);
 
@@ -38,6 +40,7 @@ public class HttpSession extends Session {
     protected int fragmentLength;
     protected Request parsing;
     protected Request handling;
+    protected int requestBodyOffset = 0;
 
     public HttpSession(Socket socket, HttpServer server) {
         super(socket);
@@ -85,6 +88,11 @@ public class HttpSession extends Session {
                 log.debug("Bad request", e);
             }
             sendError(Response.BAD_REQUEST, e.getMessage());
+        } catch (BufferUnderflowException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Request entity too large", e);
+            }
+            sendError(Response.REQUEST_ENTITY_TOO_LARGE, "");
         }
     }
 
@@ -102,13 +110,83 @@ public class HttpSession extends Session {
         }
     }
 
+    protected int getMaxRequestBodyLength() {
+        return MAX_REQUEST_BODY_LENGTH;
+    }
+
+    /**
+     * @return number of consumed bytes
+     */
+    protected int startParsingRequestBody(
+            final int contentLength,
+            final byte[] buffer,
+            final int bufferOffset,
+            final int bufferLength) throws IOException {
+        if (contentLength < 0) {
+            throw new IllegalArgumentException("Negative request Content-Length");
+        }
+
+        if (contentLength > getMaxRequestBodyLength()) {
+            throw new BufferUnderflowException();
+        }
+
+        final byte[] body = new byte[contentLength];
+        parsing.setBody(body);
+
+        // Start consuming the body
+        requestBodyOffset = Math.min(bufferLength - bufferOffset, body.length);
+        System.arraycopy(
+                buffer,
+                bufferOffset,
+                body,
+                0,
+                requestBodyOffset);
+
+        return requestBodyOffset;
+    }
+
+    protected void handleParsedRequest() throws IOException {
+        if (handling == null) {
+            server.handleRequest(handling = parsing, this);
+        } else if (pipeline.size() < MAX_PIPELINE_LENGTH) {
+            pipeline.addLast(parsing);
+        } else {
+            throw new IOException("Pipeline length exceeded");
+        }
+        parsing = null;
+        requestBodyOffset = 0;
+    }
+
     protected int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
-        int lineStart = 0;
-        for (int i = 0; i < length; i++) {
+        int i = 0; // Current position in the buffer
+
+        if (parsing != null && parsing.getBody() != null) { // Resume consuming request body
+            final byte[] body = parsing.getBody();
+            i = Math.min(length, body.length - requestBodyOffset);
+            System.arraycopy(buffer, 0, body, requestBodyOffset, i);
+            requestBodyOffset += i;
+            if (requestBodyOffset < body.length) {
+                // All the buffer copied to body, but that is not enough -- wait for next data
+                return length;
+            } else {
+                // Process current request
+                if (closing) {
+                    return i;
+                } else {
+                    handleParsedRequest();
+                }
+            }
+        }
+
+        int lineStart = i;
+        for (; i < length; i++) {
             if (buffer[i] != '\n') continue;
 
             int lineLength = i - lineStart;
             if (i > 0 && buffer[i - 1] == '\r') lineLength--;
+
+            // Skip '\n'
+            i++;
 
             if (parsing == null) {
                 parsing = parseRequest(buffer, lineStart, lineLength);
@@ -116,21 +194,28 @@ public class HttpSession extends Session {
                 if (parsing.getHeaderCount() < MAX_HEADERS) {
                     parsing.addHeader(Utf8.read(buffer, lineStart, lineLength));
                 }
-            } else {
-                if (closing) {
-                    return i + 1;
-                } else if (handling == null) {
-                    server.handleRequest(handling = parsing, this);
-                } else if (pipeline.size() < MAX_PIPELINE_LENGTH) {
-                    pipeline.addLast(parsing);
-                } else {
-                    throw new IOException("Pipeline length exceeded");
+            } else { // Empty line -- there is next request or body of the current request
+                final String contentLengthValue = parsing.getHeader("Content-Length: ");
+                if (contentLengthValue != null) { // Start parsing request body
+                    final int contentLength = Integer.valueOf(contentLengthValue);
+                    i += startParsingRequestBody(contentLength, buffer, i, length);
+                    if (requestBodyOffset < parsing.getBody().length) {
+                        // Consumed all the buffer data, but some bytes are still left
+                        return i;
+                    }
                 }
-                parsing = null;
+
+                // Process current request
+                if (closing) {
+                    return i;
+                } else {
+                    handleParsedRequest();
+                }
             }
 
-            lineStart = i + 1;
+            lineStart = i;
         }
+
         return lineStart;
     }
 
