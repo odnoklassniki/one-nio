@@ -90,6 +90,44 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>1.8</version>
+                <executions>
+                    <execution>
+                        <id>compile-native</id>
+                        <phase>compile</phase>
+                        <configuration>
+                            <target name="compile-native">
+                                <property name="build.dir"      value="target"/>
+                                <property name="src.dir"        value="src"/>
+                                <property name="gcc.extra.args" value=""/>
+
+                                <echo message="Compiling native library..."/>
+
+                                <mkdir dir="${build.dir}/native"/>
+
+                                <pathconvert property="src.native" pathsep=" ">
+                                    <fileset dir="${src.dir}" includes="**/*.c"/>
+                                </pathconvert>
+
+                                <exec os="Linux" executable="gcc">
+                                    <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args}
+                                               -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so
+                                               -I ${java.home}/../include -I ${java.home}/../include/linux
+                                               ${src.native} -lssl -lrt"/>
+                                </exec>
+
+                                <move verbose="true" failonerror="false" file="${build.dir}/native/libonenio.so" todir="${build.dir}/classes"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.6.2</version>
                 <configuration>
