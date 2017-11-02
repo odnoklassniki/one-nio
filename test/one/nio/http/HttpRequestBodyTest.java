@@ -122,7 +122,7 @@ public class HttpRequestBodyTest {
 
         @Path(ENDPOINT)
         public Response echoBody(Request request) throws IOException {
-            return Response.ok(request.getBody());
+            return Response.ok(request.getBody() == null ? Response.EMPTY : request.getBody());
         }
     }
 }

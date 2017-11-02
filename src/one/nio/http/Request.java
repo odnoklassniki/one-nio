@@ -62,7 +62,6 @@ public class Request {
     private static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
     private static final byte[] HTTP11_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
     private static final int PROTOCOL_HEADER_LENGTH = 13;
-    private static final byte[] EMPTY_BODY = new byte[0];
 
     private int method;
     private String uri;
@@ -70,7 +69,7 @@ public class Request {
     private int params;
     private int headerCount;
     private String[] headers;
-    private byte[] body = EMPTY_BODY;
+    private byte[] body;
 
     public Request(int method, String uri, boolean http11) {
         this.method = method;
