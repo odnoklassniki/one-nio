@@ -22,7 +22,7 @@ import one.nio.net.SocketClosedException;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
-import java.nio.BufferUnderflowException;
+import java.nio.BufferOverflowException;
 import java.util.LinkedList;
 
 public class HttpSession extends Session {
@@ -40,7 +40,7 @@ public class HttpSession extends Session {
     protected int fragmentLength;
     protected Request parsing;
     protected Request handling;
-    protected int requestBodyOffset = 0;
+    protected int requestBodyOffset;
 
     public HttpSession(Socket socket, HttpServer server) {
         super(socket);
@@ -83,12 +83,12 @@ public class HttpSession extends Session {
                 System.arraycopy(buffer, processed, fragment, 0, length);
             }
             fragmentLength = length;
-        } catch (IllegalArgumentException | HttpException e) {
+        } catch (HttpException e) {
             if (log.isDebugEnabled()) {
                 log.debug("Bad request", e);
             }
             sendError(Response.BAD_REQUEST, e.getMessage());
-        } catch (BufferUnderflowException e) {
+        } catch (BufferOverflowException e) {
             if (log.isDebugEnabled()) {
                 log.debug("Request entity too large", e);
             }
@@ -121,13 +121,13 @@ public class HttpSession extends Session {
             final int contentLength,
             final byte[] buffer,
             final int bufferOffset,
-            final int bufferLength) throws IOException {
+            final int bufferLength) throws IOException, HttpException {
         if (contentLength < 0) {
-            throw new IllegalArgumentException("Negative request Content-Length");
+            throw new HttpException("Negative request Content-Length");
         }
 
         if (contentLength > getMaxRequestBodyLength()) {
-            throw new BufferUnderflowException();
+            throw new BufferOverflowException();
         }
 
         final byte[] body = new byte[contentLength];
@@ -197,10 +197,10 @@ public class HttpSession extends Session {
             } else { // Empty line -- there is next request or body of the current request
                 final String contentLengthValue = parsing.getHeader("Content-Length: ");
                 if (contentLengthValue != null) { // Start parsing request body
-                    final int contentLength = Integer.valueOf(contentLengthValue);
+                    final int contentLength = Integer.parseInt(contentLengthValue);
                     i += startParsingRequestBody(contentLength, buffer, i, length);
                     if (requestBodyOffset < parsing.getBody().length) {
-                        // Consumed all the buffer data, but some bytes are still left
+                        // The body has not been read completely yet
                         return i;
                     }
                 }
