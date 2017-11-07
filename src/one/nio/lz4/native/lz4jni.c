@@ -33,33 +33,32 @@
 
 JNIEXPORT jint JNICALL
 Java_one_nio_lz4_LZ4_compress0(JNIEnv* env, jclass cls,
-                               jbyteArray src, jint srcOffset, jbyteArray dst, jint dstOffset, jint length) {
-    jbyte* srcPtr = (*env)->GetPrimitiveArrayCritical(env, src, NULL);
-    jbyte* dstPtr = (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
-    jint dstLen = (*env)->GetArrayLength(env, dst);
+                               jbyteArray src, jlong srcOffset, jbyteArray dst, jlong dstOffset, jint length) {
+    jbyte* srcPtr = src == NULL ? NULL : (*env)->GetPrimitiveArrayCritical(env, src, NULL);
+    jbyte* dstPtr = dst == NULL ? NULL : (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
 
-    jint result = LZ4_compress_default((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, dstLen - dstOffset);
+    int result = LZ4_compress_default((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, 0x7fffffff);
 
-    (*env)->ReleasePrimitiveArrayCritical(env, src, srcPtr, JNI_ABORT);
-    (*env)->ReleasePrimitiveArrayCritical(env, dst, dstPtr, 0);
+    if (src != NULL) (*env)->ReleasePrimitiveArrayCritical(env, src, srcPtr, JNI_ABORT);
+    if (dst != NULL) (*env)->ReleasePrimitiveArrayCritical(env, dst, dstPtr, 0);
     return result;
 }
 
 JNIEXPORT jint JNICALL
-JavaCritical_one_nio_lz4_LZ4_compress0(jint srcLen, jbyte* srcPtr, jint srcOffset,
-                                       jint dstLen, jbyte* dstPtr, jint dstOffset,
+JavaCritical_one_nio_lz4_LZ4_compress0(jint srcLen, jbyte* srcPtr, jlong srcOffset,
+                                       jint dstLen, jbyte* dstPtr, jlong dstOffset,
                                        jint length) {
-    return LZ4_compress_default((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, dstLen - dstOffset);
+    return LZ4_compress_default((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, 0x7fffffff);
 }
 
 JNIEXPORT jint JNICALL
 Java_one_nio_lz4_LZ4_decompress0(JNIEnv* env, jclass cls,
-                                 jbyteArray src, jint srcOffset, jbyteArray dst, jint dstOffset, jint length) {
-    jbyte* srcPtr = (*env)->GetPrimitiveArrayCritical(env, src, NULL);
-    jbyte* dstPtr = (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
-    jint dstLen = (*env)->GetArrayLength(env, dst);
+                                 jbyteArray src, jlong srcOffset, jbyteArray dst, jlong dstOffset, jint length) {
+    jbyte* srcPtr = src == NULL ? NULL : (*env)->GetPrimitiveArrayCritical(env, src, NULL);
+    jbyte* dstPtr = dst == NULL ? NULL : (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
 
-    jint result = LZ4_decompress_safe((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, dstLen - dstOffset);
+    int maxOutput = dst == NULL ? 0x7fffffff : (*env)->GetArrayLength(env, dst) - (int)dstOffset;
+    int result = LZ4_decompress_safe((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, maxOutput);
 
     (*env)->ReleasePrimitiveArrayCritical(env, src, srcPtr, JNI_ABORT);
     (*env)->ReleasePrimitiveArrayCritical(env, dst, dstPtr, 0);
@@ -67,8 +66,9 @@ Java_one_nio_lz4_LZ4_decompress0(JNIEnv* env, jclass cls,
 }
 
 JNIEXPORT jint JNICALL
-JavaCritical_one_nio_lz4_LZ4_decompress0(jint srcLen, jbyte* srcPtr, jint srcOffset,
-                                         jint dstLen, jbyte* dstPtr, jint dstOffset,
+JavaCritical_one_nio_lz4_LZ4_decompress0(jint srcLen, jbyte* srcPtr, jlong srcOffset,
+                                         jint dstLen, jbyte* dstPtr, jlong dstOffset,
                                          jint length) {
-    return LZ4_decompress_safe((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, dstLen - dstOffset);
+    int maxOutput = dstPtr == NULL ? 0x7fffffff : dstLen - (int)dstOffset;
+    return LZ4_decompress_safe((const char*)srcPtr + srcOffset, (char*)dstPtr + dstOffset, length, maxOutput);
 }
