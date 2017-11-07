@@ -33,13 +33,10 @@ import java.lang.reflect.Method;
 import java.net.SocketException;
 
 public class RpcClient extends SocketPool implements InvocationHandler {
-    protected final Object[] uidLocks = new Object[64];
+    protected static final byte[][] uidLocks = new byte[64][0];
 
     public RpcClient(ConnectionString conn) {
         super(conn);
-        for (int i = 0; i < uidLocks.length; i++) {
-            uidLocks[i] = new Object();
-        }
     }
 
     public Object invoke(Object request) throws Exception {
@@ -76,7 +73,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
         return invoke(new RemoteCall(method, args));
     }
 
-    protected Object uidLockFor(long uid) {
+    protected static Object uidLockFor(long uid) {
         return uidLocks[(int) uid & (uidLocks.length - 1)];
     }
 
