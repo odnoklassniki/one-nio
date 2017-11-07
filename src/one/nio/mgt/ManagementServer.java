@@ -17,12 +17,15 @@
 package one.nio.mgt;
 
 import one.nio.http.HttpServer;
+import one.nio.http.HttpServerConfig;
 import one.nio.http.HttpSession;
 import one.nio.http.Param;
 import one.nio.http.Path;
 import one.nio.http.Request;
 import one.nio.http.Response;
-import one.nio.server.ServerConfig;
+import one.nio.net.ConnectionString;
+import one.nio.net.SslConfig;
+import one.nio.server.AcceptorConfig;
 import one.nio.util.Utf8;
 
 import javax.management.JMException;
@@ -32,12 +35,28 @@ import java.util.Set;
 
 public class ManagementServer extends HttpServer {
 
-    public ManagementServer(ServerConfig config, Object... routers) throws IOException {
+    public ManagementServer(HttpServerConfig config, Object... routers) throws IOException {
         super(config, routers);
     }
 
     public ManagementServer(String address, Object... routers) throws IOException {
-        super(ServerConfig.from(address + "?selectors=1"), routers);
+        super(createConfigFromAddress(address), routers);
+    }
+
+    private static HttpServerConfig createConfigFromAddress(String address) {
+        ConnectionString conn = new ConnectionString(address);
+
+        AcceptorConfig acceptor = new AcceptorConfig();
+        acceptor.address = conn.getHost();
+        acceptor.port = conn.getPort();
+        if ("ssl".equals(conn.getProtocol())) {
+            acceptor.ssl = SslConfig.from(System.getProperties());
+        }
+
+        HttpServerConfig config = new HttpServerConfig();
+        config.acceptors = new AcceptorConfig[]{acceptor};
+        config.selectors = 1;
+        return config;
     }
 
     @Override
