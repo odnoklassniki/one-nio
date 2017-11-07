@@ -28,9 +28,11 @@ public class AcceptorConfig {
     public int recvBuf;
     @Converter(method = "size")
     public int sendBuf;
+    public int tos;
     public int backlog = 128;
     public boolean noDelay = true;
     public boolean tcpFastOpen = true;
     public boolean deferAccept;
+    public boolean reusePort;
     public SslConfig ssl;
 }

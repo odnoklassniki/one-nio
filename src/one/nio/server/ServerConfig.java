@@ -46,6 +46,7 @@ public class ServerConfig {
         ac.port = conn.getPort();
         ac.recvBuf = conn.getIntParam("recvBuf", 0);
         ac.sendBuf = conn.getIntParam("sendBuf", 0);
+        ac.tos = conn.getIntParam("tos", 0);
         ac.backlog = conn.getIntParam("backlog", 128);
         if ("ssl".equals(conn.getProtocol())) {
             ac.ssl = SslConfig.from(System.getProperties());
