@@ -78,8 +78,16 @@ public abstract class SslContext {
 
         setCiphers(config.ciphers != null ? config.ciphers : SslConfig.DEFAULT_CIPHERS);
 
-        if (changed(config.certFile, currentConfig.certFile) || changed(config.privateKeyFile, currentConfig.privateKeyFile)) {
-            setCertificate(config.certFile, config.privateKeyFile);
+        if (changed(config.certFile, currentConfig.certFile)) {
+            for (String certFile : config.certFile) {
+                setCertificate(certFile);
+            }
+        }
+
+        if (changed(config.privateKeyFile, currentConfig.privateKeyFile)) {
+            for (String privateKeyFile : config.privateKeyFile) {
+                setPrivateKey(privateKeyFile);
+            }
         }
 
         if (changed(config.caFile, currentConfig.caFile)) {
@@ -95,6 +103,7 @@ public abstract class SslContext {
         }
 
         setVerify(config.verifyMode);
+        setCacheSize(config.cacheSize != 0 ? config.cacheSize : SslConfig.DEFAULT_CACHE_SIZE);
         setTimeout(config.timeout != 0 ? config.timeout / 1000 : SslConfig.DEFAULT_TIMEOUT_SEC);
 
         if (changed(config.sessionId, currentConfig.sessionId)) {
@@ -124,14 +133,19 @@ public abstract class SslContext {
         return newValue != null && !newValue.equals(currentValue);
     }
 
+    private static boolean changed(String[] newValue, String[] currentValue) {
+        return newValue != null && !Arrays.equals(newValue, currentValue);
+    }
+
     private void inherit(SslConfig parent, SslConfig[] children) {
         if (children != null) {
             for (SslConfig child : children) {
                 for (Field f : SslConfig.class.getFields()) {
                     try {
                         Object value = f.get(child);
-                        if (value == null || value == Boolean.FALSE
-                                || (value instanceof Number) && ((Number) value).longValue() == 0) {
+                        if (value == null
+                                || value == Boolean.FALSE
+                                || value instanceof Number && ((Number) value).longValue() == 0) {
                             f.set(child, f.get(parent));
                         }
                     } catch (IllegalAccessException e) {
@@ -210,13 +224,15 @@ public abstract class SslContext {
 
     public abstract void setProtocols(String protocols) throws SSLException;
     public abstract void setCiphers(String ciphers) throws SSLException;
-    public abstract void setCertificate(String certFile, String privateKeyFile) throws SSLException;
+    public abstract void setCertificate(String certFile) throws SSLException;
+    public abstract void setPrivateKey(String privateKeyFile) throws SSLException;
     public abstract void setCA(String caFile) throws SSLException;
     public abstract void setVerify(int verifyMode) throws SSLException;
     public abstract void setTicketKeys(byte[] keys) throws SSLException;
+    public abstract void setCacheSize(int size) throws SSLException;
     public abstract void setTimeout(long timeout) throws SSLException;
     public abstract void setSessionId(byte[] sessionId) throws SSLException;
-    public abstract void setApplicationProtocols(String protocols) throws SSLException;
+    public abstract void setApplicationProtocols(String[] protocols) throws SSLException;
     public abstract void setOCSP(byte[] response) throws SSLException;
     public abstract void setSNI(SslConfig[] sni) throws IOException;
 }

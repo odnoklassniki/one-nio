@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
@@ -22,6 +21,7 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -35,6 +35,8 @@
 #include <arpa/inet.h>
 #include <jni.h>
 #include "jni_util.h"
+#include "sslcompat.h"
+
 
 #define MAX_COUNTERS  32
 
@@ -76,11 +78,6 @@ typedef struct {
     jboolean debug;
 } AppData;
 
-struct CRYPTO_dynlock_value {
-    pthread_mutex_t mutex;
-};
-
-static pthread_mutex_t* mutexes;
 static jfieldID f_ctx;
 static jfieldID f_ssl;
 static int preclosed_socket;
@@ -218,14 +215,6 @@ static long get_session_counter(SSL_CTX* ctx, int key) {
 	}
 }
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-static inline int DH_set0_pqg(DH* dh, BIGNUM* p, BIGNUM* q, BIGNUM* g) {
-    dh->p = p;
-    dh->q = q;
-    dh->g = g;
-}
-#endif
-
 static void setup_dh_params(SSL_CTX* ctx) {
     DH* dh = DH_new();
     if (dh != NULL) {
@@ -242,39 +231,6 @@ static void setup_ecdh_params(SSL_CTX* ctx) {
     if (ecdh != NULL) {
         SSL_CTX_set_tmp_ecdh(ctx, ecdh);
         EC_KEY_free(ecdh);
-    }
-}
-
-static unsigned long id_function() {
-    return (unsigned long)pthread_self();
-}
-
-static void locking_function(int mode, int n, const char* file, int line) {
-    if (mode & CRYPTO_LOCK) {
-        pthread_mutex_lock(&mutexes[n]);
-    } else {
-        pthread_mutex_unlock(&mutexes[n]);
-    }
-}
-
-static struct CRYPTO_dynlock_value* dyn_create_function(const char* file, int line) {
-    struct CRYPTO_dynlock_value* lock = malloc(sizeof(struct CRYPTO_dynlock_value));
-    if (lock != NULL) {
-        pthread_mutex_init(&lock->mutex, NULL);
-    }
-    return lock;
-}
-
-static void dyn_destroy_function(struct CRYPTO_dynlock_value* lock, const char* file, int line) {
-    pthread_mutex_destroy(&lock->mutex);
-    free(lock);
-}
-
-static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value* lock, const char* file, int line) {
-    if (mode & CRYPTO_LOCK) {
-        pthread_mutex_lock(&lock->mutex);
-    } else {
-        pthread_mutex_unlock(&lock->mutex);
     }
 }
 
@@ -349,7 +305,6 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
     return result;
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L
 static int alpn_callback(SSL* ssl, const unsigned char** out, unsigned char* outlen,
                          const unsigned char* in, unsigned int inlen, void* arg) {
     AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
@@ -365,7 +320,6 @@ static int alpn_callback(SSL* ssl, const unsigned char** out, unsigned char* out
 
     return status == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_NOACK;
 }
-#endif
 
 static int ocsp_callback(SSL* ssl, void* arg) {
     AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
@@ -438,33 +392,15 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
         if (SSL_get_app_data(ssl) == STATE_SERVER) {
             SSL_set_app_data((SSL*)ssl, STATE_HANDSHAKED);
         }
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-        ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
-#endif
     }
 }
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
-    SSL_load_error_strings();
-    SSL_library_init();
-
-    mutexes = malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
-    if (mutexes == NULL) {
-        throw_by_name(env, "java/lang/OutOfMemoryError", "Unable to allocate mutexes");
+    if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL || !OPENSSL_init_ssl(0, NULL)) {
+        throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libssl.so");
         return;
     }
-
-    int i;
-    for (i = 0; i < CRYPTO_num_locks(); i++) {
-        pthread_mutex_init(&mutexes[i], NULL);
-    }
-
-    CRYPTO_set_id_callback(id_function);
-    CRYPTO_set_locking_callback(locking_function);
-    CRYPTO_set_dynlock_create_callback(dyn_create_function);
-    CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
-    CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
 
     f_ctx = cache_field(env, "one/nio/net/NativeSslContext", "ctx", "J");
     f_ssl = cache_field(env, "one/nio/net/NativeSslSocket", "ssl", "J");
@@ -480,7 +416,7 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
         return 0;
     }
 
-    SSL_CTX* ctx = SSL_CTX_new(SSLv23_method());
+    SSL_CTX* ctx = SSL_CTX_new(TLS_method());
     if (ctx == NULL) {
         free_app_data(appData);
         throw_ssl_exception(env);
@@ -489,8 +425,8 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
 
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE |
-                             SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
-                             SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+                        SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
+                        SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
     // Disable read-ahead until premature socket close is fixed
     // SSL_CTX_set_read_ahead(ctx, 1);
@@ -553,7 +489,7 @@ Java_one_nio_net_NativeSslContext_setCiphers(JNIEnv* env, jobject self, jstring 
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstring certFile, jstring privateKeyFile) {
+Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstring certFile) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
 
     if (certFile != NULL) {
@@ -562,9 +498,13 @@ Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstr
         (*env)->ReleaseStringUTFChars(env, certFile, value);
         if (result <= 0) {
             throw_ssl_exception(env);
-            return;
         }
     }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setPrivateKey(JNIEnv* env, jobject self, jstring privateKeyFile) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
 
     if (privateKeyFile != NULL) {
         const char* value = (*env)->GetStringUTFChars(env, privateKeyFile, NULL);
@@ -572,7 +512,6 @@ Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstr
         (*env)->ReleaseStringUTFChars(env, privateKeyFile, value);
         if (result <= 0) {
             throw_ssl_exception(env);
-            return;
         }
     }
 }
@@ -646,7 +585,6 @@ Java_one_nio_net_NativeSslContext_setTicketKeys(JNIEnv* env, jobject self, jbyte
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_setApplicationProtocols0(JNIEnv* env, jobject self, jbyteArray protocols) {
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     AppData* appData = SSL_CTX_get_app_data(ctx);
     ALPNProtocols* alpn = &appData->alpn;
@@ -672,7 +610,6 @@ Java_one_nio_net_NativeSslContext_setApplicationProtocols0(JNIEnv* env, jobject 
         alpn->len = len;
         SSL_CTX_set_alpn_select_cb(ctx, alpn_callback, NULL);
     }
-#endif
 }
 
 JNIEXPORT void JNICALL
@@ -764,6 +701,12 @@ Java_one_nio_net_NativeSslContext_setSessionId(JNIEnv* env, jobject self, jbyteA
     unsigned char sid_ctx[len];
     (*env)->GetByteArrayRegion(env, sessionId, 0, len, (jbyte*)sid_ctx);
     SSL_CTX_set_session_id_context(ctx, sid_ctx, len);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setCacheSize(JNIEnv* env, jobject self, jint size) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    SSL_CTX_sess_set_cache_size(ctx, size);
 }
 
 JNIEXPORT void JNICALL

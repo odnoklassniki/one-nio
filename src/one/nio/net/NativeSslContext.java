@@ -117,7 +117,10 @@ class NativeSslContext extends SslContext {
     public native void setCiphers(String ciphers) throws SSLException;
 
     @Override
-    public native void setCertificate(String certFile, String privateKeyFile) throws SSLException;
+    public native void setCertificate(String certFile) throws SSLException;
+
+    @Override
+    public native void setPrivateKey(String privateKeyFile) throws SSLException;
 
     @Override
     public native void setCA(String caFile) throws SSLException;
@@ -129,6 +132,9 @@ class NativeSslContext extends SslContext {
     public native void setTicketKeys(byte[] keys) throws SSLException;
 
     @Override
+    public native void setCacheSize(int size) throws SSLException;
+
+    @Override
     public native void setTimeout(long timeout) throws SSLException;
 
     @Override
@@ -138,9 +144,9 @@ class NativeSslContext extends SslContext {
     public native void setOCSP(byte[] response) throws SSLException;
 
     @Override
-    public void setApplicationProtocols(String protocols) throws SSLException {
+    public void setApplicationProtocols(String[] protocols) throws SSLException {
         ByteArrayBuilder builder = new ByteArrayBuilder();
-        for (String protocol : protocols.split(",")) {
+        for (String protocol : protocols) {
             byte len = (byte) Utf8.length(protocol);
             builder.append(len).append(protocol);
         }
@@ -169,6 +175,7 @@ class NativeSslContext extends SslContext {
             names.append(sni[i].hostName).append((byte) 0);
             contexts[i] = subcontexts[i].ctx;
         }
+        names.append((byte) 0);
 
         setSNI0(names.toBytes(), contexts);
     }
