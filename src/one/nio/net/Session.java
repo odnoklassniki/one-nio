@@ -44,6 +44,7 @@ public class Session implements Closeable {
     protected int slot;
     protected int events;
     protected int eventsToListen;
+    protected boolean wasSelected;
     protected boolean closing;
     protected QueueItem queueHead;
     protected volatile long lastAccessTime;
@@ -166,6 +167,7 @@ public class Session implements Closeable {
                     }
                     item = item.next;
                 }
+                lastAccessTime = System.currentTimeMillis();
             } else {
                 queueHead.append(item);
             }
@@ -216,6 +218,7 @@ public class Session implements Closeable {
             if ((events & READABLE) != 0) processRead(buffer);
         }
 
+        wasSelected = true;
         lastAccessTime = System.currentTimeMillis();
     }
 
