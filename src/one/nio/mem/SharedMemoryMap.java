@@ -46,7 +46,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
 
     protected static final int MAX_CUSTOM_DATA_SIZE = (int) (MAP_OFFSET - CUSTOM_DATA_OFFSET);
 
-    protected final String className = this.getClass().getSimpleName();
+    protected final String className;
     protected final MappedFile mmap;
     protected final String name;
     protected MallocMT allocator;
@@ -58,6 +58,9 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
 
     protected SharedMemoryMap(int capacity, String fileName, long fileSize, long expirationTime) throws IOException {
         super(capacity);
+
+        String className = getClass().getName();
+        this.className = className.substring(className.lastIndexOf('.') + 1);
 
         if (fileName == null || fileName.isEmpty()) {
             this.mmap = new MappedFile(fileSize);

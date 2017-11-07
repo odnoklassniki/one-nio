@@ -93,7 +93,7 @@ public class MallocMT extends Malloc {
         int i = start;
         do {
             Malloc segment = segments[i];
-            if (segment.getFreeMemory() >= alignedSize) {
+            if (segment.getFreeMemory() >= adjustedSize) {
                 long address = segment.mallocImpl(bin, adjustedSize);
                 if (address != 0) {
                     return address;
@@ -132,11 +132,7 @@ public class MallocMT extends Malloc {
     }
 
     private void initSegments(int concurrencyLevel) {
-        if (concurrencyLevel < 1) {
-            throw new IllegalArgumentException("Nonpositive concurrencyLevel");
-        }
-
-        if (Integer.bitCount(concurrencyLevel) != 1) {
+        if (concurrencyLevel < 1 || (concurrencyLevel & (concurrencyLevel - 1)) != 0) {
             throw new IllegalArgumentException("Only power of 2 concurrencyLevel's are supported");
         }
 
