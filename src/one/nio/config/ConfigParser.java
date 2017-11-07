@@ -20,10 +20,14 @@ import one.nio.util.JavaInternals;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
@@ -49,11 +53,13 @@ import java.util.StringTokenizer;
 //
 public class ConfigParser {
     private final StringTokenizer st;
+    private final Map<String, Object> references;
     private String line;
     private int indent;
 
     private ConfigParser(String config) {
         this.st = new StringTokenizer(config, "\r\n");
+        this.references = new HashMap<>();
         this.indent = -1;
     }
 
@@ -71,20 +77,37 @@ public class ConfigParser {
         }
     }
 
-    private Object parseValue(Class<?> type, int level) throws ReflectiveOperationException {
-        if (type == String.class) {
-            return tail();
-        } else if (type.isPrimitive()) {
-            return parsePrimitive(type, tail());
-        } else if (type.isArray()) {
-            return parseArray(type.getComponentType(), level);
-        } else if (type.isAnnotationPresent(Config.class)) {
-            return parseBean(type, level);
-        }
+    private Object parseValue(Type type, int level) throws ReflectiveOperationException {
+        if (type instanceof Class) {
+            Class<?> cls = (Class) type;
+            if (cls == String.class) {
+                return tail();
+            } else if (cls.isPrimitive()) {
+                return parsePrimitive(cls, tail());
+            } else if (cls.isArray()) {
+                Object ref = parseReference();
+                return ref != null ? ref : parseArray(cls.getComponentType(), level);
+            } else if (cls.isAnnotationPresent(Config.class)) {
+                Object ref = parseReference();
+                return ref != null ? ref : parseBean(cls, level);
+            }
 
-        Method method = JavaInternals.getMethod(type, "valueOf", String.class);
-        if (method != null && (method.getModifiers() & Modifier.STATIC) != 0 && type.isAssignableFrom(method.getReturnType())) {
-            return method.invoke(null, tail());
+            Method method = JavaInternals.getMethod(cls, "valueOf", String.class);
+            if (method != null && (method.getModifiers() & Modifier.STATIC) != 0 && cls.isAssignableFrom(method.getReturnType())) {
+                return method.invoke(null, tail());
+            }
+        } else if (type instanceof ParameterizedType) {
+            ParameterizedType ptype = (ParameterizedType) type;
+            if (ptype.getRawType() == List.class && ptype.getActualTypeArguments().length >= 1) {
+                Object ref = parseReference();
+                return ref != null ? ref : parseList(ptype.getActualTypeArguments()[0], level);
+            } else if (ptype.getRawType() == Map.class && ptype.getActualTypeArguments().length >= 2) {
+                Object ref = parseReference();
+                return ref != null ? ref : parseMap(ptype.getActualTypeArguments()[1], level);
+            }
+        } else if (type instanceof GenericArrayType) {
+            Object ref = parseReference();
+            return ref != null ? ref : parseArray(((GenericArrayType) type).getGenericComponentType(), level);
         }
 
         throw new IllegalArgumentException("Invalid type: " + type);
@@ -92,6 +115,7 @@ public class ConfigParser {
 
     private Object parseBean(Class<?> type, int minLevel) throws ReflectiveOperationException {
         Object obj = type.newInstance();
+        registerReference(obj);
         fillBean(obj, minLevel);
         return obj;
     }
@@ -112,8 +136,13 @@ public class ConfigParser {
 
                 skipSpaces(colon + 1);
 
+                Object value;
                 Converter converter = f.getAnnotation(Converter.class);
-                Object value = converter != null ? convert(tail(), converter) : parseValue(f.getType(), level + 1);
+                if (converter != null) {
+                    value = convert(tail(), converter);
+                } else {
+                    value = parseValue(f.getGenericType(), level + 1);
+                }
                 f.set(obj, value);
             } while (nextLine() == level);
         }
@@ -130,35 +159,90 @@ public class ConfigParser {
         return method.invoke(sender, value);
     }
 
-    private Object parseArray(Class<?> componentType, int minLevel) throws ReflectiveOperationException {
-        ArrayList<Object> elements = new ArrayList<>();
+    private Object parseArray(Type elementType, int minLevel) throws ReflectiveOperationException {
+        List<Object> list = parseList(elementType, minLevel);
 
-        // Support single inlined primitive array value
-        if (hasTail()) {
-            if (!(componentType == String.class || componentType.isPrimitive())) {
-                throw new IllegalArgumentException("Array is expected");
+        Class<?> cls = resolveArrayElementType(elementType);
+        Object array = Array.newInstance(cls, list.size());
+        changeReference(list, array);
+
+        if (cls.isPrimitive()) {
+            for (int i = 0; i < list.size(); i++) {
+                Array.set(array, i, list.get(i));
             }
-            elements.add(parseValue(componentType, -1));
+            return array;
+        } else {
+            return list.toArray((Object[]) array);
+        }
+    }
+
+    private Class<?> resolveArrayElementType(Type elementType) {
+        if (elementType instanceof Class) {
+            return (Class) elementType;
+        } else if (elementType instanceof ParameterizedType) {
+            return (Class) ((ParameterizedType) elementType).getRawType();
+        }
+        throw new IllegalArgumentException("Invalid array element type: " + elementType);
+    }
+
+    // If the reference is already registered as List, change it to the array
+    private void changeReference(List<?> list, Object array) {
+        for (Map.Entry<String, Object> ref : references.entrySet()) {
+            if (ref.getValue() == list) {
+                ref.setValue(array);
+                return;
+            }
+        }
+    }
+
+    private List<Object> parseList(Type elementType, int minLevel) throws ReflectiveOperationException {
+        ArrayList<Object> list = new ArrayList<>();
+        registerReference(list);
+
+        if (hasTail()) {
+            // Support inlined primitive array value
+            if (elementType instanceof Class) {
+                Class<?> cls = (Class) elementType;
+                if (cls == String.class || cls.isPrimitive()) {
+                    for (String element : tail().split(",")) {
+                        list.add(parsePrimitive(cls, element.trim()));
+                    }
+                    return list;
+                }
+            }
+            throw new IllegalArgumentException("Array is expected");
         } else {
             int level = nextLine();
             if (level >= minLevel && line.charAt(level) == '-') {
                 do {
                     skipSpaces(level + 1);
-                    Object value = parseValue(componentType, level + 1);
-                    elements.add(value);
+                    Object value = parseValue(elementType, level + 1);
+                    list.add(value);
                 } while (nextLine() == level && line.charAt(level) == '-');
             }
         }
 
-        Object array = Array.newInstance(componentType, elements.size());
-        if (componentType.isPrimitive()) {
-            for (int i = 0; i < elements.size(); i++) {
-                Array.set(array, i, elements.get(i));
-            }
-            return array;
-        } else {
-            return elements.toArray((Object[]) array);
+        return list;
+    }
+
+    private Map<String, Object> parseMap(Type valueType, int minLevel) throws ReflectiveOperationException {
+        HashMap<String, Object> map = new HashMap<>();
+        registerReference(map);
+
+        int level = nextLine();
+        if (level >= minLevel) {
+            do {
+                int colon = line.indexOf(':', level);
+                if (colon < 0) throw new IllegalArgumentException("Key expected: " + line);
+
+                String key = line.substring(level, colon);
+                skipSpaces(colon + 1);
+                Object value = parseValue(valueType, level + 1);
+                map.put(key, value);
+            } while (nextLine() == level);
         }
+
+        return map;
     }
 
     private Object parsePrimitive(Class<?> type, String value) {
@@ -178,6 +262,30 @@ public class ConfigParser {
             return Double.parseDouble(value);
         } else if (type == char.class) {
             return value.charAt(0);
+        } else if (type == String.class) {
+            return value;
+        }
+        return null;
+    }
+
+    private void registerReference(Object ref) {
+        if (hasTail() && line.charAt(indent) == '&') {
+            Object prev = references.put(line.substring(indent + 1), ref);
+            if (prev != null) {
+                throw new IllegalArgumentException("Duplicate reference: " + line);
+            }
+            indent = -1;
+        }
+    }
+
+    private Object parseReference() {
+        if (hasTail() && line.charAt(indent) == '*') {
+            Object ref = references.get(line.substring(indent + 1));
+            if (ref == null) {
+                throw new IllegalArgumentException("No such reference: " + line);
+            }
+            indent = -1;
+            return ref;
         }
         return null;
     }
