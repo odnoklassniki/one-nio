@@ -1,7 +1,22 @@
+/*
+ * Copyright 2017 Odnoklassniki Ltd, Mail.Ru Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package one.nio.http;
 
 import one.nio.net.ConnectionString;
-import one.nio.server.ServerConfig;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -18,15 +33,16 @@ import static org.junit.Assert.assertEquals;
  * @author Vadim Tsesko <mail@incubos.org>
  */
 public class HttpRequestBodyTest {
-    private static final String URL = "http://0.0.0.0:8181";
+    private static final String URL = "http://127.0.0.1:8181";
     private static final String ENDPOINT = "/echoBody";
+    private static final int MAX_REQUEST_BODY_LENGTH = 65536;
 
     private static HttpServer server;
     private static HttpClient client;
 
     @BeforeClass
     public static void beforeAll() throws IOException {
-        server = new TestServer(ServerConfig.from(URL));
+        server = new TestServer(HttpServerConfigFactory.create(8181));
         server.start();
         client = new HttpClient(new ConnectionString(URL));
     }
@@ -39,7 +55,7 @@ public class HttpRequestBodyTest {
 
     @Test
     public void maxPostBody() throws Exception {
-        final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH];
+        final byte[] body = new byte[MAX_REQUEST_BODY_LENGTH];
         ThreadLocalRandom.current().nextBytes(body);
 
         final Response response = client.post(ENDPOINT, body);
@@ -49,7 +65,7 @@ public class HttpRequestBodyTest {
 
     @Test
     public void tooBigPostBody() throws Exception {
-        final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH + 1];
+        final byte[] body = new byte[MAX_REQUEST_BODY_LENGTH + 1];
         ThreadLocalRandom.current().nextBytes(body);
 
         final Response response = client.post(ENDPOINT, body);
@@ -65,7 +81,7 @@ public class HttpRequestBodyTest {
 
     @Test
     public void put() throws Exception {
-        final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH];
+        final byte[] body = new byte[MAX_REQUEST_BODY_LENGTH];
         ThreadLocalRandom.current().nextBytes(body);
 
         final Response response = client.put(ENDPOINT, body);
@@ -75,7 +91,7 @@ public class HttpRequestBodyTest {
 
     @Test
     public void tooBigPutBody() throws Exception {
-        final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH + 1];
+        final byte[] body = new byte[MAX_REQUEST_BODY_LENGTH + 1];
         ThreadLocalRandom.current().nextBytes(body);
 
         final Response response = client.put(ENDPOINT, body);
@@ -91,7 +107,7 @@ public class HttpRequestBodyTest {
 
     @Test
     public void patch() throws Exception {
-        final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH];
+        final byte[] body = new byte[MAX_REQUEST_BODY_LENGTH];
         ThreadLocalRandom.current().nextBytes(body);
 
         final Response response = client.patch(ENDPOINT, body);
@@ -101,7 +117,7 @@ public class HttpRequestBodyTest {
 
     @Test
     public void tooBigPatchBody() throws Exception {
-        final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH + 1];
+        final byte[] body = new byte[MAX_REQUEST_BODY_LENGTH + 1];
         ThreadLocalRandom.current().nextBytes(body);
 
         final Response response = client.patch(ENDPOINT, body);
@@ -116,7 +132,7 @@ public class HttpRequestBodyTest {
     }
 
     public static class TestServer extends HttpServer {
-        TestServer(ServerConfig config) throws IOException {
+        TestServer(HttpServerConfig config) throws IOException {
             super(config);
         }
 
