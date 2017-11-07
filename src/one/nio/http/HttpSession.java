@@ -29,8 +29,8 @@ public class HttpSession extends Session {
     private static final int MAX_HEADERS = 48;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;
-    private static final int HTTP_VERSION_LENGTH = " HTTP/1.0".length();
-    static final int MAX_REQUEST_BODY_LENGTH = 65536;
+    private static final int MAX_REQUEST_BODY_LENGTH = 65536;
+    private static final int HTTP_VERSION_LENGTH = 9;  // " HTTP/1.0"
 
     protected static final Request FIN = new Request(0, "", false);
 
@@ -38,9 +38,9 @@ public class HttpSession extends Session {
     protected final LinkedList<Request> pipeline = new LinkedList<>();
     protected final byte[] fragment = new byte[MAX_FRAGMENT_LENGTH];
     protected int fragmentLength;
-    protected Request parsing;
-    protected Request handling;
     protected int requestBodyOffset;
+    protected Request parsing;
+    protected volatile Request handling;
 
     public HttpSession(Socket socket, HttpServer server) {
         super(socket);
@@ -114,34 +114,28 @@ public class HttpSession extends Session {
         return MAX_REQUEST_BODY_LENGTH;
     }
 
-    /**
-     * @return number of consumed bytes
-     */
-    protected int startParsingRequestBody(
-            final int contentLength,
-            final byte[] buffer,
-            final int bufferOffset,
-            final int bufferLength) throws IOException, HttpException {
+    // Returns number of consumed bytes
+    protected int startParsingRequestBody(String contentLengthHeader, byte[] buffer, int offset, int remaining)
+        throws IOException, HttpException
+    {
+        int contentLength;
+        try {
+            contentLength = Integer.parseInt(contentLengthHeader);
+        } catch (NumberFormatException e) {
+            throw new HttpException("Invalid Content-Length header");
+        }
+
         if (contentLength < 0) {
-            throw new HttpException("Negative request Content-Length");
+            throw new HttpException("Invalid Content-Length header");
         }
 
         if (contentLength > getMaxRequestBodyLength()) {
             throw new BufferOverflowException();
         }
 
-        final byte[] body = new byte[contentLength];
+        byte[] body = new byte[contentLength];
+        System.arraycopy(buffer, offset, body, 0, requestBodyOffset = Math.min(remaining, contentLength));
         parsing.setBody(body);
-
-        // Start consuming the body
-        requestBodyOffset = Math.min(bufferLength - bufferOffset, body.length);
-        System.arraycopy(
-                buffer,
-                bufferOffset,
-                body,
-                0,
-                requestBodyOffset);
-
         return requestBodyOffset;
     }
 
@@ -158,28 +152,27 @@ public class HttpSession extends Session {
     }
 
     protected int processHttpBuffer(byte[] buffer, int length) throws IOException, HttpException {
-        int i = 0; // Current position in the buffer
+        int lineStart = 0; // Current position in the buffer
 
         if (parsing != null && parsing.getBody() != null) { // Resume consuming request body
-            final byte[] body = parsing.getBody();
-            i = Math.min(length, body.length - requestBodyOffset);
-            System.arraycopy(buffer, 0, body, requestBodyOffset, i);
-            requestBodyOffset += i;
+            byte[] body = parsing.getBody();
+            int remaining = Math.min(length, body.length - requestBodyOffset);
+            System.arraycopy(buffer, 0, body, requestBodyOffset, remaining);
+            requestBodyOffset += remaining;
+
             if (requestBodyOffset < body.length) {
                 // All the buffer copied to body, but that is not enough -- wait for next data
                 return length;
-            } else {
-                // Process current request
-                if (closing) {
-                    return i;
-                } else {
-                    handleParsedRequest();
-                }
+            } else if (closing) {
+                return remaining;
             }
+
+            // Process current request
+            handleParsedRequest();
+            lineStart = remaining;
         }
 
-        int lineStart = i;
-        for (; i < length; i++) {
+        for (int i = lineStart; i < length; i++) {
             if (buffer[i] != '\n') continue;
 
             int lineLength = i - lineStart;
@@ -194,11 +187,11 @@ public class HttpSession extends Session {
                 if (parsing.getHeaderCount() < MAX_HEADERS) {
                     parsing.addHeader(Utf8.read(buffer, lineStart, lineLength));
                 }
-            } else { // Empty line -- there is next request or body of the current request
-                final String contentLengthValue = parsing.getHeader("Content-Length: ");
-                if (contentLengthValue != null) { // Start parsing request body
-                    final int contentLength = Integer.parseInt(contentLengthValue);
-                    i += startParsingRequestBody(contentLength, buffer, i, length);
+            } else {
+                // Empty line -- there is next request or body of the current request
+                String contentLengthHeader = parsing.getHeader("Content-Length: ");
+                if (contentLengthHeader != null) {
+                    i += startParsingRequestBody(contentLengthHeader, buffer, i, length - i);
                     if (requestBodyOffset < parsing.getBody().length) {
                         // The body has not been read completely yet
                         return i;
@@ -225,19 +218,15 @@ public class HttpSession extends Session {
             final byte[] verb = Request.VERBS[i]; // Includes space
             final int auxLength = verb.length + HTTP_VERSION_LENGTH; // Everything except path
             if (length > auxLength && Utf8.startsWith(verb, buffer, start)) {
-                return new Request(
-                        i,
-                        Utf8.read(
-                                buffer,
-                                start + verb.length,
-                                length - auxLength),
-                        buffer[start + length - 1] == '1');
+                String uri = Utf8.read(buffer, start + verb.length, length - auxLength);
+                return new Request(i, uri, buffer[start + length - 1] == '1');
             }
         }
         throw new HttpException("Invalid request");
     }
 
     public synchronized void sendResponse(Response response) throws IOException {
+        Request handling = this.handling;
         if (handling == null) {
             throw new IOException("Out of order response");
         }
@@ -253,7 +242,7 @@ public class HttpSession extends Session {
         writeResponse(response, handling.getMethod() != Request.METHOD_HEAD);
         if (!keepAlive) scheduleClose();
 
-        if ((handling = pipeline.pollFirst()) != null) {
+        if ((this.handling = handling = pipeline.pollFirst()) != null) {
             if (handling == FIN) {
                 scheduleClose();
             } else {

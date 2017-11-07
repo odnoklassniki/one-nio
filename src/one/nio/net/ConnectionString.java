@@ -205,4 +205,20 @@ public class ConnectionString {
         }
         return result;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        if (protocol != null) {
+            sb.append(protocol).append("://");
+        }
+        sb.append(host);
+        if (port != 0) {
+            sb.append(':').append(port);
+        }
+        if (path != null) {
+            sb.append(path);
+        }
+        return sb.toString();
+    }
 }
