@@ -31,7 +31,10 @@
 
 package one.nio.lz4;
 
+import one.nio.mem.DirectMemory;
 import one.nio.os.NativeLibrary;
+
+import java.nio.ByteBuffer;
 
 import static one.nio.util.JavaInternals.*;
 
@@ -76,7 +79,7 @@ public class LZ4 {
         if (srcOffset < 0 || srcOffset + length > src.length || dstOffset < 0 || length < 0) {
             throw new IndexOutOfBoundsException();
         }
-        if (dstOffset + compressBound(length) > dst.length) {
+        if (compressBound(length) > dst.length - dstOffset) {
             throw new IllegalArgumentException("Output array is too small");
         }
 
@@ -89,6 +92,28 @@ public class LZ4 {
         } else {
             throw new IllegalArgumentException("Input exceeds limit");
         }
+    }
+
+    public static int compress(ByteBuffer src, ByteBuffer dst) {
+        int length = src.remaining();
+        if (compressBound(length) > dst.remaining()) {
+            throw new IndexOutOfBoundsException();
+        }
+
+        int result;
+        if (NativeLibrary.IS_SUPPORTED) {
+            result = compress0(array(src), offset(src), array(dst), offset(dst), length);
+        } else if (length < LZ4_64K_LIMIT) {
+            result = compress16(array(src), address(src), array(dst), address(dst), length);
+        } else if (length <= LZ4_MAX_INPUT_SIZE) {
+            result = compress32(array(src), address(src), array(dst), address(dst), length);
+        } else {
+            throw new IllegalArgumentException("Input exceeds limit");
+        }
+
+        src.position(src.limit());
+        dst.position(dst.position() + result);
+        return result;
     }
 
     public static int decompress(byte[] src, byte[] dst) {
@@ -111,6 +136,35 @@ public class LZ4 {
             throw new IllegalArgumentException("Malformed input");
         }
         return result;
+    }
+
+    public static int decompress(ByteBuffer src, ByteBuffer dst) {
+        int result;
+        if (NativeLibrary.IS_SUPPORTED) {
+            result = decompress0(array(src), offset(src), array(dst), offset(dst), src.remaining());
+        } else {
+            result = decompress(array(src), address(src), array(dst), address(dst), src.remaining(), dst.remaining());
+        }
+
+        if (result < 0) {
+            throw new IllegalArgumentException("Malformed input");
+        }
+
+        src.position(src.limit());
+        dst.position(dst.position() + result);
+        return result;
+    }
+
+    private static byte[] array(ByteBuffer buf) {
+        return buf.hasArray() ? buf.array() : null;
+    }
+
+    private static long offset(ByteBuffer buf) {
+        return (buf.hasArray() ? buf.arrayOffset() : DirectMemory.getAddress(buf)) + buf.position();
+    }
+
+    private static long address(ByteBuffer buf) {
+        return (buf.hasArray() ? byteArrayOffset + buf.arrayOffset() : DirectMemory.getAddress(buf)) + buf.position();
     }
 
     // Compression implementation
@@ -557,6 +611,6 @@ public class LZ4 {
 
     // JNI implementation
 
-    private static native int compress0(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length);
-    private static native int decompress0(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length);
+    private static native int compress0(byte[] src, long srcOffset, byte[] dst, long dstOffset, int length);
+    private static native int decompress0(byte[] src, long srcOffset, byte[] dst, long dstOffset, int length);
 }
