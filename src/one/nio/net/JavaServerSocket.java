@@ -22,9 +22,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 
-final class JavaServerSocket extends Socket {
+final class JavaServerSocket extends SelectableJavaSocket {
     ServerSocketChannel ch;
 
     JavaServerSocket() throws IOException {
@@ -81,12 +83,22 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
+    public int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public final int readRaw(long buf, int count, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public final int read(byte[] data, int offset, int count) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -139,7 +151,7 @@ final class JavaServerSocket extends Socket {
     }
 
     @Override
-    public final void setReuseAddr(boolean reuseAddr) {
+    public final void setReuseAddr(boolean reuseAddr, boolean reusePort) {
         try {
             ch.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
         } catch (IOException e) {
@@ -151,6 +163,15 @@ final class JavaServerSocket extends Socket {
     public final void setRecvBuffer(int recvBuf) {
         try {
             ch.setOption(StandardSocketOptions.SO_RCVBUF, recvBuf);
+        } catch (IOException e) {
+            // Ignore
+        }
+    }
+
+    @Override
+    public final void setTos(int tos) {
+        try {
+            ch.setOption(StandardSocketOptions.IP_TOS, tos);
         } catch (IOException e) {
             // Ignore
         }
@@ -193,5 +214,10 @@ final class JavaServerSocket extends Socket {
     @Override
     public SslContext getSslContext() {
         return null;
+    }
+
+    @Override
+    public SelectableChannel getSelectableChannel() {
+        return ch;
     }
 }

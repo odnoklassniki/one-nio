@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2015-2017 Odnoklassniki Ltd, Mail.Ru Group
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package one.nio.net;
 
-import one.nio.mem.DirectMemory;
-
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
@@ -25,18 +23,17 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.SocketChannel;
 
-final class JavaSocket extends SelectableJavaSocket {
-    SocketChannel ch;
+/**
+ * @author ivan.grigoryev
+ */
+public class JavaDatagramSocket extends SelectableJavaSocket {
+    DatagramChannel ch;
 
-    JavaSocket() throws IOException {
-        this.ch = SocketChannel.open();
-    }
-
-    JavaSocket(SocketChannel ch) {
-        this.ch = ch;
+    JavaDatagramSocket() throws IOException {
+        this.ch = DatagramChannel.open();
     }
 
     @Override
@@ -54,13 +51,14 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final Socket accept() {
+    public final JavaSocket accept() throws IOException {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public final void connect(InetAddress address, int port) throws IOException {
-        ch.socket().connect(new InetSocketAddress(address, port), ch.socket().getSoTimeout());
+        // It will be quite easy to add support for "connected" mode if it is needed in future
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -70,65 +68,51 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final void listen(int backlog) throws IOException {
-        throw new UnsupportedOperationException();
     }
 
     @Override
     public final int writeRaw(long buf, int count, int flags) throws IOException {
-        return ch.write(DirectMemory.wrap(buf, count));
-    }
-
-    @Override
-    public final int write(byte[] data, int offset, int count, int flags) throws IOException {
-        return ch.write(ByteBuffer.wrap(data, offset, count));
-    }
-
-    @Override
-    public final void writeFully(byte[] data, int offset, int count) throws IOException {
-        ch.write(ByteBuffer.wrap(data, offset, count));
-    }
-
-    @Override
-    public int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
         throw new UnsupportedOperationException();
     }
 
     @Override
+    public final int write(byte[] data, int offset, int count, int flags) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public final void writeFully(byte[] data, int offset, int count) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
+        return ch.send(data, new InetSocketAddress(address, port));
+    }
+
+    @Override
     public final int readRaw(long buf, int count, int flags) throws IOException {
-        int result = ch.read(DirectMemory.wrap(buf, count));
-        if (result < 0) {
-            throw new SocketClosedException();
-        }
-        return result;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public final int read(byte[] data, int offset, int count) throws IOException {
-        int result = ch.read(ByteBuffer.wrap(data, offset, count));
-        if (result < 0) {
-            throw new SocketClosedException();
-        }
-        return result;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
-        throw new SocketClosedException();
+        return (InetSocketAddress)ch.receive(buffer);
     }
 
     @Override
     public final void readFully(byte[] data, int offset, int count) throws IOException {
-        ByteBuffer buffer = ByteBuffer.wrap(data, offset, count);
-        while (buffer.hasRemaining()) {
-            if (ch.read(buffer) < 0) {
-                throw new SocketClosedException();
-            }
-        }
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
-        return file.getChannel().transferTo(offset, count, ch);
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -151,20 +135,12 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final void setKeepAlive(boolean keepAlive) {
-        try {
-            ch.setOption(StandardSocketOptions.SO_KEEPALIVE, keepAlive);
-        } catch (IOException e) {
-            // Ignore
-        }
+        // Ignore
     }
 
     @Override
     public final void setNoDelay(boolean noDelay) {
-        try {
-            ch.setOption(StandardSocketOptions.TCP_NODELAY, noDelay);
-        } catch (IOException e) {
-            // Ignore
-        }
+        // Ignore
     }
 
     @Override
@@ -196,21 +172,17 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final void setSendBuffer(int sendBuf) {
-        try {
-            ch.setOption(StandardSocketOptions.SO_SNDBUF, sendBuf);
-        } catch (IOException e) {
-            // Ignore
-        }
-    }
-
-    @Override
     public final void setTos(int tos) {
         try {
             ch.setOption(StandardSocketOptions.IP_TOS, tos);
         } catch (IOException e) {
             // Ignore
         }
+    }
+
+    @Override
+    public final void setSendBuffer(int sendBuf) {
+        // Ignore
     }
 
     @Override
@@ -234,11 +206,7 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final InetSocketAddress getRemoteAddress() {
-        try {
-            return (InetSocketAddress) ch.getRemoteAddress();
-        } catch (IOException e) {
-            return null;
-        }
+        throw new UnsupportedOperationException();
     }
 
     @Override

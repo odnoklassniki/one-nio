@@ -69,7 +69,7 @@ final class JavaSelector extends Selector {
 
     @Override
     public final void unregister(Session session) {
-        SelectionKey key = ((JavaSocket) session.socket).ch.keyFor(impl);
+        SelectionKey key = ((SelectableJavaSocket) session.socket).getSelectableChannel().keyFor(impl);
         if (key != null) {
             key.cancel();
         }
@@ -78,7 +78,7 @@ final class JavaSelector extends Selector {
 
     @Override
     public final void listen(Session session, int events) {
-        ((JavaSocket) session.socket).ch.keyFor(impl).interestOps(events);
+        ((SelectableJavaSocket) session.socket).getSelectableChannel().keyFor(impl).interestOps(events);
         impl.wakeup();
     }
 
@@ -115,7 +115,7 @@ final class JavaSelector extends Selector {
     private void registerPendingSessions() throws ClosedChannelException {
         for (Session session; (session = pendingSessions.poll()) != null; ) {
             try {
-                ((JavaSocket) session.socket).ch.register(impl, session.eventsToListen, session);
+                ((SelectableJavaSocket) session.socket).getSelectableChannel().register(impl, session.eventsToListen, session);
             } catch (CancelledKeyException key) {
                 log.warn("Cannot register session: " + session.toString(), key);
             }

@@ -84,10 +84,18 @@ static int sockaddr_from_java(JNIEnv* env, jbyteArray address, jint port, struct
     }
 }
 
-static int sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_storage* sa) {
-    int len = sa->ss_family == AF_INET6 ? 24 : 8;
-    (*env)->SetByteArrayRegion(env, buffer, 0, len, (jbyte*)sa);
-    return len;
+static int isUDPSocket(int fd) {
+    int type = 0;
+    int length = sizeof(type);
+    return getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length) == 0 && type == SOCK_DGRAM;
+}
+
+static void sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_storage* sa, int err) {
+    jbyte tmpBuf[25];
+    int len = err == 0 ? (sa->ss_family == AF_INET6 ? 24 : 8) : 0;
+    tmpBuf[0] = (jbyte)len;
+    memcpy(tmpBuf + 1, sa, len);
+    (*env)->SetByteArrayRegion(env, buffer, 0, len + 1, tmpBuf);
 }
 
 static void wakeup_handler(int sig) {
@@ -142,8 +150,8 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls) {
-    int result = socket(use_IPv6 ? PF_INET6 : PF_INET, SOCK_STREAM, 0);
+Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls, jboolean datagram) {
+    int result = socket(use_IPv6 ? PF_INET6 : PF_INET, datagram ? SOCK_DGRAM : SOCK_STREAM, 0);
     if (result == -1) {
         throw_io_exception(env);
     }
@@ -412,25 +420,67 @@ Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD
 }
 
 JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_sendTo(JNIEnv* env, jobject self, jlong buffer, jint count,
+                                      jint flags, jbyteArray address, jint port) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else if (count != 0) {
+        struct sockaddr_storage sa;
+        int len = sockaddr_from_java(env, address, port, &sa);
+        int result = sendto(fd, (void*)buffer, count, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
+        if (result > 0) {
+            return result;
+        } else if (result == 0) {
+            throw_socket_closed(env);
+        } else if (is_io_exception(fd)) {
+            throw_io_exception(env);
+        }
+        return result;
+    }
+    return 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_recvFrom(JNIEnv* env, jobject self, jlong buffer, jint count,
+                                       jint flags, jbyteArray address) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else if (count != 0) {
+        struct sockaddr_storage sa;
+        int len = sizeof(sa);
+
+        int result = recvfrom(fd, (void*)buffer, count, flags, (struct sockaddr*)&sa, &len);
+
+        if (result > 0 || result == 0 && isUDPSocket(fd)) {
+            sockaddr_to_java(env, address, &sa, 0);
+            return result;
+        } else if (result == 0) {
+            throw_socket_closed(env);
+        } else if (is_io_exception(fd)) {
+            throw_io_exception(env);
+        }
+    }
+    return 0;
+}
+
+JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_getsockname(JNIEnv* env, jobject self, jbyteArray buffer) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     struct sockaddr_storage sa;
     int len = sizeof(sa);
-    if (getsockname(fd, (struct sockaddr*)&sa, &len) != 0) {
-        return -1;
-    }
-    return sockaddr_to_java(env, buffer, &sa);
+    int err = getsockname(fd, (struct sockaddr*)&sa, &len);
+    sockaddr_to_java(env, buffer, &sa, err);
 }
 
-JNIEXPORT jint JNICALL
+JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_getpeername(JNIEnv* env, jobject self, jbyteArray buffer) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     struct sockaddr_storage sa;
     int len = sizeof(sa);
-    if (getpeername(fd, (struct sockaddr*)&sa, &len) != 0) {
-        return -1;
-    }
-    return sockaddr_to_java(env, buffer, &sa);
+    int err = getpeername(fd, (struct sockaddr*)&sa, &len);
+    sockaddr_to_java(env, buffer, &sa, err);
 }
 
 JNIEXPORT void JNICALL
@@ -478,10 +528,11 @@ Java_one_nio_net_NativeSocket_setDeferAccept(JNIEnv* env, jobject self, jboolean
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean reuseAddr) {
+Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean reuseAddr, jboolean reusePort) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     int value = (int) reuseAddr;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
+    value = (int) reusePort;
     setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
 }
 
@@ -495,6 +546,12 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setSendBuffer(JNIEnv* env, jobject self, jint sendBuf) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendBuf, sizeof(sendBuf));
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_setTos(JNIEnv* env, jobject self, jint tos) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
 }
 
 JNIEXPORT jbyteArray JNICALL

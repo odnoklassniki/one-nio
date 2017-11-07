@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 
 public abstract class Socket implements Closeable {
     public static final int SOL_SOCKET    = 1;
@@ -48,8 +49,10 @@ public abstract class Socket implements Closeable {
     public abstract int writeRaw(long buf, int count, int flags) throws IOException;
     public abstract int write(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void writeFully(byte[] data, int offset, int count) throws IOException;
+    public abstract int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException;
     public abstract int readRaw(long buf, int count, int flags) throws IOException;
     public abstract int read(byte[] data, int offset, int count) throws IOException;
+    public abstract InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException;
     public abstract void readFully(byte[] data, int offset, int count) throws IOException;
     public abstract long sendFile(RandomAccessFile file, long offset, long count) throws IOException;
     public abstract void setBlocking(boolean blocking);
@@ -58,9 +61,10 @@ public abstract class Socket implements Closeable {
     public abstract void setNoDelay(boolean noDelay);
     public abstract void setTcpFastOpen(boolean tcpFastOpen);
     public abstract void setDeferAccept(boolean deferAccept);
-    public abstract void setReuseAddr(boolean reuseAddr);
+    public abstract void setReuseAddr(boolean reuseAddr, boolean reusePort);
     public abstract void setRecvBuffer(int recvBuf);
     public abstract void setSendBuffer(int sendBuf);
+    public abstract void setTos(int tos);
     public abstract byte[] getOption(int level, int option);
     public abstract boolean setOption(int level, int option, byte[] value);
     public abstract InetSocketAddress getLocalAddress();
@@ -77,11 +81,15 @@ public abstract class Socket implements Closeable {
     }
 
     public static Socket create() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket() : new JavaSocket();
+        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(false) : new JavaSocket();
     }
 
     public static Socket createServerSocket() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket() : new JavaServerSocket();
+        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(false) : new JavaServerSocket();
+    }
+
+    public static Socket createDatagramSocket() throws IOException {
+        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(true) : new JavaDatagramSocket();
     }
 
     public static Socket connectInet(InetAddress address, int port) throws IOException {
