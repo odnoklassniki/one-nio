@@ -7,6 +7,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -52,8 +53,12 @@ public class HttpRequestBodyTest {
         final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH + 1];
         ThreadLocalRandom.current().nextBytes(body);
 
-        final Response response = client.post(ENDPOINT, body);
-        assertEquals(413, response.getStatus());
+        try {
+            final Response response = client.post(ENDPOINT, body);
+            assertEquals(413, response.getStatus());
+        } catch (SocketException e) {
+            assertEquals("Broken pipe", e.getMessage());
+        }
     }
 
     @Test
@@ -78,8 +83,12 @@ public class HttpRequestBodyTest {
         final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH + 1];
         ThreadLocalRandom.current().nextBytes(body);
 
-        final Response response = client.put(ENDPOINT, body);
-        assertEquals(413, response.getStatus());
+        try {
+            final Response response = client.put(ENDPOINT, body);
+            assertEquals(413, response.getStatus());
+        } catch (SocketException e) {
+            assertEquals("Broken pipe", e.getMessage());
+        }
     }
 
     @Test
@@ -104,8 +113,12 @@ public class HttpRequestBodyTest {
         final byte[] body = new byte[HttpSession.MAX_REQUEST_BODY_LENGTH + 1];
         ThreadLocalRandom.current().nextBytes(body);
 
-        final Response response = client.patch(ENDPOINT, body);
-        assertEquals(413, response.getStatus());
+        try {
+            final Response response = client.patch(ENDPOINT, body);
+            assertEquals(413, response.getStatus());
+        } catch (SocketException e) {
+            assertEquals("Broken pipe", e.getMessage());
+        }
     }
 
     @Test
