@@ -54,11 +54,12 @@ final class AcceptorThread extends Thread {
 
         if (config.recvBuf != 0) serverSocket.setRecvBuffer(config.recvBuf);
         if (config.sendBuf != 0) serverSocket.setSendBuffer(config.sendBuf);
+        if (config.tos != 0) serverSocket.setTos(config.tos);
         if (config.deferAccept) serverSocket.setDeferAccept(true);
 
         serverSocket.setNoDelay(config.noDelay);
         serverSocket.setTcpFastOpen(config.tcpFastOpen);
-        serverSocket.setReuseAddr(true);
+        serverSocket.setReuseAddr(true, config.reusePort);
         serverSocket.bind(address, port, backlog);
     }
 
@@ -69,9 +70,13 @@ final class AcceptorThread extends Thread {
         if (config.sendBuf != 0) {
             serverSocket.setSendBuffer(config.sendBuf);
         }
+        if (config.tos != 0) {
+            serverSocket.setTos(config.tos);
+        }
         serverSocket.setDeferAccept(config.deferAccept);
         serverSocket.setNoDelay(config.noDelay);
         serverSocket.setTcpFastOpen(config.tcpFastOpen);
+        serverSocket.setReuseAddr(true, config.reusePort);
 
         SslContext sslContext = serverSocket.getSslContext();
         if (sslContext != null && config.ssl != null) {
