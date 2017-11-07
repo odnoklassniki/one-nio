@@ -27,7 +27,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.zip.CRC32;
 
 public final class NativeLibrary implements NativeLibraryMXBean {
@@ -54,7 +53,7 @@ public final class NativeLibrary implements NativeLibraryMXBean {
             String tmpDir = System.getProperty("java.io.tmpdir", "/tmp");
             File dll = new File(tmpDir, "libonenio." + crc32(libData) + ".so");
             if (!dll.exists() || dll.length() != libData.length() && dll.delete()) {
-                OutputStream out = new FileOutputStream(dll);
+                FileOutputStream out = new FileOutputStream(dll);
                 out.write(libData.buffer(), 0, libData.length());
                 out.close();
             }
