@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.StringTokenizer;
 
 public class HttpCluster extends WeightCluster<HttpProvider> {
-    protected int retries = 3;
-    protected int maxFailures = 5;
+    protected volatile int retries = 3;
+    protected volatile int maxFailures = 5;
 
     public void setRetries(int retries) {
         this.retries = retries;
@@ -66,6 +66,7 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
             log.trace(request.toString());
         }
 
+        final int retries = this.retries;
         for (int i = 0; i < retries; i++) {
             HttpProvider provider = getProvider();
             try {
