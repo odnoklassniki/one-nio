@@ -38,9 +38,7 @@ public class JsonTest implements Serializable {
     }
 
     public static class TestObject implements Serializable {
-
         @JsonName("test_name")
         public String name;
     }
-
 }

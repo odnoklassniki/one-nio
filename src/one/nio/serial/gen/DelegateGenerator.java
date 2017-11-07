@@ -17,11 +17,15 @@
 package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
-import one.nio.serial.*;
+import one.nio.serial.Default;
+import one.nio.serial.FieldDescriptor;
+import one.nio.serial.JsonName;
+import one.nio.serial.Repository;
 import one.nio.util.JavaInternals;
 
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
@@ -207,8 +211,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         if (defaultFields != null && !defaultFields.isEmpty()) {
             for (Field defaultField : defaultFields) {
-                String defaultValue = defaultField.getAnnotation(Default.class).value();
-                putFieldConstant(mv, defaultField, defaultValue);
+                setDefaultField(mv, defaultField);
             }
         }
 
@@ -274,21 +277,13 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
-
             if (ownField == null) {
                 continue;
             }
 
-            String name = ownField.getName();
-
             JsonName jsonName = ownField.getAnnotation(JsonName.class);
-
-            if (jsonName != null) {
-                name = jsonName.value();
-            }
-
-            String fieldName = "\"" + name + "\":";
-            mv.visitLdcInsn(firstWritten ? ',' + fieldName : '{' + fieldName);
+            String fieldName = jsonName != null ? jsonName.value() : ownField.getName();
+            mv.visitLdcInsn((firstWritten ? ',' : '{') + "\"" + fieldName + "\":");
             mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;");
             firstWritten = true;
 
@@ -327,7 +322,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
-    private static void putFieldConstant(MethodVisitor mv, Field field, String value) {
+    private static void setDefaultField(MethodVisitor mv, Field field) {
         if (Modifier.isFinal(field.getModifiers())) {
             mv.visitFieldInsn(GETSTATIC, "one/nio/util/JavaInternals", "unsafe", "Lsun/misc/Unsafe;");
             mv.visitVarInsn(ALOAD, 2);
@@ -336,59 +331,83 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitVarInsn(ALOAD, 2);
         }
 
+        Default defaultValue = field.getAnnotation(Default.class);
         Class<?> fieldType = field.getType();
-        FieldType dstType = FieldType.valueOf(fieldType);
-        switch (dstType) {
+
+        if (!defaultValue.method().isEmpty()) {
+            String methodName = defaultValue.method();
+            int p = methodName.lastIndexOf('.');
+            Method m = JavaInternals.getMethod(methodName.substring(0, p), methodName.substring(p + 1));
+            if (m == null || !Modifier.isStatic(m.getModifiers()) || !fieldType.isAssignableFrom(m.getReturnType())) {
+                throw new IllegalArgumentException("Invalid default initializer " + methodName + " for field " + field);
+            }
+            emitInvoke(mv, m);
+        } else if (!defaultValue.field().isEmpty()) {
+            String fieldName = defaultValue.field();
+            int p = fieldName.lastIndexOf('.');
+            Field f = JavaInternals.getField(fieldName.substring(0, p), fieldName.substring(p + 1));
+            if (f == null || !Modifier.isStatic(f.getModifiers()) || !fieldType.isAssignableFrom(f.getType())) {
+                throw new IllegalArgumentException("Invalid default initializer " + fieldName + " for field " + field);
+            }
+            emitGetField(mv, f);
+        } else {
+            emitDefaultValue(mv, field, fieldType, defaultValue.value());
+        }
+
+        if (Modifier.isFinal(field.getModifiers())) {
+            FieldType dstType = FieldType.valueOf(fieldType);
+            mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
+        } else {
+            emitPutField(mv, field);
+        }
+    }
+
+    private static void emitDefaultValue(MethodVisitor mv, Field field, Class<?> fieldType, String value) {
+        switch (FieldType.valueOf(fieldType)) {
             case Int:
             case Byte:
             case Short:
                 emitInt(mv, Integer.decode(value));
-                break;
+                return;
             case Long:
                 emitLong(mv, Long.decode(value));
-                break;
+                return;
             case Boolean:
                 emitInt(mv, Boolean.parseBoolean(value) ? 1 : 0);
-                break;
+                return;
             case Char:
                 emitInt(mv, value.length() == 1 ? value.charAt(0) : Integer.decode(value));
-                break;
+                return;
             case Float:
                 emitFloat(mv, Float.parseFloat(value));
-                break;
+                return;
             case Double:
                 emitDouble(mv, Double.parseDouble(value));
-                break;
-            default:
-                if (fieldType == String.class) {
-                    mv.visitLdcInsn(value);
-                } else if (fieldType == Character.class) {
-                    emitInt(mv, value.length() == 1 ? value.charAt(0) : Integer.decode(value));
-                    mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;");
-                } else if (fieldType == Class.class) {
-                    try {
-                        mv.visitLdcInsn(Class.forName(value, false, INSTANCE));
-                    } catch (ClassNotFoundException e) {
-                        throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
-                    }
-                } else {
-                    try {
-                        Method valueOf = fieldType.getMethod("valueOf", String.class);
-                        if (!Modifier.isStatic(valueOf.getModifiers()) || valueOf.getReturnType() != fieldType) {
-                            throw new NoSuchMethodException("valueOf(String) is not found in class " + fieldType.getName());
-                        }
-                        mv.visitLdcInsn(value);
-                        emitInvoke(mv, valueOf);
-                    } catch (NoSuchMethodException e) {
-                        throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
-                    }
-                }
+                return;
         }
 
-        if (Modifier.isFinal(field.getModifiers())) {
-            mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
+        if (fieldType == String.class) {
+            mv.visitLdcInsn(value);
+        } else if (fieldType == Character.class) {
+            emitInt(mv, value.length() == 1 ? value.charAt(0) : Integer.decode(value));
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;");
+        } else if (fieldType == Class.class) {
+            try {
+                mv.visitLdcInsn(Class.forName(value, false, INSTANCE));
+            } catch (ClassNotFoundException e) {
+                throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
+            }
         } else {
-            emitPutField(mv, field);
+            try {
+                Method valueOf = fieldType.getMethod("valueOf", String.class);
+                if (!Modifier.isStatic(valueOf.getModifiers()) || valueOf.getReturnType() != fieldType) {
+                    throw new NoSuchMethodException("valueOf(String) is not found in class " + fieldType.getName());
+                }
+                mv.visitLdcInsn(value);
+                emitInvoke(mv, valueOf);
+            } catch (NoSuchMethodException e) {
+                throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
+            }
         }
     }
 
@@ -410,6 +429,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         // A[] -> B[]
         if (src.isArray() && dst.isArray() && src.getComponentType().isPrimitive() == dst.getComponentType().isPrimitive()) {
+            Label isNull = emitNullGuard(mv, dst);
             mv.visitInsn(DUP);
             mv.visitInsn(ARRAYLENGTH);
 
@@ -425,6 +445,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
             mv.visitInsn(DUP_X1);
             mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/gen/ArrayCopy", "copy", copySig);
+            mv.visitLabel(isNull);
             return;
         }
 
@@ -441,11 +462,13 @@ public class DelegateGenerator extends BytecodeGenerator {
                         Modifier.isStatic(m.getModifiers()) && "valueOf".equals(m.getName())) {
                     Class param = m.getParameterTypes()[0];
                     if (param.isPrimitive() && param != boolean.class && param != char.class) {
+                        Label isNull = emitNullGuard(mv, dst);
                         String valueMethod = param.getName() + "Value";
                         String valueSignature = "()" + Type.getDescriptor(param);
                         String valueOfSignature = "(" + Type.getDescriptor(param) + ")" + Type.getDescriptor(dst);
                         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", valueMethod, valueSignature);
                         mv.visitMethodInsn(INVOKESTATIC, Type.getInternalName(dst), "valueOf", valueOfSignature);
+                        mv.visitLabel(isNull);
                         return;
                     }
                 }
@@ -466,7 +489,9 @@ public class DelegateGenerator extends BytecodeGenerator {
         // dst = src.someMethod()
         for (Method m : src.getMethods()) {
             if (!Modifier.isStatic(m.getModifiers()) && m.getParameterTypes().length == 0 && m.getReturnType() == dst) {
+                Label isNull = emitNullGuard(mv, dst);
                 emitInvoke(mv, m);
+                mv.visitLabel(isNull);
                 return;
             }
         }
@@ -474,5 +499,19 @@ public class DelegateGenerator extends BytecodeGenerator {
         // The types are not convertible, just leave the default value
         mv.visitInsn(FieldType.valueOf(src).convertTo(FieldType.Void));
         mv.visitInsn(FieldType.Void.convertTo(FieldType.valueOf(dst)));
+    }
+
+    private static Label emitNullGuard(MethodVisitor mv, Class<?> dst) {
+        Label isNull = new Label();
+        Label nonNull = new Label();
+
+        mv.visitInsn(DUP);
+        mv.visitJumpInsn(IFNONNULL, nonNull);
+        mv.visitInsn(POP);
+        mv.visitInsn(FieldType.Void.convertTo(FieldType.valueOf(dst)));
+        mv.visitJumpInsn(GOTO, isNull);
+
+        mv.visitLabel(nonNull);
+        return isNull;
     }
 }

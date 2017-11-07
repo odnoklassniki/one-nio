@@ -147,13 +147,12 @@ class SerializationMXBeanImpl implements SerializationMXBean {
     }
 
     private String[] getSerializers(Map<?, ? extends Serializer> map) {
-        synchronized (Repository.class) {
-            String[] result = new String[map.size()];
-            int i = 0;
-            for (Serializer serializer : map.values()) {
-                result[i++] = Long.toHexString(serializer.uid);
-            }
-            return result;
+        Serializer[] serializers = map.values().toArray(new Serializer[0]);
+        String[] result = new String[serializers.length];
+        int i = 0;
+        for (Serializer serializer : serializers) {
+            result[i++] = Long.toHexString(serializer.uid);
         }
+        return result;
     }
 }

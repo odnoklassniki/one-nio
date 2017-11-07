@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class MapSerializer extends Serializer<Map> {
     private Constructor constructor;
@@ -110,7 +111,16 @@ public class MapSerializer extends Serializer<Map> {
         try {
             return cls.getConstructor();
         } catch (NoSuchMethodException e) {
-            Class implementation = SortedMap.class.isAssignableFrom(cls) ? TreeMap.class : HashMap.class;
+            Class implementation;
+            if (ConcurrentNavigableMap.class.isAssignableFrom(cls)) {
+                implementation = ConcurrentSkipListMap.class;
+            } else if (ConcurrentMap.class.isAssignableFrom(cls)) {
+                implementation = ConcurrentHashMap.class;
+            } else if (SortedMap.class.isAssignableFrom(cls)) {
+                implementation = TreeMap.class;
+            } else {
+                implementation = HashMap.class;
+            }
 
             generateUid();
             Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
@@ -129,7 +139,8 @@ public class MapSerializer extends Serializer<Map> {
             type.getConstructor();
             return (type.getModifiers() & Modifier.ABSTRACT) == 0;
         } catch (NoSuchMethodException e) {
-            return type == Map.class || type == SortedMap.class || type == NavigableMap.class;
+            return type == Map.class || type == SortedMap.class || type == NavigableMap.class
+                    || type == ConcurrentMap.class || type == ConcurrentNavigableMap.class;
         }
     }
 }

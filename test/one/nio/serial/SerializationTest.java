@@ -187,7 +187,7 @@ public class SerializationTest extends TestCase {
     public void testUrls() throws IOException, ClassNotFoundException, URISyntaxException {
         checkSerialize(new URI("socket://192.168.0.1:2222/?param1=value1&param2=value2"));
         // This one is not serializable since Java 8
-        //checkSerialize(new URL("http://www.example.com/somePath/file.txt#anchor"));
+        // checkSerialize(new URL("http://www.example.com/somePath/file.txt#anchor"));
     }
 
     public void testExceptions() throws IOException, ClassNotFoundException {

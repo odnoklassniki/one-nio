@@ -17,7 +17,6 @@
 package one.nio.serial;
 
 import junit.framework.TestCase;
-
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
@@ -26,7 +25,9 @@ import java.io.Serializable;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 public class DefaultFieldsTest extends TestCase implements Serializable {
     @Default("abc")
@@ -47,6 +48,12 @@ public class DefaultFieldsTest extends TestCase implements Serializable {
     @Default("METHOD")
     final ElementType type = ElementType.TYPE;
 
+    @Default(method = "java.util.Collections.emptyList")
+    List<Long> list;
+
+    @Default(field = "java.util.Collections.EMPTY_SET")
+    final Set<String> set = null;
+
     public void testDefaultFields() throws Exception {
         List<Field> defaultFields = Arrays.asList(DefaultFieldsTest.class.getDeclaredFields());
         byte[] code = DelegateGenerator.generate(DefaultFieldsTest.class, new FieldDescriptor[0], defaultFields);
@@ -60,5 +67,7 @@ public class DefaultFieldsTest extends TestCase implements Serializable {
         assertEquals(true, obj.getClass().getDeclaredField("b").getBoolean(obj));
         assertEquals((Character) 'c', obj.c);
         assertEquals(ElementType.METHOD, obj.type);
+        assertEquals(Collections.emptyList(), obj.list);
+        assertEquals(Collections.EMPTY_SET, obj.set);
     }
 }
