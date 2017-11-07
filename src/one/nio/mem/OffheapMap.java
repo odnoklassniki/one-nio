@@ -185,10 +185,12 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return null;
     }
 
-    public void put(K key, V value) throws OutOfMemoryException {
+    // Returns true for new entry and false for value update
+    public boolean put(K key, V value) throws OutOfMemoryException {
         long hashCode = hashCode(key);
         long currentPtr = bucketFor(hashCode);
         int newSize = sizeOf(value);
+        boolean newEntry = true;
 
         RWLock lock = lockFor(hashCode).lockWrite();
         try {
@@ -198,12 +200,13 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     if (newSize <= oldSize) {
                         setTimeAt(entry);
                         setValueAt(entry, value);
-                        return;
+                        return false;
                     }
 
                     unsafe.putAddress(currentPtr, unsafe.getAddress(entry + NEXT_OFFSET));
                     destroyEntry(entry);
                     count.decrementAndGet();
+                    newEntry = false;
                     break;
                 }
             }
@@ -215,10 +218,12 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             setValueAt(entry, value);
 
             unsafe.putAddress(currentPtr, entry);
-            count.incrementAndGet();
         } finally {
             lock.unlockWrite();
         }
+
+        count.incrementAndGet();
+        return newEntry;
     }
 
     public boolean putIfAbsent(K key, V value) throws OutOfMemoryException {
