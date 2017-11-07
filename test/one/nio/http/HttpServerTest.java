@@ -16,14 +16,13 @@
 
 package one.nio.http;
 
-import one.nio.server.ServerConfig;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
 
 public class HttpServerTest extends HttpServer {
 
-    public HttpServerTest(ServerConfig config) throws IOException {
+    public HttpServerTest(HttpServerConfig config) throws IOException {
         super(config);
     }
 
@@ -68,8 +67,14 @@ public class HttpServerTest extends HttpServer {
     }
 
     public static void main(String[] args) throws Exception {
-        String url = args.length > 0 ? args[0] : "socket://0.0.0.0:8080";
-        HttpServerTest server = new HttpServerTest(ServerConfig.from(url));
+        HttpServerConfig config;
+        if (args.length > 0) {
+            config = HttpServerConfigFactory.fromFile(args[0]);
+        } else {
+            config = HttpServerConfigFactory.create(8080);
+        }
+
+        HttpServerTest server = new HttpServerTest(config);
         server.start();
     }
 }
