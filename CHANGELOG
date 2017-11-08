@@ -1,2 +1,8 @@
+1.0.1
+  * Support for HTTP PUT/DELETE/TRACE/CONNECT/PATCH (#16)
+  * Include libonenio.so into Maven build
+  * Interpret IllegalArgumentException as "400 Bad request"
+  * Support for HTTP request body
+
 1.0.0
   * Initial release
