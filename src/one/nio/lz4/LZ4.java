@@ -127,7 +127,7 @@ public class LZ4 {
 
         int result;
         if (NativeLibrary.IS_SUPPORTED) {
-            result = decompress0(src, srcOffset, dst, dstOffset, length);
+            result = decompress0(src, srcOffset, dst, dstOffset, length, dst.length - dstOffset);
         } else {
             result = decompress(src, byteArrayOffset + srcOffset, dst, byteArrayOffset + dstOffset, length, dst.length - dstOffset);
         }
@@ -141,7 +141,7 @@ public class LZ4 {
     public static int decompress(ByteBuffer src, ByteBuffer dst) {
         int result;
         if (NativeLibrary.IS_SUPPORTED) {
-            result = decompress0(array(src), offset(src), array(dst), offset(dst), src.remaining());
+            result = decompress0(array(src), offset(src), array(dst), offset(dst), src.remaining(), dst.remaining());
         } else {
             result = decompress(array(src), address(src), array(dst), address(dst), src.remaining(), dst.remaining());
         }
@@ -612,5 +612,5 @@ public class LZ4 {
     // JNI implementation
 
     private static native int compress0(byte[] src, long srcOffset, byte[] dst, long dstOffset, int length);
-    private static native int decompress0(byte[] src, long srcOffset, byte[] dst, long dstOffset, int length);
+    private static native int decompress0(byte[] src, long srcOffset, byte[] dst, long dstOffset, int length, int maxOutput);
 }
