@@ -219,6 +219,16 @@ public class Request {
         this.body = body.getBytes(StandardCharsets.UTF_8);
     }
 
+    public String getHost() {
+        String host = getHeader("Host: ");
+        if (host == null) {
+            return null;
+        }
+
+        int hostEndIndex = host.indexOf(':');
+        return hostEndIndex >= 0 ? host.substring(0, hostEndIndex) : host;
+    }
+
     public byte[] toBytes() {
         int estimatedSize = VERBS[method].length + Utf8.length(uri) + PROTOCOL_HEADER_LENGTH + headerCount * 2;
         for (int i = 0; i < headerCount; i++) {
