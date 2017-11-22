@@ -397,8 +397,13 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
-    if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL || !OPENSSL_init_ssl(0, NULL)) {
+    if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL && dlopen("libssl.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL) == NULL) {
         throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libssl.so");
+        return;
+    }
+
+    if (!OPENSSL_init_ssl(0, NULL)) {
+        throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to initialize OpenSSL library");
         return;
     }
 

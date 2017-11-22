@@ -54,7 +54,7 @@
             <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args}
                        -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so
                        -I ${java.home}/../include -I ${java.home}/../include/linux
-                       ${src.native} -lssl -lrt"/>
+                       ${src.native} -ldl -lrt"/>
         </exec>
     </target>
 
