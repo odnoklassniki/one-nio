@@ -37,7 +37,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
         this.host = conn.getHost();
         this.port = conn.getPort();
         this.readTimeout = conn.getIntParam("readTimeout", timeout);
-        this.connectTimeout = conn.getIntParam("connectTimeout", readTimeout);
+        this.connectTimeout = conn.getIntParam("connectTimeout", 1000);
         this.tos = conn.getIntParam("tos", 0);
 
         setProperties(conn);
