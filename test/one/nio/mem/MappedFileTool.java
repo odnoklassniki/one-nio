@@ -29,7 +29,7 @@ public class MappedFileTool {
 
         if ("getInt".equals(cmd)) {
             System.out.println(unsafe.getInt(addr));
-        } else if ("getLong".equals("cmd")) {
+        } else if ("getLong".equals(cmd)) {
             System.out.println(unsafe.getLong(addr));
         } else if ("putInt".equals(cmd)) {
             unsafe.putInt(addr, Integer.decode(args[3]));
