@@ -16,8 +16,8 @@
 
 package one.nio.serial;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -32,7 +32,9 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class SerializationTest extends TestCase {
+import org.junit.Test;
+
+public class SerializationTest {
 
     private Object clone(Object obj) throws IOException, ClassNotFoundException {
         CalcSizeStream css = new CalcSizeStream();
@@ -70,12 +72,12 @@ public class SerializationTest extends TestCase {
         if (other != cls) {
             if (Collection.class.isAssignableFrom(cls)) {
                 for (Class<?> iface : collectionInterfaces) {
-                    Assert.assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
+                    assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
                 }
             }
             if (Map.class.isAssignableFrom(cls)) {
                 for (Class<?> iface : mapInterfaces) {
-                    Assert.assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
+                    assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
                 }
             }
         }
@@ -84,16 +86,16 @@ public class SerializationTest extends TestCase {
     private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
         Object clone1 = clone(obj);
         checkClass(obj.getClass(), clone1.getClass());
-        Assert.assertEquals(obj, clone1);
+        assertEquals(obj, clone1);
 
         Object clone2 = cloneViaPersist(obj);
         checkClass(obj.getClass(), clone2.getClass());
-        Assert.assertEquals(obj, clone2);
+        assertEquals(obj, clone2);
     }
 
     private void checkSerializeToString(Object obj) throws IOException, ClassNotFoundException {
         Object objCopy = clone(obj);
-        Assert.assertEquals(obj.toString(), objCopy.toString());
+        assertEquals(obj.toString(), objCopy.toString());
     }
 
     private String makeString(int length) {
@@ -120,6 +122,7 @@ public class SerializationTest extends TestCase {
         return result;
     }
 
+    @Test
     public void testStrings() throws IOException, ClassNotFoundException {
         checkSerialize("");
         checkSerialize("a");
@@ -136,6 +139,7 @@ public class SerializationTest extends TestCase {
         checkSerialize(makeString(1234567));
     }
 
+    @Test
     public void testBitSet() throws IOException, ClassNotFoundException {
         checkSerialize(new BitSet());
         checkSerialize(makeBitSet(15));
@@ -148,6 +152,7 @@ public class SerializationTest extends TestCase {
         checkSerialize(makeBitSet(100000));
     }
 
+    @Test
     public void testRecursiveRef() throws IOException, ClassNotFoundException {
         checkSerialize(makeList(0));
         checkSerialize(makeList(1));
@@ -174,6 +179,7 @@ public class SerializationTest extends TestCase {
         final int i = ordinal();
     }
 
+    @Test
     public void testEnum() throws IOException, ClassNotFoundException {
         checkSerialize(SimpleEnum.A);
         checkSerialize(SimpleEnum.B);
@@ -184,12 +190,14 @@ public class SerializationTest extends TestCase {
         checkSerialize(new EnumSerializer(ComplexEnum.class));
     }
 
+    @Test
     public void testUrls() throws IOException, ClassNotFoundException, URISyntaxException {
         checkSerialize(new URI("socket://192.168.0.1:2222/?param1=value1&param2=value2"));
         // This one is not serializable since Java 8
         // checkSerialize(new URL("http://www.example.com/somePath/file.txt#anchor"));
     }
 
+    @Test
     public void testExceptions() throws IOException, ClassNotFoundException {
         Exception e = new NullPointerException();
 
@@ -201,9 +209,10 @@ public class SerializationTest extends TestCase {
         CalcSizeStream css2 = new CalcSizeStream();
         css2.writeObject(e);
 
-        Assert.assertEquals(css1.count(), css2.count());
+        assertEquals(css1.count(), css2.count());
     }
 
+    @Test
     public void testInetAddress() throws IOException, ClassNotFoundException {
         checkSerialize(InetAddress.getByName("123.45.67.89"));
         checkSerialize(InetAddress.getByName("localhost"));
@@ -215,6 +224,7 @@ public class SerializationTest extends TestCase {
         checkSerialize(new InetSocketAddress("google.com", 443));
     }
 
+    @Test
     public void testBigDecimal() throws IOException, ClassNotFoundException {
         checkSerialize(new BigInteger("12345678901234567890"));
         checkSerialize(new BigInteger(-1, new byte[] { 11, 22, 33, 44, 55, 66, 77, 88, 99 }));
@@ -222,6 +232,7 @@ public class SerializationTest extends TestCase {
         checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
     }
 
+    @Test
     public void testStringBuilder() throws IOException, ClassNotFoundException {
         checkSerializeToString(new StringBuilder());
         checkSerializeToString(new StringBuilder("asdasd").append(123).append(true));
@@ -267,6 +278,7 @@ public class SerializationTest extends TestCase {
         }
     }
 
+    @Test
     public void testCompiledReadObject() throws IOException, ClassNotFoundException {
         for (int i = 0; i < 20000; i++) {
             checkSerialize(new ReadObject1());
@@ -310,6 +322,7 @@ public class SerializationTest extends TestCase {
         }
     }
 
+    @Test
     public void testMap() throws IOException, ClassNotFoundException {
         ConcurrentHashMap<Long, User> users = new ConcurrentHashMap<>();
         users.put(1L, new User(1, 1234567890L, "My Name"));
@@ -317,6 +330,7 @@ public class SerializationTest extends TestCase {
         checkSerialize(users);
     }
 
+    @Test
     public void testCollections() throws IOException, ClassNotFoundException {
         Random random = new Random();
         ArrayList<Long> list = new ArrayList<>();
@@ -364,6 +378,7 @@ public class SerializationTest extends TestCase {
         }
     }
 
+    @Test
     public void testHierarchy() throws IOException, ClassNotFoundException {
         checkSerialize(new Parent());
         checkSerialize(new Child());

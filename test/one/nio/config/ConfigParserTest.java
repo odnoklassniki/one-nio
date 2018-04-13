@@ -16,12 +16,17 @@
 
 package one.nio.config;
 
-import junit.framework.TestCase;
 import one.nio.http.HttpServerConfig;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 
-public class ConfigParserTest extends TestCase {
+import org.junit.Test;
+
+public class ConfigParserTest {
     private static final String SERVER_CONFIG = "\n" +
             "keepAlive: 120s\n" +
             "maxWorkers: 1000\n" +
@@ -57,6 +62,7 @@ public class ConfigParserTest extends TestCase {
             "   - www.example.com\n" +
             "  invalid: *id2\n";
 
+    @Test
     public void testConfigParser() throws Exception {
         HttpServerConfig config = ConfigParser.parse(SERVER_CONFIG, HttpServerConfig.class);
 
@@ -81,7 +87,7 @@ public class ConfigParserTest extends TestCase {
         assertEquals("[http/1.1, http/2]", Arrays.toString(config.acceptors[1].ssl.applicationProtocols));
 
         assertEquals(9443, config.acceptors[2].port);
-        assertTrue(config.acceptors[1].ssl == config.acceptors[2].ssl);
+        assertSame(config.acceptors[1].ssl, config.acceptors[2].ssl);
 
         assertEquals(80, config.acceptors[3].port);
         assertEquals(10000, config.acceptors[3].backlog);
@@ -93,6 +99,6 @@ public class ConfigParserTest extends TestCase {
         assertEquals(3, config.virtualHosts.size());
         assertEquals("[admin.example.com]", Arrays.toString(config.virtualHosts.get("admin")));
         assertEquals("[example.com, www.example.com]", Arrays.toString(config.virtualHosts.get("default")));
-        assertTrue(config.virtualHosts.get("default") == config.virtualHosts.get("invalid"));
+        assertSame(config.virtualHosts.get("default"), config.virtualHosts.get("invalid"));
     }
 }
