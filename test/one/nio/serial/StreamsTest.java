@@ -16,10 +16,10 @@
 
 package one.nio.serial;
 
+import org.junit.Test;
+
 import java.io.IOException;
 import java.io.Serializable;
-
-import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 

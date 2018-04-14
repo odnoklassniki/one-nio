@@ -19,7 +19,6 @@ package one.nio.serial;
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
-import static org.junit.Assert.assertEquals;
 
 import java.io.Serializable;
 import java.lang.annotation.ElementType;
@@ -28,6 +27,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
 
 public class DefaultFieldsTest implements Serializable {
     @Default("abc")

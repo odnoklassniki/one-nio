@@ -16,9 +16,9 @@
 
 package one.nio.net;
 
+import one.nio.mgt.ManagementServer;
 import org.junit.Test;
 
-import one.nio.mgt.ManagementServer;
 import static org.junit.Assert.assertEquals;
 
 public class ConnectionStringTest {

@@ -19,14 +19,14 @@ package one.nio.serial;
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
-import static org.junit.Assert.assertEquals;
+import org.junit.Test;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.util.Collections;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 public class ConversionTest implements Serializable {
     int intField = 1;

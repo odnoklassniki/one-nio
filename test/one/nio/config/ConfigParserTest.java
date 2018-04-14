@@ -17,14 +17,11 @@
 package one.nio.config;
 
 import one.nio.http.HttpServerConfig;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
 
 import java.util.Arrays;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 public class ConfigParserTest {
     private static final String SERVER_CONFIG = "\n" +
