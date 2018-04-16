@@ -16,20 +16,23 @@
 
 package one.nio.serial;
 
-import junit.framework.TestCase;
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
+import org.junit.Test;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.util.Collections;
 
-public class ConversionTest extends TestCase implements Serializable {
+import static org.junit.Assert.assertEquals;
+
+public class ConversionTest implements Serializable {
     int intField = 1;
     long longField = 2;
 
+    @Test
     public void testFieldConversion() throws Exception {
         byte[] code = DelegateGenerator.generate(ConversionTest.class, new FieldDescriptor[]{
                 fd("intField", BigInteger.class),

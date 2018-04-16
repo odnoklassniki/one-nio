@@ -16,14 +16,16 @@
 
 package one.nio.serial;
 
+import org.junit.Test;
+
 import java.io.IOException;
 import java.io.Serializable;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
 
-public class StreamsTest extends TestCase {
+public class StreamsTest {
 
+    @Test
     public void testReadPlace() throws IOException, ClassNotFoundException {
         Place place = new Place("blah", "", "");
 
@@ -38,7 +40,7 @@ public class StreamsTest extends TestCase {
         DeserializeStream in = new DeserializeStream(buf);
         Place place2 = serializer.read(in);
 
-        Assert.assertEquals(place, place2);
+        assertEquals(place, place2);
     }
 
     private static class Place implements Serializable {

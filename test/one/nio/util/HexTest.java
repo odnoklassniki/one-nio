@@ -16,13 +16,17 @@
 
 package one.nio.util;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Random;
 
-public class HexTest extends TestCase {
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
+public class HexTest {
+
+    @Test
     public void testBytes() {
         Random random = new Random();
         for (int i = 0; i < 1000; i++) {
@@ -37,6 +41,7 @@ public class HexTest extends TestCase {
         }
     }
 
+    @Test
     public void testNumbers() {
         Random random = new Random();
         for (int i = 0; i < 1000; i++) {
@@ -52,6 +57,7 @@ public class HexTest extends TestCase {
         }
     }
 
+    @Test
     public void testMisc() {
         assertEquals(0x12345678, Hex.parseInt("12345678"));
         assertEquals(0xabcdefABCDEF0987L, Hex.parseLong("abcdefABCDEF0987"));

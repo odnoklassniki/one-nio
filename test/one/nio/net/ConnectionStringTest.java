@@ -16,12 +16,14 @@
 
 package one.nio.net;
 
-import junit.framework.TestCase;
-
 import one.nio.mgt.ManagementServer;
+import org.junit.Test;
 
-public class ConnectionStringTest extends TestCase {
+import static org.junit.Assert.assertEquals;
 
+public class ConnectionStringTest {
+
+    @Test
     public void testConnectionStrings() {
         ConnectionString conn;
 
