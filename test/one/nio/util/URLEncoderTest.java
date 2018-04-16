@@ -16,11 +16,14 @@
 
 package one.nio.util;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
-public class URLEncoderTest extends TestCase {
+import static org.junit.Assert.assertEquals;
 
-    public static void testEncode() {
+public class URLEncoderTest {
+
+    @Test
+    public void testEncode() {
         final String[] pairs = {
                 "SimpleString1_SimpleString2_SimpleString3", "SimpleString1_SimpleString2_SimpleString3",
                 "param1=value1&param2=value", "param1%3Dvalue1%26param2%3Dvalue",

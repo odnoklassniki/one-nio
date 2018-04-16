@@ -16,10 +16,10 @@
 
 package one.nio.serial;
 
-import junit.framework.TestCase;
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
+import org.junit.Test;
 
 import java.io.Serializable;
 import java.lang.annotation.ElementType;
@@ -29,7 +29,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-public class DefaultFieldsTest extends TestCase implements Serializable {
+import static org.junit.Assert.assertEquals;
+
+public class DefaultFieldsTest implements Serializable {
     @Default("abc")
     String s;
 
@@ -54,6 +56,7 @@ public class DefaultFieldsTest extends TestCase implements Serializable {
     @Default(field = "java.util.Collections.EMPTY_SET")
     final Set<String> set = null;
 
+    @Test
     public void testDefaultFields() throws Exception {
         List<Field> defaultFields = Arrays.asList(DefaultFieldsTest.class.getDeclaredFields());
         byte[] code = DelegateGenerator.generate(DefaultFieldsTest.class, new FieldDescriptor[0], defaultFields);
