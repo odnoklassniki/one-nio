@@ -23,6 +23,7 @@ import one.nio.util.Utf8;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 public class Request {
@@ -167,6 +168,94 @@ public class Request {
             throw new NoSuchElementException("Missing required parameter: " + key);
         }
         return value;
+    }
+
+    /**
+     * @return {@link Iterator} over {@code String} {@code key[=[value]]} parameters in order
+     *         skipping empty parameters
+     */
+    public Iterator<Map.Entry<String, String>> getParameters() {
+        return new Iterator<Map.Entry<String, String>>() {
+            // Stops if params is -1
+            int cur = findNext(params + 1);
+
+            @Override
+            public boolean hasNext() {
+                return cur > 0;
+            }
+
+            @Override
+            public Map.Entry<String, String> next() {
+                final int next = uri.indexOf('&', cur);
+                final String parameter = next > 0 ? uri.substring(cur, next) : uri.substring(cur);
+                assert !parameter.isEmpty();
+
+                // Advance (stop if next is -1)
+                cur = findNext(next + 1);
+
+                // Parse parameter
+                final int delimiter = parameter.indexOf('=');
+                if (delimiter < 0) {
+                    // Whole parameter becomes the key
+                    return new QueryParameter(parameter, "");
+                } else {
+                    return new QueryParameter(
+                            parameter.substring(0, delimiter),
+                            parameter.substring(delimiter + 1));
+                }
+            }
+
+            private int findNext(int cur) {
+                if (cur <= 0) {
+                    return -1;
+                }
+
+                // Skip empty parameters (?& or &&)
+                while (cur < uri.length() && uri.charAt(cur) == '&') {
+                    cur++;
+                }
+
+                // Or reached the end
+                if (cur == uri.length()) {
+                    return -1;
+                } else {
+                    return cur;
+                }
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    /**
+     * HTTP URL parameter with lazily decoded value without memoization
+     */
+    private static class QueryParameter implements Map.Entry<String, String> {
+        private final String key;
+        private final String rawValue;
+
+        private QueryParameter(String key, String rawValue) {
+            this.key = key;
+            this.rawValue = rawValue;
+        }
+
+        @Override
+        public String getKey() {
+            return key;
+        }
+
+        @Override
+        public String getValue() {
+            return URLEncoder.decode(rawValue);
+        }
+
+        @Override
+        public String setValue(String value) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     public int getHeaderCount() {
