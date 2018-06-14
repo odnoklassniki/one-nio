@@ -23,7 +23,7 @@ import one.nio.os.Proc;
 import java.io.IOException;
 import java.util.Iterator;
 
-public final class SelectorThread extends Thread {
+public final class SelectorThread extends PayloadThread {
     private static final int BUFFER_SIZE = 64000;
 
     public final Selector selector;

@@ -34,13 +34,10 @@ public class ServerConfig {
     public int keepAlive;
     public int threadPriority = Thread.NORM_PRIORITY;
 
-    @Deprecated  // Do not use for new servers! Use ConfigParser instead
-    public static ServerConfig from(String conn) {
-        return from(new ConnectionString(conn));
+    public ServerConfig() {
     }
 
-    @Deprecated  // Do not use for new servers! Use ConfigParser instead
-    public static ServerConfig from(ConnectionString conn) {
+    private ServerConfig(ConnectionString conn) {
         AcceptorConfig ac = new AcceptorConfig();
         ac.address = conn.getHost();
         ac.port = conn.getPort();
@@ -52,14 +49,21 @@ public class ServerConfig {
             ac.ssl = SslConfig.from(System.getProperties());
         }
 
-        ServerConfig sc = new ServerConfig();
-        sc.acceptors = new AcceptorConfig[]{ac};
-        sc.selectors = conn.getIntParam("selectors", 0);
-        sc.minWorkers = conn.getIntParam("minWorkers", 0);
-        sc.maxWorkers = conn.getIntParam("maxWorkers", 0);
-        sc.queueTime = conn.getIntParam("queueTime", 0) / 1000;
-        sc.threadPriority = conn.getIntParam("threadPriority", Thread.NORM_PRIORITY);
+        this.acceptors = new AcceptorConfig[]{ac};
+        this.selectors = conn.getIntParam("selectors", 0);
+        this.minWorkers = conn.getIntParam("minWorkers", 0);
+        this.maxWorkers = conn.getIntParam("maxWorkers", 0);
+        this.queueTime = conn.getIntParam("queueTime", 0) / 1000;
+        this.threadPriority = conn.getIntParam("threadPriority", Thread.NORM_PRIORITY);
+    }
 
-        return sc;
+    @Deprecated  // Do not use for new servers! Use ConfigParser instead
+    public static ServerConfig from(String conn) {
+        return new ServerConfig(new ConnectionString(conn));
+    }
+
+    @Deprecated  // Do not use for new servers! Use ConfigParser instead
+    public static ServerConfig from(ConnectionString conn) {
+        return new ServerConfig(conn);
     }
 }

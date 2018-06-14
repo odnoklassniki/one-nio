@@ -54,7 +54,7 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
 
     @Override
     public Thread newThread(Runnable r) {
-        Thread thread = new Thread(r, "NIO Worker #" + index.incrementAndGet());
+        Thread thread = new PayloadThread(r, "NIO Worker #" + index.incrementAndGet());
         thread.setUncaughtExceptionHandler(this);
         thread.setPriority(threadPriority);
         return thread;

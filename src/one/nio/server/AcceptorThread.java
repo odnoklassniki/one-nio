@@ -48,7 +48,7 @@ final class AcceptorThread extends Thread {
         if (config.ssl != null) {
             SslContext sslContext = SslContext.create();
             sslContext.configure(config.ssl);
-            serverSocket = serverSocket.ssl(sslContext);
+            serverSocket = serverSocket.sslWrap(sslContext);
         }
         this.serverSocket = serverSocket;
 
