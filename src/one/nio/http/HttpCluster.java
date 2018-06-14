@@ -20,7 +20,6 @@ import one.nio.cluster.ServiceUnavailableException;
 import one.nio.cluster.WeightCluster;
 import one.nio.net.ConnectionString;
 
-import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.List;
@@ -39,7 +38,7 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
         this.maxFailures = maxFailures;
     }
 
-    public void configure(String configuration) throws IOException {
+    public void configure(String configuration) {
         Map<HttpProvider, Integer> newProviders = createProviders(configuration);
         List<HttpProvider> oldProviders = replaceProviders(newProviders);
         for (HttpProvider provider : oldProviders) {
@@ -47,7 +46,7 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
         }
     }
 
-    protected Map<HttpProvider, Integer> createProviders(String configuration) throws IOException {
+    protected Map<HttpProvider, Integer> createProviders(String configuration) {
         HashMap<HttpProvider, Integer> providers = new HashMap<>();
         for (StringTokenizer st = new StringTokenizer(configuration); st.hasMoreTokens(); ) {
             HttpProvider provider = createProvider(st.nextToken());
@@ -57,7 +56,7 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
         return providers;
     }
 
-    protected HttpProvider createProvider(String provider) throws IOException {
+    protected HttpProvider createProvider(String provider) {
         return new HttpProvider(new ConnectionString(provider));
     }
 
