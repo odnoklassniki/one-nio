@@ -136,7 +136,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
             socket.setTimeout(readTimeout);
 
             if (sslContext != null) {
-                socket = socket.ssl(sslContext);
+                socket = socket.sslWrap(sslContext);
             }
 
             return socket;

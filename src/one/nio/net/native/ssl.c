@@ -40,8 +40,20 @@
 
 #define MAX_COUNTERS  32
 
-#define STATE_SERVER     ((char*)1)
-#define STATE_HANDSHAKED ((char*)2)
+// Constants from Socket.java
+enum SOL_SSL {
+    SOL_SSL_SESSION        = 1,
+    SOL_SSL_SESSION_REUSED = 2,
+    SOL_SSL_SESSION_TICKET = 3
+};
+
+enum SSLFlags {
+    SF_SERVER         = 1,
+    SF_HANDSHAKED     = 2,
+    SF_HAS_TICKET     = 4,
+    SF_HAS_OLD_TICKET = 8,
+    SF_NEW_TICKET     = 12
+};
 
 typedef struct {
     unsigned char name[16];
@@ -71,6 +83,7 @@ typedef struct {
 
 typedef struct {
     pthread_rwlock_t lock;
+    char* pass;
     TicketArray tickets;
     ALPNProtocols alpn;
     OCSPResponse ocsp;
@@ -153,7 +166,15 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
     }
 }
 
-static char* ssl_get_peer_ip(SSL* ssl, char* buf, size_t len) {
+static jbyteArray int_to_bytes(JNIEnv* env, int value) {
+    jbyteArray result = (*env)->NewByteArray(env, sizeof(value));
+    if (result != NULL) {
+        (*env)->SetByteArrayRegion(env, result, 0, sizeof(value), (jbyte*)&value);
+    }
+    return result;
+}
+
+static char* ssl_get_peer_ip(const SSL* ssl, char* buf, size_t len) {
     int fd = SSL_get_fd(ssl);
     if (fd == -1) {
         return NULL;
@@ -173,7 +194,7 @@ static char* ssl_get_peer_ip(SSL* ssl, char* buf, size_t len) {
     return buf;
 }
 
-static void ssl_debug(SSL* ssl, const char* fmt, ...) {
+static void ssl_debug(const SSL* ssl, const char* fmt, ...) {
     char message[512];
     va_list args;
     va_start(args, fmt);
@@ -251,6 +272,7 @@ static void free_app_data(AppData* appData) {
     free(appData->ocsp.data);
     free(appData->alpn.data);
     free(appData->tickets.data);
+    free(appData->pass);
     free(appData);
 }
 
@@ -264,6 +286,23 @@ static void* ssl_memdup(const void* data, size_t size) {
         memcpy(copy, data, size);
     }
     return copy;
+}
+
+static int pass_callback(char* buf, int size, int rwflag, void* userdata) {
+    AppData* appData = (AppData*)userdata;
+    if (appData == NULL || pthread_rwlock_rdlock(&appData->lock) != 0) {
+        return 0;
+    }
+
+    int result = 0;
+    if (appData->pass != NULL) {
+        strncpy(buf, appData->pass, size);
+        buf[size - 1] = 0;
+        result = strlen(buf);
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
+    return result;
 }
 
 static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned char* iv,
@@ -284,6 +323,7 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
         memcpy(key_name, ticket->name, 16);
         EVP_EncryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, ticket->aes_key, iv);
         HMAC_Init_ex(hmac_ctx, ticket->hmac_key, 16, EVP_sha256(), NULL);
+        SSL_set_app_data(ssl, (char*)(SF_SERVER | SF_NEW_TICKET));
         result = 1;
     } else {
         unsigned int i;
@@ -291,6 +331,8 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
             if (memcmp(key_name, ticket->name, 16) == 0) {
                 HMAC_Init_ex(hmac_ctx, ticket->hmac_key, 16, EVP_sha256(), NULL);
                 EVP_DecryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, ticket->aes_key, iv);
+                intptr_t ticket_options = i == 0 ? SF_SERVER | SF_HAS_TICKET : SF_SERVER | SF_HAS_OLD_TICKET;
+                SSL_set_app_data(ssl, (char*)ticket_options);
                 result = i == 0 ? 1 : 2;
                 break;
             }
@@ -385,19 +427,23 @@ static int sni_callback(SSL* ssl, int* unused, void* arg) {
 static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
     if (cb == SSL_CB_HANDSHAKE_START) {
         // Reject any renegotiation by replacing actual socket with a dummy
-        if (SSL_get_app_data(ssl) == STATE_HANDSHAKED) {
+        intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
+        if (flags & SF_HANDSHAKED) {
             SSL_set_fd((SSL*)ssl, preclosed_socket);
         }
     } else if (cb == SSL_CB_HANDSHAKE_DONE) {
-        if (SSL_get_app_data(ssl) == STATE_SERVER) {
-            SSL_set_app_data((SSL*)ssl, STATE_HANDSHAKED);
+        intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
+        if (flags & SF_SERVER) {
+            SSL_set_app_data((SSL*)ssl, (char*)(flags | SF_HANDSHAKED));
         }
     }
 }
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
-    if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL && dlopen("libssl.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL) == NULL) {
+    if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
+        dlopen("libssl.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
+        dlopen("libssl.so.10", RTLD_LAZY | RTLD_GLOBAL) == NULL) {
         throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libssl.so");
         return;
     }
@@ -505,6 +551,40 @@ Java_one_nio_net_NativeSslContext_setCertificate(JNIEnv* env, jobject self, jstr
             throw_ssl_exception(env);
         }
     }
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setPassphrase(JNIEnv* env, jobject self, jbyteArray passphrase) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+    AppData* appData = SSL_CTX_get_app_data(ctx);
+    char* data = NULL;
+
+    if (passphrase != NULL) {
+        int len = (*env)->GetArrayLength(env, passphrase);
+        data = (char*)malloc(len + 1);
+        if (data == NULL) {
+            throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate memory for passphrase");
+            return;
+        }
+        (*env)->GetByteArrayRegion(env, passphrase, 0, len, (jbyte*)data);
+        data[len] = 0;
+    }
+
+    if (pthread_rwlock_wrlock(&appData->lock) != 0) {
+        throw_by_name(env, "javax/net/ssl/SSLException", "Invalid state of appData lock");
+        free(data);
+        return;
+    }
+
+    free(appData->pass);
+    appData->pass = data;
+
+    if (data != NULL) {
+        SSL_CTX_set_default_passwd_cb(ctx, pass_callback);
+        SSL_CTX_set_default_passwd_cb_userdata(ctx, appData);
+    }
+
+    pthread_rwlock_unlock(&appData->lock);
 }
 
 JNIEXPORT void JNICALL
@@ -749,7 +829,7 @@ Java_one_nio_net_NativeSslSocket_sslNew(JNIEnv* env, jclass cls, jint fd, jlong 
     if (ssl != NULL && SSL_set_fd(ssl, fd)) {
         if (serverMode) {
             SSL_set_accept_state(ssl);
-            SSL_set_app_data(ssl, STATE_SERVER);
+            SSL_set_app_data(ssl, (char*)SF_SERVER);
         } else {
             SSL_set_connect_state(ssl);
         }
@@ -770,6 +850,23 @@ Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) 
     SSL_free(ssl);
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_one_nio_net_NativeSslSocket_sslGetOption(JNIEnv* env, jobject self, jint option) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        return NULL;
+    }
+
+    switch (option) {
+        case SOL_SSL_SESSION_REUSED:
+            return int_to_bytes(env, SSL_session_reused(ssl));
+        case SOL_SSL_SESSION_TICKET:
+            return int_to_bytes(env, ((intptr_t)SSL_get_app_data(ssl) & SF_NEW_TICKET) >> 2);
+        default:
+            return NULL;
+    }
+}
+
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
     SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
@@ -781,7 +878,8 @@ Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, 
         if (result > 0) {
             return result;
         }
-        return check_ssl_error(env, ssl, result) == SSL_ERROR_WANT_READ ? -1 : 0;
+        check_ssl_error(env, ssl, result);
+        return 0;
     }
 }
 

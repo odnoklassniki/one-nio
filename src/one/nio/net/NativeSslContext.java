@@ -24,22 +24,27 @@ import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.util.ServiceConfigurationError;
 import java.util.StringTokenizer;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class NativeSslContext extends SslContext {
+    private static final AtomicInteger counter = new AtomicInteger();
+
+    final int id;
     long ctx;
     NativeSslContext[] subcontexts;
 
     NativeSslContext() throws SSLException {
+        this.id = counter.incrementAndGet();
         this.ctx = ctxNew();
         Management.registerMXBean(new NativeSslContextMXBeanImpl(),
-                "one.nio.net:type=SslContext,id=" + Long.toHexString(ctx));
+                "one.nio.net:type=SslContext,id=" + id);
     }
 
     @Override
     public void close() {
         if (ctx != 0) {
             setSubcontexts(null);
-            Management.unregisterMXBean("one.nio.net:type=SslContext,id=" + Long.toHexString(ctx));
+            Management.unregisterMXBean("one.nio.net:type=SslContext,id=" + id);
             ctxFree(ctx);
             ctx = 0;
         }
@@ -121,6 +126,9 @@ class NativeSslContext extends SslContext {
 
     @Override
     public native void setPrivateKey(String privateKeyFile) throws SSLException;
+
+    @Override
+    public native void setPassphrase(byte[] passphrase) throws SSLException;
 
     @Override
     public native void setCA(String caFile) throws SSLException;

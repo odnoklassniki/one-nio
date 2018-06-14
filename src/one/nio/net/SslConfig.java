@@ -33,6 +33,7 @@ public class SslConfig {
     public String ciphers;
     public String[] certFile;
     public String[] privateKeyFile;
+    public String passphrase;
     public String caFile;
     public String ticketKeyFile;
     public String ticketDir;

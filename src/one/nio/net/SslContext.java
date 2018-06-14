@@ -78,6 +78,10 @@ public abstract class SslContext {
 
         setCiphers(config.ciphers != null ? config.ciphers : SslConfig.DEFAULT_CIPHERS);
 
+        if (changed(config.passphrase, currentConfig.passphrase)) {
+            setPassphrase(Utf8.toBytes(getPassphrase(config.passphrase)));
+        }
+
         if (changed(config.certFile, currentConfig.certFile)) {
             for (String certFile : config.certFile) {
                 setCertificate(certFile);
@@ -135,6 +139,17 @@ public abstract class SslContext {
 
     private static boolean changed(String[] newValue, String[] currentValue) {
         return newValue != null && !Arrays.equals(newValue, currentValue);
+    }
+
+    private String getPassphrase(String passphrase) {
+        int length = passphrase.length();
+        if (length > 2 && passphrase.charAt(0) == '%' && passphrase.charAt(length - 1) == '%') {
+            String envPassphrase = System.getenv(passphrase.substring(1, length - 1));
+            if (envPassphrase != null) {
+                return envPassphrase;
+            }
+        }
+        return passphrase;
     }
 
     private void inherit(SslConfig parent, SslConfig[] children) {
@@ -226,6 +241,7 @@ public abstract class SslContext {
     public abstract void setCiphers(String ciphers) throws SSLException;
     public abstract void setCertificate(String certFile) throws SSLException;
     public abstract void setPrivateKey(String privateKeyFile) throws SSLException;
+    public abstract void setPassphrase(byte[] passphrase) throws SSLException;
     public abstract void setCA(String caFile) throws SSLException;
     public abstract void setVerify(int verifyMode) throws SSLException;
     public abstract void setTicketKeys(byte[] keys) throws SSLException;

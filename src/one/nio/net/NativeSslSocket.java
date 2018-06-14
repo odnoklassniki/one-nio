@@ -45,8 +45,21 @@ class NativeSslSocket extends NativeSocket {
     }
 
     @Override
+    public Socket sslUnwrap() {
+        return new NativeSocket(fd);
+    }
+
+    @Override
     public SslContext getSslContext() {
         return context;
+    }
+
+    @Override
+    public byte[] getOption(int level, int option) {
+        if (level == SOL_SSL) {
+            return sslGetOption(option);
+        }
+        return super.getOption(level, option);
     }
 
     @Override
@@ -67,10 +80,12 @@ class NativeSslSocket extends NativeSocket {
     public synchronized native int readRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public synchronized native int read(byte[] data, int offset, int count) throws IOException;
+    public synchronized native int read(byte[] data, int offset, int count, int flags) throws IOException;
 
     @Override
     public synchronized native void readFully(byte[] data, int offset, int count) throws IOException;
+
+    private synchronized native byte[] sslGetOption(int option);
 
     static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
     static native void sslFree(long ssl);
