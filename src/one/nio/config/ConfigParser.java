@@ -26,9 +26,12 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 // Parse YAML-like configuration files into Java objects.
@@ -63,8 +66,12 @@ public class ConfigParser {
         this.indent = -1;
     }
 
-    @SuppressWarnings("unchecked")
     public static <T> T parse(String config, Class<T> type) {
+        return parse(config, (Type) type);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T parse(String config, Type type) {
         ConfigParser parser = new ConfigParser(config);
         if (parser.nextLine() < 0) {
             throw new IllegalArgumentException("Unexpected end of input");
@@ -80,10 +87,8 @@ public class ConfigParser {
     private Object parseValue(Type type, int level) throws ReflectiveOperationException {
         if (type instanceof Class) {
             Class<?> cls = (Class) type;
-            if (cls == String.class) {
-                return tail();
-            } else if (cls.isPrimitive()) {
-                return parsePrimitive(cls, tail());
+            if (isScalar(cls)) {
+                return parseScalar(cls, tail());
             } else if (cls.isArray()) {
                 Object ref = parseReference();
                 return ref != null ? ref : parseArray(cls.getComponentType(), level);
@@ -98,12 +103,13 @@ public class ConfigParser {
             }
         } else if (type instanceof ParameterizedType) {
             ParameterizedType ptype = (ParameterizedType) type;
-            if (ptype.getRawType() == List.class && ptype.getActualTypeArguments().length >= 1) {
+            Class<?> rawType = (Class<?>) ptype.getRawType();
+            if (Collection.class.isAssignableFrom(rawType) && ptype.getActualTypeArguments().length >= 1) {
                 Object ref = parseReference();
-                return ref != null ? ref : parseList(ptype.getActualTypeArguments()[0], level);
-            } else if (ptype.getRawType() == Map.class && ptype.getActualTypeArguments().length >= 2) {
+                return ref != null ? ref : parseCollection(rawType, ptype.getActualTypeArguments()[0], level);
+            } else if (Map.class.isAssignableFrom(rawType) && ptype.getActualTypeArguments().length >= 2) {
                 Object ref = parseReference();
-                return ref != null ? ref : parseMap(ptype.getActualTypeArguments()[1], level);
+                return ref != null ? ref : parseMap(rawType, ptype.getActualTypeArguments()[1], level);
             }
         } else if (type instanceof GenericArrayType) {
             Object ref = parseReference();
@@ -150,7 +156,7 @@ public class ConfigParser {
 
     private Object convert(String value, Converter converter) throws ReflectiveOperationException {
         Class<?> cls = converter.value();
-        Method method = JavaInternals.getMethod(cls, converter.method(), String.class);
+        Method method = JavaInternals.findMethodRecursively(cls, converter.method(), String.class);
         if (method == null) {
             throw new IllegalArgumentException("Invalid converter class: " + cls.getName());
         }
@@ -160,7 +166,7 @@ public class ConfigParser {
     }
 
     private Object parseArray(Type elementType, int minLevel) throws ReflectiveOperationException {
-        List<Object> list = parseList(elementType, minLevel);
+        List<Object> list = parseCollection(new ArrayList<>(), elementType, minLevel);
 
         Class<?> cls = resolveArrayElementType(elementType);
         Object array = Array.newInstance(cls, list.size());
@@ -195,17 +201,31 @@ public class ConfigParser {
         }
     }
 
-    private List<Object> parseList(Type elementType, int minLevel) throws ReflectiveOperationException {
-        ArrayList<Object> list = new ArrayList<>();
+    @SuppressWarnings("unchecked")
+    private Collection<Object> parseCollection(Class<?> rawType, Type elementType, int minLevel) throws ReflectiveOperationException {
+        if (rawType == List.class || rawType == Collection.class) {
+            return parseCollection(new ArrayList<>(), elementType, minLevel);
+        } else if (rawType == Set.class) {
+            return parseCollection(new HashSet<>(), elementType, minLevel);
+        }
+        return parseCollection((Collection<Object>) rawType.newInstance(), elementType, minLevel);
+    }
+
+    private <T extends Collection<Object>> T parseCollection(T list, Type elementType, int minLevel) throws ReflectiveOperationException {
         registerReference(list);
 
         if (hasTail()) {
-            // Support inlined primitive array value
+            // Support inlined scalar array value
             if (elementType instanceof Class) {
                 Class<?> cls = (Class) elementType;
-                if (cls == String.class || cls.isPrimitive()) {
-                    for (String element : tail().split(",")) {
-                        list.add(parsePrimitive(cls, element.trim()));
+                if (isScalar(cls)) {
+                    String tail = tail();
+                    if (tail.charAt(0) == '[' && tail.charAt(tail.length() - 1) == ']') {
+                        tail = tail.substring(1, tail.length() - 1);
+                    }
+
+                    for (String element : tail.split(",")) {
+                        list.add(parseScalar(cls, element.trim()));
                     }
                     return list;
                 }
@@ -225,8 +245,15 @@ public class ConfigParser {
         return list;
     }
 
-    private Map<String, Object> parseMap(Type valueType, int minLevel) throws ReflectiveOperationException {
-        HashMap<String, Object> map = new HashMap<>();
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseMap(Class<?> rawType, Type valueType, int minLevel) throws ReflectiveOperationException {
+        if (rawType == Map.class) {
+            return parseMap(new HashMap<String, Object>(), valueType, minLevel);
+        }
+        return parseMap((Map<String, Object>) rawType.newInstance(), valueType, minLevel);
+    }
+
+    private <T extends Map<String, Object>> T parseMap(T map, Type valueType, int minLevel) throws ReflectiveOperationException {
         registerReference(map);
 
         int level = nextLine();
@@ -245,25 +272,38 @@ public class ConfigParser {
         return map;
     }
 
-    private Object parsePrimitive(Class<?> type, String value) {
-        if (type == boolean.class) {
-            return "true".equalsIgnoreCase(value);
-        } else if (type == byte.class) {
-            return Byte.decode(value);
-        } else if (type == short.class) {
-            return Short.decode(value);
-        } else if (type == int.class) {
-            return Integer.decode(value);
-        } else if (type == long.class) {
-            return Long.decode(value);
-        } else if (type == float.class) {
-            return Float.parseFloat(value);
-        } else if (type == double.class) {
-            return Double.parseDouble(value);
-        } else if (type == char.class) {
-            return value.charAt(0);
-        } else if (type == String.class) {
+    private boolean isScalar(Class<?> type) {
+        return type.isPrimitive()
+                || type == String.class
+                || type == Boolean.class
+                || type == Byte.class
+                || type == Short.class
+                || type == Integer.class
+                || type == Long.class
+                || type == Float.class
+                || type == Double.class
+                || type == Character.class;
+    }
+
+    private Object parseScalar(Class<?> type, String value) {
+        if (type == String.class) {
             return value;
+        } else if (type == boolean.class || type == Boolean.class) {
+            return "true".equalsIgnoreCase(value);
+        } else if (type == byte.class || type == Byte.class) {
+            return Byte.decode(value);
+        } else if (type == short.class || type == Short.class) {
+            return Short.decode(value);
+        } else if (type == int.class || type == Integer.class) {
+            return Integer.decode(value);
+        } else if (type == long.class || type == Long.class) {
+            return Long.decode(value);
+        } else if (type == float.class || type == Float.class) {
+            return Float.parseFloat(value);
+        } else if (type == double.class || type == Double.class) {
+            return Double.parseDouble(value);
+        } else if (type == char.class || type == Character.class) {
+            return value.charAt(0);
         }
         return null;
     }
