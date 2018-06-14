@@ -153,4 +153,11 @@ public abstract class AbstractMallocTest {
     public void testNotEnoughSpace() {
         newInstance(65536).malloc(65000);
     }
+
+    @Test
+    public void testWrongAllocatedSize() {
+        Malloc malloc = newInstance(65536);
+        assertEquals(0, malloc.allocatedSize(malloc.base - 1));
+        assertEquals(0, malloc.allocatedSize(malloc.base + malloc.capacity));
+    }
 }

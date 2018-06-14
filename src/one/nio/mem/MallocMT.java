@@ -116,7 +116,10 @@ public class MallocMT extends Malloc {
 
     @Override
     public int allocatedSize(long address) {
-        return segmentByAddress(address).allocatedSize(address);
+        if (base <= address && address < base + capacity) {
+            return segmentByAddress(address).allocatedSize(address);
+        }
+        return 0;
     }
 
     @Override

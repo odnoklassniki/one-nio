@@ -22,26 +22,26 @@ import static one.nio.util.JavaInternals.unsafe;
 
 /**
  * A simplified implementation of <a href="http://g.oswego.edu/dl/html/malloc.html">Doug Lea's Memory Allocator</a>.
- * Allocates up to 25% larger memory chunks rounded to bin size.
+ * Allocates up to 25% larger memory chunks rounded to the bin size.
  * <p>
  * Memory format:
  * <ul>
- * <li>{@code SIGNATURE} {@code int64}  format version magic bytes)</li>
- * <li>{@code CAPACITY}  {@code int64}  size of the allocated memory)</li>
- * <li>{@code BASE}      {@code int64}  base address of the memory)</li>
+ * <li>{@code SIGNATURE} {@code int64}  format version magic bytes</li>
+ * <li>{@code CAPACITY}  {@code int64}  size of the allocated memory</li>
+ * <li>{@code BASE}      {@code int64}  base address of the memory</li>
  * <li>padding up to 64 bytes</li>
  * <li>Bins:
  * <ul>
  * <li>{@code BIN_0_CHUNK} {@code int64}</li>
  * <li>{@code BIN_1_CHUNK} {@code int64}</li>
  * <li>...</li>
- * <li>{@code BIN_1_CHUNK} {@code int64}</li>
+ * <li>{@code BIN_N_CHUNK} {@code int64}</li>
  * </ul></li>
  * </ul>
  * <p>
- * There are 2 types of chunks: free and occupied. Chunks are aligned by 8 bytes.
+ * There are 2 types of chunks: free and occupied. Chunks are aligned to 8 byte boundary.
  * <p>
- * Free chunk format (8 byte header + 2 64-bit references = 24 bytes min chunk):
+ * Free chunk format (8 byte header + 2 x 64-bit references = 24 bytes min chunk):
  * <pre>{@code
  * +--------------+--------------+
  * | size (int32) | left (int32) |
@@ -101,7 +101,8 @@ import static one.nio.util.JavaInternals.unsafe;
  */
 public class Malloc implements Allocator, MallocMXBean {
     // Format magic
-    static final long SIGNATURE = 0x3330636f6c6c614dL;
+    static final long SIGNATURE_V3 = 0x3330636f6c6c614dL;
+    static final long SIGNATURE_V2 = 0x3230636f6c6c614dL;
 
     // General header
     static final int SIGNATURE_OFFSET = 0;
@@ -127,7 +128,7 @@ public class Malloc implements Allocator, MallocMXBean {
     // Size flag that means the chunk is occupied
     static final int OCCUPIED_MASK = 0x80000000;
     // Mask to extract the size of an occupied chunk
-    static final int FREE_MASK = 0x7fffffff;
+    static final int FREE_MASK = 0x7ffffff8;
 
     final long base;
     final long capacity;
@@ -291,7 +292,7 @@ public class Malloc implements Allocator, MallocMXBean {
 
         // If the heap already contains data (e.g. backed by an existing file), do relocation instead of initialization
         if (signature != 0) {
-            if (signature != SIGNATURE) {
+            if (signature != SIGNATURE_V3 && signature != SIGNATURE_V2) {
                 throw new IllegalArgumentException("Incompatible Malloc image");
             } else if (unsafe.getLong(base + CAPACITY_OFFSET) != capacity) {
                 throw new IllegalArgumentException("Malloc capacity mismatch");
@@ -301,8 +302,13 @@ public class Malloc implements Allocator, MallocMXBean {
             unsafe.putLong(base + BASE_OFFSET, base);
 
             relocate(base - oldBase);
+
+            if (signature == SIGNATURE_V2) {
+                upgradeBinFormat();
+                unsafe.putLong(base + SIGNATURE_OFFSET, SIGNATURE_V3);
+            }
         } else {
-            unsafe.putLong(base + SIGNATURE_OFFSET, SIGNATURE);
+            unsafe.putLong(base + SIGNATURE_OFFSET, SIGNATURE_V3);
             unsafe.putLong(base + CAPACITY_OFFSET, capacity);
             unsafe.putLong(base + BASE_OFFSET, base);
 
@@ -334,6 +340,27 @@ public class Malloc implements Allocator, MallocMXBean {
                 freeMemory += unsafe.getInt(chunk + SIZE_OFFSET);
                 unsafe.putLong(prev + NEXT_OFFSET, chunk);
                 unsafe.putLong(chunk + PREV_OFFSET, prev);
+            }
+        }
+    }
+
+    // Unlink free chunks and put them to bins according to newer Malloc format
+    private void upgradeBinFormat() {
+        // Unlink
+        long[] firstChunk = new long[BIN_COUNT];
+        for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
+            long binAddress = base + bin * BIN_SIZE + NEXT_OFFSET;
+            firstChunk[bin] = unsafe.getLong(binAddress);
+            unsafe.putLong(binAddress, 0);
+        }
+
+        // Put back to different bins
+        for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
+            for (long chunk = firstChunk[bin]; chunk != 0; ) {
+                int size = unsafe.getInt(chunk + SIZE_OFFSET);
+                long next = unsafe.getLong(chunk + NEXT_OFFSET);
+                addFreeChunk(chunk, size);
+                chunk = next;
             }
         }
     }

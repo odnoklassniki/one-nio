@@ -32,8 +32,9 @@ import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements SharedMemoryMapMXBean {
-    protected static final long SIGNATURE_CLEAR = 0xa10a1e4c436d6873L;
-    protected static final long SIGNATURE_DIRTY = 0xa10a1f49446d6873L;
+    protected static final long SIGNATURE_CLEAR  = 0xa10a1e4c436d6873L;
+    protected static final long SIGNATURE_LEGACY = 0xa1091e4c436d6873L;
+    protected static final long SIGNATURE_DIRTY  = 0xa10a1f49446d6873L;
 
     protected static final long SIGNATURE_OFFSET   = 0;
     protected static final long TIMESTAMP_OFFSET   = 8;
@@ -116,7 +117,9 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
             log.info("Resetting dirty " + className + "...");
             return true;
         }
-        if (signature != SIGNATURE_CLEAR) {
+        if (signature == SIGNATURE_LEGACY) {
+            log.info("Converting " + className + " from legacy format...");
+        } else if (signature != SIGNATURE_CLEAR) {
             log.info("Initial cleanup of " + className + "...");
             return true;
         }
