@@ -27,7 +27,7 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 
 final class JavaServerSocket extends SelectableJavaSocket {
-    ServerSocketChannel ch;
+    final ServerSocketChannel ch;
 
     JavaServerSocket() throws IOException {
         this.ch = ServerSocketChannel.open();
@@ -93,7 +93,7 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final int read(byte[] data, int offset, int count) throws IOException {
+    public final int read(byte[] data, int offset, int count, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -207,7 +207,12 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public Socket ssl(SslContext context) {
+    public Socket sslWrap(SslContext context) {
+        return this;
+    }
+
+    @Override
+    public Socket sslUnwrap() {
         return this;
     }
 

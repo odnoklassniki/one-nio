@@ -64,6 +64,10 @@ public class Session implements Closeable {
         return address == null ? null : address.getAddress().getHostAddress();
     }
 
+    public final Socket socket() {
+        return socket;
+    }
+
     public final long lastAccessTime() {
         return lastAccessTime;
     }
@@ -121,7 +125,7 @@ public class Session implements Closeable {
     }
 
     public int read(byte[] data, int offset, int count) throws IOException {
-        int bytesRead = socket.read(data, offset, count);
+        int bytesRead = socket.read(data, offset, count, 0);
         if (bytesRead >= 0) {
             listen(READABLE);
             return bytesRead;
@@ -143,7 +147,7 @@ public class Session implements Closeable {
     }
 
     public final void write(byte[] data, int offset, int count) throws IOException {
-        write(data, offset, count, 0);
+        write(new ArrayQueueItem(data, offset, count, 0));
     }
 
     public final void write(byte[] data, int offset, int count, int flags) throws IOException {

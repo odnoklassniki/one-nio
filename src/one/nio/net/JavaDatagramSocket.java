@@ -29,8 +29,8 @@ import java.nio.channels.SelectableChannel;
 /**
  * @author ivan.grigoryev
  */
-public class JavaDatagramSocket extends SelectableJavaSocket {
-    DatagramChannel ch;
+final class JavaDatagramSocket extends SelectableJavaSocket {
+    final DatagramChannel ch;
 
     JavaDatagramSocket() throws IOException {
         this.ch = DatagramChannel.open();
@@ -96,13 +96,13 @@ public class JavaDatagramSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final int read(byte[] data, int offset, int count) throws IOException {
+    public final int read(byte[] data, int offset, int count, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
-        return (InetSocketAddress)ch.receive(buffer);
+        return (InetSocketAddress) ch.receive(buffer);
     }
 
     @Override
@@ -210,7 +210,12 @@ public class JavaDatagramSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public Socket ssl(SslContext context) {
+    public Socket sslWrap(SslContext context) {
+        return this;
+    }
+
+    @Override
+    public Socket sslUnwrap() {
         return this;
     }
 

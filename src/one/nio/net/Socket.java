@@ -27,15 +27,28 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 public abstract class Socket implements Closeable {
+    // Levels for getOption()
     public static final int SOL_SOCKET    = 1;
     public static final int SOL_IP        = 0;
     public static final int SOL_IPV6      = 41;
     public static final int SOL_TCP       = 6;
     public static final int SOL_UDP       = 17;
+    public static final int SOL_SSL       = 1024;
 
+    // Options to use with SOL_SSL
+
+    // Session ID as a byte array
+    public static final int SSL_SESSION        = 1;
+    // 0 = new SSL session; 1 = reused SSL session
+    public static final int SSL_SESSION_REUSED = 2;
+    // 0 = no ticket; 1 = reused ticket; 2 = reused older ticket; 3 = newly issued ticket
+    public static final int SSL_SESSION_TICKET = 3;
+
+    // Flags for readRaw / writeRaw
     public static final int MSG_OOB       = 0x01;
     public static final int MSG_PEEK      = 0x02;
     public static final int MSG_DONTROUTE = 0x04;
+    public static final int MSG_TRUNC     = 0x20;
     public static final int MSG_DONTWAIT  = 0x40;
     public static final int MSG_WAITALL   = 0x100;
     public static final int MSG_MORE      = 0x8000;
@@ -51,9 +64,9 @@ public abstract class Socket implements Closeable {
     public abstract void writeFully(byte[] data, int offset, int count) throws IOException;
     public abstract int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException;
     public abstract int readRaw(long buf, int count, int flags) throws IOException;
-    public abstract int read(byte[] data, int offset, int count) throws IOException;
-    public abstract InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException;
+    public abstract int read(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void readFully(byte[] data, int offset, int count) throws IOException;
+    public abstract InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException;
     public abstract long sendFile(RandomAccessFile file, long offset, long count) throws IOException;
     public abstract void setBlocking(boolean blocking);
     public abstract void setTimeout(int timeout);
@@ -69,7 +82,8 @@ public abstract class Socket implements Closeable {
     public abstract boolean setOption(int level, int option, byte[] value);
     public abstract InetSocketAddress getLocalAddress();
     public abstract InetSocketAddress getRemoteAddress();
-    public abstract Socket ssl(SslContext context) throws IOException;
+    public abstract Socket sslWrap(SslContext context) throws IOException;
+    public abstract Socket sslUnwrap();
     public abstract SslContext getSslContext();
 
     public void connect(String host, int port) throws IOException {

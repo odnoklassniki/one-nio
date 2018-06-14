@@ -84,8 +84,13 @@ class NativeSocket extends Socket {
     }
 
     @Override
-    public final Socket ssl(SslContext context) throws IOException {
+    public Socket sslWrap(SslContext context) throws IOException {
         return new NativeSslSocket(fd, (NativeSslContext) context, false);
+    }
+
+    @Override
+    public Socket sslUnwrap() {
+        return this;
     }
 
     @Override
@@ -136,7 +141,7 @@ class NativeSocket extends Socket {
     public native int readRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public native int read(byte[] data, int offset, int count) throws IOException;
+    public native int read(byte[] data, int offset, int count, int flags) throws IOException;
 
     @Override
     public InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
@@ -193,10 +198,10 @@ class NativeSocket extends Socket {
     public final native void setTos(int tos);
 
     @Override
-    public final native byte[] getOption(int level, int option);
+    public native byte[] getOption(int level, int option);
 
     @Override
-    public final native boolean setOption(int level, int option, byte[] value);
+    public native boolean setOption(int level, int option, byte[] value);
 
     // PF_INET
     static native int socket0(boolean datagram) throws IOException;

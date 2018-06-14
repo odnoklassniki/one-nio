@@ -37,7 +37,7 @@ public class SocketTest {
         System.out.println("connected from " + s.getLocalAddress() + " to " + s.getRemoteAddress());
 
         byte[] b = new byte[1000];
-        int bytes = s.read(b, 0, b.length);
+        int bytes = s.read(b, 0, b.length, 0);
         System.out.println("read " + bytes + " bytes");
 
         s.close();

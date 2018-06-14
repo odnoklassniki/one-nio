@@ -204,8 +204,12 @@ Java_one_nio_net_NativeSocket_connect0(JNIEnv* env, jobject self, jbyteArray add
     } else {
         struct sockaddr_storage sa;
         int len = sockaddr_from_java(env, address, port, &sa);
-        if (connect(fd, (struct sockaddr*)&sa, len) != 0) {
-            throw_io_exception(env);
+
+        while (connect(fd, (struct sockaddr*)&sa, len) != 0) {
+            if (errno != EINTR) {
+                throw_io_exception(env);
+                break;
+            }
         }
     }
 }
@@ -216,14 +220,17 @@ Java_one_nio_net_NativeSocket_connect1(JNIEnv* env, jobject self, jstring path) 
     if (fd == -1) {
         throw_socket_closed(env);
     } else {
-        struct sockaddr_un sun;
         const char* npath = (*env)->GetStringUTFChars(env, path, NULL);
+        struct sockaddr_un sun;
         sun.sun_family = AF_UNIX;
         strncpy(sun.sun_path, npath, UNIX_PATH_MAX);
         (*env)->ReleaseStringUTFChars(env, path, npath);
         
-        if (connect(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
-            throw_io_exception(env);
+        while (connect(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
+            if (errno != EINTR) {
+                throw_io_exception(env);
+                break;
+            }
         }
     }
 }
@@ -355,14 +362,14 @@ Java_one_nio_net_NativeSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint
 }
 
 JNIEXPORT int JNICALL
-Java_one_nio_net_NativeSocket_read(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
+Java_one_nio_net_NativeSocket_read(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count, jint flags) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     jbyte buf[MAX_STACK_BUF];
 
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        int result = recv(fd, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, 0);
+        int result = recv(fd, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, flags);
         if (result > 0) {
             (*env)->SetByteArrayRegion(env, data, offset, result, buf);
             return result;

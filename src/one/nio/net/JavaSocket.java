@@ -19,6 +19,7 @@ package one.nio.net;
 import one.nio.mem.DirectMemory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -29,7 +30,7 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SocketChannel;
 
 final class JavaSocket extends SelectableJavaSocket {
-    SocketChannel ch;
+    final SocketChannel ch;
 
     JavaSocket() throws IOException {
         this.ch = SocketChannel.open();
@@ -85,7 +86,7 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final void writeFully(byte[] data, int offset, int count) throws IOException {
-        ch.write(ByteBuffer.wrap(data, offset, count));
+        ch.socket().getOutputStream().write(data, offset, count);
     }
 
     @Override
@@ -103,7 +104,7 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final int read(byte[] data, int offset, int count) throws IOException {
+    public final int read(byte[] data, int offset, int count, int flags) throws IOException {
         int result = ch.read(ByteBuffer.wrap(data, offset, count));
         if (result < 0) {
             throw new SocketClosedException();
@@ -118,11 +119,14 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final void readFully(byte[] data, int offset, int count) throws IOException {
-        ByteBuffer buffer = ByteBuffer.wrap(data, offset, count);
-        while (buffer.hasRemaining()) {
-            if (ch.read(buffer) < 0) {
+        InputStream in = ch.socket().getInputStream();
+        while (count > 0) {
+            int bytes = in.read(data, offset, count);
+            if (bytes < 0) {
                 throw new SocketClosedException();
             }
+            offset += bytes;
+            count -= bytes;
         }
     }
 
@@ -242,7 +246,12 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public Socket ssl(SslContext context) {
+    public Socket sslWrap(SslContext context) {
+        return this;
+    }
+
+    @Override
+    public Socket sslUnwrap() {
         return this;
     }
 

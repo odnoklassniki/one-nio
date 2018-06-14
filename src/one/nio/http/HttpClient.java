@@ -180,7 +180,7 @@ public class HttpClient extends SocketPool {
         ResponseReader(Socket socket, int bufferSize) throws IOException {
             this.socket = socket;
             this.buf = new byte[bufferSize];
-            this.length = socket.read(buf, 0, bufferSize);
+            this.length = socket.read(buf, 0, bufferSize, 0);
         }
 
         Response readResponse(int method) throws IOException, HttpException {
@@ -224,7 +224,7 @@ public class HttpClient extends SocketPool {
                     if (pos >= buf.length) {
                         throw new HttpException("Line too long");
                     }
-                    length += socket.read(buf, pos, buf.length - pos);
+                    length += socket.read(buf, pos, buf.length - pos, 0);
                 }
             } while (buf[pos++] != '\n');
 
