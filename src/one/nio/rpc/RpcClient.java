@@ -40,7 +40,11 @@ public class RpcClient extends SocketPool implements InvocationHandler {
     }
 
     public Object invoke(Object request) throws Exception {
-        byte[] buffer = invokeRaw(request);
+        return invoke(request, readTimeout);
+    }
+
+    public Object invoke(Object request, int timeout) throws Exception {
+        byte[] buffer = invokeRaw(request, timeout);
 
         for (;;) {
             Object response;
@@ -61,7 +65,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
             } else if (response instanceof SerializerNotFoundException) {
                 long uid = ((SerializerNotFoundException) response).getUid();
                 provideSerializer(Repository.requestSerializer(uid));
-                buffer = invokeRaw(request);
+                buffer = invokeRaw(request, readTimeout);
             } else {
                 throw (Exception) response;
             }
@@ -86,7 +90,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
     }
 
     protected Object invokeServiceRequest(Object request) throws Exception {
-        byte[] rawResponse = invokeRaw(request);
+        byte[] rawResponse = invokeRaw(request, readTimeout);
         Object response = new DeserializeStream(rawResponse).readObject();
         if (response instanceof Exception) {
             throw (Exception) response;
@@ -94,18 +98,18 @@ public class RpcClient extends SocketPool implements InvocationHandler {
         return response;
     }
 
-    private byte[] invokeRaw(Object request) throws Exception {
+    private byte[] invokeRaw(Object request, int timeout) throws Exception {
         byte[] buffer = serialize(request);
 
         Socket socket = borrowObject();
         try {
             try {
-                sendRequest(socket, buffer);
+                sendRequest(socket, buffer, timeout);
             } catch (SocketException e) {
                 // Stale connection? Retry on a fresh socket
                 destroyObject(socket);
                 socket = createObject();
-                sendRequest(socket, buffer);
+                sendRequest(socket, buffer, timeout);
             }
 
             int responseSize = RpcPacket.getSize(buffer, socket);
@@ -132,7 +136,8 @@ public class RpcClient extends SocketPool implements InvocationHandler {
         return buffer;
     }
 
-    private void sendRequest(Socket socket, byte[] buffer) throws IOException {
+    private void sendRequest(Socket socket, byte[] buffer, int timeout) throws IOException {
+        if (timeout != 0) socket.setTimeout(timeout);
         socket.writeFully(buffer, 0, buffer.length);
         socket.readFully(buffer, 0, 4);
     }
