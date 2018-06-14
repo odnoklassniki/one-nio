@@ -257,12 +257,19 @@ public class GeneratedSerializer extends Serializer {
         if (cls != null) {
             getSerializableFields(cls.getSuperclass(), parentField, list);
             for (Field f : cls.getDeclaredFields()) {
-                if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT | 0x1000)) == 0) {
+                int modifiers = f.getModifiers();
+                if ((modifiers & Modifier.STATIC) != 0) {
+                    continue;
+                }
+
+                if ((modifiers & Modifier.TRANSIENT) == 0) {
+                    if (f.isSynthetic() && !Repository.hasOptions(cls, Repository.SYNTHETIC_FIELDS)) {
+                        logFieldMismatch("Skipping synthetic field", f.getType(), cls, f.getName());
+                        continue;
+                    }
                     list.add(f);
                     list.add(parentField);
-                } else if ((f.getModifiers() & Modifier.STATIC) == 0
-                        && Repository.hasOptions(f.getType(), Repository.INLINE)
-                        && parentField == null) {
+                } else if (Repository.hasOptions(f.getType(), Repository.INLINE) && parentField == null) {
                     logFieldMismatch("Inlining field", f.getType(), cls, f.getName());
                     getSerializableFields(f.getType(), f, list);
                 }

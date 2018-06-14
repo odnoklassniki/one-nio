@@ -61,6 +61,7 @@ public class Repository {
     public static final int SKIP_CUSTOM_SERIALIZATION = SKIP_READ_OBJECT | SKIP_WRITE_OBJECT;
     public static final int INLINE = 4;
     public static final int FIELD_SERIALIZATION = 8;
+    public static final int SYNTHETIC_FIELDS = 16;
 
     public static final int ARRAY_STUBS      = 1;
     public static final int COLLECTION_STUBS = 2;
@@ -155,8 +156,7 @@ public class Repository {
             addBootstrap(generateFor(Class.forName(className)));
         } catch (ClassNotFoundException e) {
             // Optional class is missing. Skip the slot to maintain the order of other bootstrap serializers.
-            log.warn("Missing optional bootstrap class: " + className);
-            nextBootstrapUid--;
+            addBootstrap(new InvalidSerializer(className));
         }
     }
 
@@ -306,6 +306,21 @@ public class Repository {
                 return serializer;
             }
 
+            if (cls.isAnonymousClass() && (cls.getModifiers() & ENUM) == 0) {
+                log.warn("Trying to serialize anonymous class: " + cls.getName());
+                anonymousClasses.incrementAndGet();
+            }
+
+            SerialOptions options = cls.getAnnotation(SerialOptions.class);
+            if (options != null) {
+                setOptions(cls, options.value());
+            }
+
+            Renamed renamed = cls.getAnnotation(Renamed.class);
+            if (renamed != null) {
+                renamedClasses.put(renamed.from(), cls);
+            }
+
             if (cls.isArray()) {
                 get(cls.getComponentType());
                 serializer = new ObjectArraySerializer(cls);
@@ -334,17 +349,6 @@ public class Repository {
 
             serializer.generateUid();
             provideSerializer(serializer);
-
-            if (cls.isAnonymousClass()) {
-                log.warn("Trying to serialize anonymous class: " + cls.getName());
-                anonymousClasses.incrementAndGet();
-            }
-
-            Renamed renamed = cls.getAnnotation(Renamed.class);
-            if (renamed != null) {
-                renamedClasses.put(renamed.from(), cls);
-            }
-
             return serializer;
         }
     }

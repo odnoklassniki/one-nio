@@ -165,6 +165,51 @@ public class SerializationTest {
         checkSerialize(makeList(200000));
     }
 
+    static class Outer implements Serializable {
+        private int outerValue = 123;
+
+        @SerialOptions(Repository.SYNTHETIC_FIELDS)
+        private class Inner implements Serializable {
+            private int innerValue = 5;
+
+            private int outerValue() {
+                return outerValue;
+            }
+
+            @Override
+            public int hashCode() {
+                return innerValue;
+            }
+
+            @Override
+            public boolean equals(Object obj) {
+                return obj instanceof Inner
+                        && ((Inner) obj).innerValue == innerValue
+                        && ((Inner) obj).outerValue() == outerValue();
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            return outerValue;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof Outer && ((Outer) obj).outerValue == outerValue;
+        }
+
+        public Object getInner() {
+            return new Inner();
+        }
+    }
+
+    @Test
+    public void testInner() throws IOException, ClassNotFoundException {
+        checkSerialize(new Outer());
+        checkSerialize(new Outer().getInner());
+    }
+
     private enum SimpleEnum {
         A, B
     }

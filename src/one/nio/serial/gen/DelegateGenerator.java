@@ -21,6 +21,7 @@ import one.nio.serial.Default;
 import one.nio.serial.FieldDescriptor;
 import one.nio.serial.JsonName;
 import one.nio.serial.Repository;
+import one.nio.serial.SerializeWith;
 import one.nio.util.JavaInternals;
 
 import org.objectweb.asm.ClassVisitor;
@@ -100,7 +101,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitVarInsn(ALOAD, 1);
                 if (fd.parentField() != null) emitGetField(mv, fd.parentField());
-                emitGetField(mv, ownField);
+                emitGetField(mv, ownField, fd.useGetter());
                 emitTypeCast(mv, ownField.getType(), sourceClass);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/CalcSizeStream", "writeObject", "(Ljava/lang/Object;)V");
             }
@@ -144,7 +145,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             } else {
                 mv.visitVarInsn(ALOAD, 1);
                 if (fd.parentField() != null) emitGetField(mv, fd.parentField());
-                emitGetField(mv, ownField);
+                emitGetField(mv, ownField, fd.useGetter());
                 emitTypeCast(mv, ownField.getType(), sourceClass);
             }
 
@@ -187,7 +188,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
                 mv.visitInsn(srcType.convertTo(FieldType.Void));
-            } else if (Modifier.isFinal(ownField.getModifiers())) {
+            } else if (Modifier.isFinal(ownField.getModifiers()) && !fd.useSetter()) {
                 FieldType dstType = FieldType.valueOf(ownField.getType());
                 mv.visitFieldInsn(GETSTATIC, "one/nio/util/JavaInternals", "unsafe", "Lsun/misc/Unsafe;");
                 mv.visitVarInsn(ALOAD, 2);
@@ -205,7 +206,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature());
                 if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
                 emitTypeCast(mv, sourceClass, ownField.getType());
-                emitPutField(mv, ownField);
+                emitPutField(mv, ownField, fd.useSetter());
             }
         }
 
@@ -292,7 +293,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
             mv.visitVarInsn(ALOAD, 1);
             if (fd.parentField() != null) emitGetField(mv, fd.parentField());
-            emitGetField(mv, ownField);
+            emitGetField(mv, ownField, fd.useGetter());
             emitTypeCast(mv, ownField.getType(), sourceClass);
 
             switch (srcType) {
@@ -499,6 +500,40 @@ public class DelegateGenerator extends BytecodeGenerator {
         // The types are not convertible, just leave the default value
         mv.visitInsn(FieldType.valueOf(src).convertTo(FieldType.Void));
         mv.visitInsn(FieldType.Void.convertTo(FieldType.valueOf(dst)));
+    }
+
+    private static void emitGetField(MethodVisitor mv, Field f, boolean useGetter) {
+        if (useGetter) {
+            String getter = f.getAnnotation(SerializeWith.class).getter();
+            try {
+                Method m = f.getDeclaringClass().getDeclaredMethod(getter);
+                if (Modifier.isStatic(m.getModifiers()) || m.getReturnType() != f.getType()) {
+                    throw new IllegalArgumentException("Incompatible getter method: " + m);
+                }
+                emitInvoke(mv, m);
+            } catch (NoSuchMethodException e) {
+                throw new IllegalArgumentException("Getter method not found", e);
+            }
+        } else {
+            emitGetField(mv, f);
+        }
+    }
+
+    private static void emitPutField(MethodVisitor mv, Field f, boolean useSetter) {
+        if (useSetter) {
+            String setter = f.getAnnotation(SerializeWith.class).setter();
+            try {
+                Method m = f.getDeclaringClass().getDeclaredMethod(setter, f.getType());
+                if (Modifier.isStatic(m.getModifiers()) || m.getReturnType() != void.class) {
+                    throw new IllegalArgumentException("Incompatible setter method: " + m);
+                }
+                emitInvoke(mv, m);
+            } catch (NoSuchMethodException e) {
+                throw new IllegalArgumentException("Setter method not found", e);
+            }
+        } else {
+            emitPutField(mv, f);
+        }
     }
 
     private static Label emitNullGuard(MethodVisitor mv, Class<?> dst) {

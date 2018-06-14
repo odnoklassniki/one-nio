@@ -26,6 +26,8 @@ public class FieldDescriptor {
     private TypeDescriptor typeDescriptor;
     private Field ownField;
     private Field parentField;
+    private boolean useGetter;
+    private boolean useSetter;
 
     FieldDescriptor(String nameDescriptor, TypeDescriptor typeDescriptor) {
         this.nameDescriptor = nameDescriptor;
@@ -60,6 +62,14 @@ public class FieldDescriptor {
         return parentField;
     }
 
+    public boolean useGetter() {
+        return useGetter;
+    }
+
+    public boolean useSetter() {
+        return useSetter;
+    }
+
     public boolean is(String nameDescriptor, String typeDescriptor) {
         return nameDescriptor.equals(this.nameDescriptor) && typeDescriptor.equals(this.typeDescriptor.toString());
     }
@@ -67,6 +77,12 @@ public class FieldDescriptor {
     public void assignField(Field ownField, Field parentField) {
         this.ownField = ownField;
         this.parentField = parentField;
+
+        SerializeWith serializeWith = ownField.getAnnotation(SerializeWith.class);
+        if (serializeWith != null) {
+            this.useGetter = !serializeWith.getter().isEmpty();
+            this.useSetter = !serializeWith.setter().isEmpty();
+        }
     }
 
     public static FieldDescriptor read(ObjectInput in) throws IOException {

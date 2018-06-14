@@ -17,12 +17,13 @@
 package one.nio.serial;
 
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class MethodSerializer extends InvalidSerializer {
+public class MethodSerializer<T> extends Serializer<T> {
     static final AtomicInteger renamedMethods = new AtomicInteger();
 
     private String holderName;
@@ -105,6 +106,32 @@ public class MethodSerializer extends InvalidSerializer {
 
     public Method method() {
         return method;
+    }
+
+    @Override
+    public void calcSize(T obj, CalcSizeStream css) throws IOException {
+        // Typically MethodSerializer uniquely identifies Method - no need to write extra data
+    }
+
+    @Override
+    public void write(T obj, DataStream out) throws IOException {
+        // Typically MethodSerializer uniquely identifies Method - no need to write extra data
+    }
+
+    @Override
+    public T read(DataStream in) throws IOException, ClassNotFoundException {
+        // Possibly overridden in subclasses
+        throw new NotSerializableException(cls.getName());
+    }
+
+    @Override
+    public void skip(DataStream in) throws IOException, ClassNotFoundException {
+        // Typically MethodSerializer uniquely identifies Method - no need to read extra data
+    }
+
+    @Override
+    public void toJson(T obj, StringBuilder builder) throws IOException {
+        Json.appendString(builder, method.getName());
     }
 
     private Method findMatchingMethod() throws ClassNotFoundException {

@@ -24,28 +24,34 @@ class InvalidSerializer extends Serializer {
         super(cls);
     }
 
+    InvalidSerializer(String descriptor) {
+        super(Object.class);
+        this.descriptor = descriptor;
+        this.origin = Origin.EXTERNAL;
+    }
+
     @Override
     public void calcSize(Object obj, CalcSizeStream css) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+        throw new NotSerializableException(descriptor);
     }
 
     @Override
     public void write(Object obj, DataStream out) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+        throw new NotSerializableException(descriptor);
     }
 
     @Override
     public Object read(DataStream in) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+        throw new NotSerializableException(descriptor);
     }
 
     @Override
     public void skip(DataStream in) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+        throw new NotSerializableException(descriptor);
     }
 
     @Override
     public void toJson(Object obj, StringBuilder builder) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+        throw new NotSerializableException(descriptor);
     }
 }
