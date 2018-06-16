@@ -16,9 +16,8 @@
 
 package one.nio.mem;
 
+import one.nio.util.Cleaner;
 import one.nio.util.JavaInternals;
-
-import sun.misc.Cleaner;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -36,12 +35,12 @@ public final class DirectMemory {
 
     public static long allocate(long size, Object holder) {
         final long address = unsafe.allocateMemory(size);
-        Cleaner.create(holder, new Runnable() {
+        new Cleaner(holder) {
             @Override
-            public void run() {
+            public void clean() {
                 unsafe.freeMemory(address);
             }
-        });
+        };
         return address;
     }
 

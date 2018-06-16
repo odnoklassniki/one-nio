@@ -17,7 +17,7 @@
 package one.nio.gen;
 
 import one.nio.mgt.Management;
-
+import one.nio.util.Hex;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.objectweb.asm.MethodVisitor;
@@ -31,6 +31,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.ProtectionDomain;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.nio.file.StandardOpenOption.*;
@@ -77,7 +78,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     @SuppressWarnings("unchecked")
     public <T> T instantiate(byte[] classData, Class<T> iface) {
         try {
-            return (T) defineClass(classData).newInstance();
+            return (T) defineClass(classData).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new IllegalArgumentException("Cannot instantiate class", e);
         }
@@ -226,6 +227,37 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         } else {
             throw new IllegalArgumentException("Not a wrapper type: " + type);
         }
+    }
+
+    // In JDK 9+ there is no more sun.reflect.MagicAccessorImpl class.
+    // Instead there is package private jdk.internal.reflect.MagicAccessorImpl, which is not visible
+    // by application classes. We abuse ClassLoaded private API to inject a publicly visible bridge
+    // using the bootstrap ClassLoader.
+    //   ¯\_(ツ)_/¯
+    public static void generateMagicBridges() {
+        if (System.getProperty("java.version").startsWith("1.")) {
+            // Not needed on JDK 8 and earlier
+            return;
+        }
+
+        try {
+            Method m = ClassLoader.class.getDeclaredMethod("defineClass1", ClassLoader.class, String.class,
+                    byte[].class, int.class, int.class, ProtectionDomain.class, String.class);
+            m.setAccessible(true);
+
+            // public jdk.internal.reflect.MagicAccessorBridge extends jdk.internal.reflect.MagicAccessorImpl
+            defineBootstrapClass(m, "cafebabe00000033000a0a000300070700080700090100063c696e69743e010003282956010004436f64650c000400050100286a646b2f696e7465726e616c2f7265666c6563742f4d616769634163636573736f724272696467650100266a646b2f696e7465726e616c2f7265666c6563742f4d616769634163636573736f72496d706c042100020003000000000001000100040005000100060000001100010001000000052ab70001b1000000000000");
+            // public sun.reflect.MagicAccessorImpl extends jdk.internal.reflect.MagicAccessorBridge
+            defineBootstrapClass(m, "cafebabe00000033000a0a000300070700080700090100063c696e69743e010003282956010004436f64650c0004000501001d73756e2f7265666c6563742f4d616769634163636573736f72496d706c0100286a646b2f696e7465726e616c2f7265666c6563742f4d616769634163636573736f72427269646765042100020003000000000001000100040005000100060000001100010001000000052ab70001b1000000000000");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    // Defines a new class by the bootstrap ClassLoader
+    private static void defineBootstrapClass(Method m, String classData) throws ReflectiveOperationException {
+        byte[] code = Hex.parseBytes(classData);
+        m.invoke(null, null, null, code, 0, code.length, null, null);
     }
 
     @Override

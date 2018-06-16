@@ -20,8 +20,6 @@ import one.nio.os.Mem;
 import one.nio.serial.DataStream;
 import one.nio.util.JavaInternals;
 
-import sun.nio.ch.FileChannelImpl;
-
 import java.io.Closeable;
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -32,8 +30,6 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 
 public class MappedFile implements Closeable {
-    private static final Method map0 = JavaInternals.getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
-    private static final Method unmap0 = JavaInternals.getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
     private static final Method force0 = JavaInternals.getMethod(MappedByteBuffer.class, "force0", FileDescriptor.class, long.class, long.class);
 
     private static final int STATE_CLOSED = 0;
@@ -164,12 +160,14 @@ public class MappedFile implements Closeable {
         }
 
         try {
+            Method map0 = Class.forName("sun.nio.ch.FileChannelImpl").getDeclaredMethod("map0", int.class, long.class, long.class);
+            map0.setAccessible(true);
             return (Long) map0.invoke(f.getChannel(), mode, start, size);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
         } catch (InvocationTargetException e) {
             Throwable target = e.getTargetException();
             throw (target instanceof IOException) ? (IOException) target : new IOException(target);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -181,8 +179,10 @@ public class MappedFile implements Closeable {
         }
 
         try {
+            Method unmap0 = Class.forName("sun.nio.ch.FileChannelImpl").getDeclaredMethod("unmap0", long.class, long.class);
+            unmap0.setAccessible(true);
             unmap0.invoke(null, start, size);
-        } catch (IllegalAccessException | InvocationTargetException e) {
+        } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
         }
     }

@@ -44,6 +44,10 @@ import static one.nio.util.JavaInternals.unsafe;
 public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();
 
+    static {
+        generateMagicBridges();
+    }
+
     public static byte[] generate(Class cls, FieldDescriptor[] fds, List<Field> defaultFields) {
         String className = "sun/reflect/Delegate" + index.getAndIncrement() + '_' + cls.getSimpleName();
 
@@ -338,7 +342,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         if (!defaultValue.method().isEmpty()) {
             String methodName = defaultValue.method();
             int p = methodName.lastIndexOf('.');
-            Method m = JavaInternals.getMethod(methodName.substring(0, p), methodName.substring(p + 1));
+            Method m = JavaInternals.findMethod(methodName.substring(0, p), methodName.substring(p + 1));
             if (m == null || !Modifier.isStatic(m.getModifiers()) || !fieldType.isAssignableFrom(m.getReturnType())) {
                 throw new IllegalArgumentException("Invalid default initializer " + methodName + " for field " + field);
             }
@@ -346,7 +350,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         } else if (!defaultValue.field().isEmpty()) {
             String fieldName = defaultValue.field();
             int p = fieldName.lastIndexOf('.');
-            Field f = JavaInternals.getField(fieldName.substring(0, p), fieldName.substring(p + 1));
+            Field f = JavaInternals.findField(fieldName.substring(0, p), fieldName.substring(p + 1));
             if (f == null || !Modifier.isStatic(f.getModifiers()) || !fieldType.isAssignableFrom(f.getType())) {
                 throw new IllegalArgumentException("Invalid default initializer " + fieldName + " for field " + field);
             }

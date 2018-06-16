@@ -52,9 +52,9 @@ public class Repository {
     static final int ENUM = 0x4000;
 
     public static final MethodSerializer provide =
-            registerMethod(JavaInternals.getMethod(Repository.class, "provideSerializer", Serializer.class));
+            registerMethod(JavaInternals.findMethod(Repository.class, "provideSerializer", Serializer.class));
     public static final MethodSerializer request =
-            registerMethod(JavaInternals.getMethod(Repository.class, "requestSerializer", long.class));
+            registerMethod(JavaInternals.findMethod(Repository.class, "requestSerializer", long.class));
 
     public static final int SKIP_READ_OBJECT  = 1;
     public static final int SKIP_WRITE_OBJECT = 2;
@@ -180,7 +180,7 @@ public class Repository {
     }
 
     public static boolean preload(Class... classes) {
-        for (Class cls : classes) {
+        for (Class<?> cls : classes) {
             get(cls);
         }
         return true;

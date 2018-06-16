@@ -97,7 +97,7 @@ public class ConfigParser {
                 return ref != null ? ref : parseBean(cls, level);
             }
 
-            Method method = JavaInternals.getMethod(cls, "valueOf", String.class);
+            Method method = JavaInternals.findMethod(cls, "valueOf", String.class);
             if (method != null && (method.getModifiers() & Modifier.STATIC) != 0 && cls.isAssignableFrom(method.getReturnType())) {
                 return method.invoke(null, tail());
             }
@@ -120,7 +120,7 @@ public class ConfigParser {
     }
 
     private Object parseBean(Class<?> type, int minLevel) throws ReflectiveOperationException {
-        Object obj = type.newInstance();
+        Object obj = type.getDeclaredConstructor().newInstance();
         registerReference(obj);
         fillBean(obj, minLevel);
         return obj;
@@ -161,7 +161,7 @@ public class ConfigParser {
             throw new IllegalArgumentException("Invalid converter class: " + cls.getName());
         }
 
-        Object sender = (method.getModifiers() & Modifier.STATIC) != 0 ? null : cls.newInstance();
+        Object sender = (method.getModifiers() & Modifier.STATIC) != 0 ? null : cls.getDeclaredConstructor().newInstance();
         return method.invoke(sender, value);
     }
 
@@ -208,7 +208,7 @@ public class ConfigParser {
         } else if (rawType == Set.class) {
             return parseCollection(new HashSet<>(), elementType, minLevel);
         }
-        return parseCollection((Collection<Object>) rawType.newInstance(), elementType, minLevel);
+        return parseCollection((Collection<Object>) rawType.getDeclaredConstructor().newInstance(), elementType, minLevel);
     }
 
     private <T extends Collection<Object>> T parseCollection(T list, Type elementType, int minLevel) throws ReflectiveOperationException {
@@ -250,7 +250,7 @@ public class ConfigParser {
         if (rawType == Map.class) {
             return parseMap(new HashMap<String, Object>(), valueType, minLevel);
         }
-        return parseMap((Map<String, Object>) rawType.newInstance(), valueType, minLevel);
+        return parseMap((Map<String, Object>) rawType.getDeclaredConstructor().newInstance(), valueType, minLevel);
     }
 
     private <T extends Map<String, Object>> T parseMap(T map, Type valueType, int minLevel) throws ReflectiveOperationException {

@@ -16,9 +16,7 @@
 
 package one.nio.compiler;
 
-import one.nio.util.JavaInternals;
 import one.nio.util.URLEncoder;
-import sun.misc.URLClassPath;
 
 import javax.tools.FileObject;
 import javax.tools.ForwardingJavaFileManager;
@@ -30,7 +28,6 @@ import javax.tools.ToolProvider;
 import java.io.ByteArrayOutputStream;
 import java.io.CharArrayWriter;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Arrays;
@@ -76,31 +73,28 @@ public class Javac {
     }
 
     private static String buildPathFromClassLoader(ClassLoader loader) {
-        StringBuilder builder = new StringBuilder();
-        Field ucp = JavaInternals.getField(URLClassLoader.class, "ucp");
+        String classPath = "";
+        ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
 
-        while (loader instanceof URLClassLoader) {
-            for (URL url : getURLsFromClassLoader((URLClassLoader) loader, ucp)) {
-                if ("file".equals(url.getProtocol())) {
-                    String file = URLEncoder.decode(url.getFile());
-                    builder.append(file).append(File.pathSeparatorChar);
-                }
+        while (loader != null) {
+            if (loader == systemClassLoader) {
+                return System.getProperty("java.class.path") + File.pathSeparatorChar + classPath;
             }
+
+            if (loader instanceof URLClassLoader) {
+                StringBuilder sb = new StringBuilder(100);
+                for (URL url : ((URLClassLoader) loader).getURLs()) {
+                    if ("file".equals(url.getProtocol())) {
+                        String file = URLEncoder.decode(url.getFile());
+                        sb.append(file).append(File.pathSeparatorChar);
+                    }
+                }
+                classPath = sb.append(classPath).toString();
+            }
+
             loader = loader.getParent();
         }
 
-        return builder.toString();
-    }
-
-    private static URL[] getURLsFromClassLoader(URLClassLoader loader, Field ucp) {
-        if (ucp != null) {
-            try {
-                // Some custom URLClassLoaders do not return getURLs. Hack them using internal API.
-                return ((URLClassPath) ucp.get(loader)).getURLs();
-            } catch (Exception e) {
-                // Fallback to public API
-            }
-        }
-        return loader.getURLs();
+        return classPath;
     }
 }

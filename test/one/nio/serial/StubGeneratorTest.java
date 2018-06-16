@@ -35,7 +35,7 @@ public class StubGeneratorTest {
                 new FieldDescriptor("renamedField|oldField", new TypeDescriptor(double.class)),
                 new FieldDescriptor("listField", new TypeDescriptor(List.class)),
                 new FieldDescriptor("unknownField", new TypeDescriptor(Object.class))
-        }).newInstance();
+        }).getDeclaredConstructor().newInstance();
 
         Class<?> c1 = o1.getClass();
         assertEquals(4, c1.getDeclaredFields().length);
@@ -46,7 +46,7 @@ public class StubGeneratorTest {
         assertEquals(Object.class, f2.getType());
         assertEquals("oldField", f1.getAnnotation(Renamed.class).from());
 
-        Object o2 = StubGenerator.generateRegular("Stub_o2", "java/util/ArrayList", null).newInstance();
+        Object o2 = StubGenerator.generateRegular("Stub_o2", "java/util/ArrayList", null).getDeclaredConstructor().newInstance();
 
         Class<?> c2 = o2.getClass();
         assertTrue(List.class.isAssignableFrom(c2));
@@ -57,7 +57,7 @@ public class StubGeneratorTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void testEnum() throws Exception {
+    public void testEnum() {
         Class enumCls = StubGenerator.generateEnum("Enum_test", new String[] {
                 "ZERO",
                 "FIRST",

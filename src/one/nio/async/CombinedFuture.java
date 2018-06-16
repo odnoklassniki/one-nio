@@ -28,6 +28,7 @@ import java.util.concurrent.TimeoutException;
 public class CombinedFuture<V> implements Future<List<V>>, Serializable {
     private Future<V>[] futures;
 
+    @SuppressWarnings("unchecked")
     public CombinedFuture(Future<V>... futures) {
         this.futures = futures;
     }

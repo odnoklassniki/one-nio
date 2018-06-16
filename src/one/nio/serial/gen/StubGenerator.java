@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StubGenerator extends BytecodeGenerator {
     public static final AtomicInteger stubClasses = new AtomicInteger();
 
-    public static Class generateRegular(String className, String superName, FieldDescriptor[] fds) {
+    public static Class<?> generateRegular(String className, String superName, FieldDescriptor[] fds) {
         String internalClassName = getStubName(className);
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -71,7 +71,7 @@ public class StubGenerator extends BytecodeGenerator {
         return INSTANCE.defineClassIfNotExists(internalClassName.replace('/', '.'), cv.toByteArray());
     }
 
-    public static Class generateEnum(String className, String[] constants) {
+    public static Class<?> generateEnum(String className, String[] constants) {
         String internalClassName = getStubName(className);
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);

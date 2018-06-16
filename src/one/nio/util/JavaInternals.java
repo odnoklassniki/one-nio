@@ -36,18 +36,22 @@ public final class JavaInternals {
     }
 
     public static Field getField(Class<?> cls, String name) {
+        Field f = findField(cls, name);
+        if (f != null) f.setAccessible(true);
+        return f;
+    }
+
+    public static Field findField(Class<?> cls, String name) {
         try {
-            Field f = cls.getDeclaredField(name);
-            f.setAccessible(true);
-            return f;
-        } catch (Exception e) {
+            return cls.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
             return null;
         }
     }
 
-    public static Field getField(String cls, String name) {
+    public static Field findField(String cls, String name) {
         try {
-            return getField(Class.forName(cls), name);
+            return findField(Class.forName(cls), name);
         } catch (ClassNotFoundException e) {
             return null;
         }
@@ -55,7 +59,7 @@ public final class JavaInternals {
 
     public static Field findFieldRecursively(Class<?> cls, String name) {
         for (; cls != null; cls = cls.getSuperclass()) {
-            Field f = getField(cls, name);
+            Field f = findField(cls, name);
             if (f != null) {
                 return f;
             }
@@ -64,18 +68,22 @@ public final class JavaInternals {
     }
 
     public static Method getMethod(Class<?> cls, String name, Class<?>... params) {
+        Method m = findMethod(cls, name, params);
+        if (m != null) m.setAccessible(true);
+        return m;
+    }
+
+    public static Method findMethod(Class<?> cls, String name, Class<?>... params) {
         try {
-            Method m = cls.getDeclaredMethod(name, params);
-            m.setAccessible(true);
-            return m;
-        } catch (Exception e) {
+            return cls.getDeclaredMethod(name, params);
+        } catch (NoSuchMethodException e) {
             return null;
         }
     }
 
-    public static Method getMethod(String cls, String name, Class<?>... params) {
+    public static Method findMethod(String cls, String name, Class<?>... params) {
         try {
-            return getMethod(Class.forName(cls), name, params);
+            return findMethod(Class.forName(cls), name, params);
         } catch (ClassNotFoundException e) {
             return null;
         }
@@ -83,7 +91,7 @@ public final class JavaInternals {
 
     public static Method findMethodRecursively(Class<?> cls, String name, Class<?>... params) {
         for (; cls != null; cls = cls.getSuperclass()) {
-            Method m = getMethod(cls, name, params);
+            Method m = findMethod(cls, name, params);
             if (m != null) {
                 return m;
             }
@@ -92,18 +100,22 @@ public final class JavaInternals {
     }
 
     public static <T> Constructor<T> getConstructor(Class<T> cls, Class<?>... params) {
+        Constructor<T> c = findConstructor(cls, params);
+        if (c != null) c.setAccessible(true);
+        return c;
+    }
+
+    public static <T> Constructor<T> findConstructor(Class<T> cls, Class<?>... params) {
         try {
-            Constructor<T> c = cls.getDeclaredConstructor(params);
-            c.setAccessible(true);
-            return c;
-        } catch (Exception e) {
+            return cls.getDeclaredConstructor(params);
+        } catch (NoSuchMethodException e) {
             return null;
         }
     }
 
-    public static Constructor<?> getConstructor(String cls, Class<?>... params) {
+    public static Constructor<?> findConstructor(String cls, Class<?>... params) {
         try {
-            return getConstructor(Class.forName(cls), params);
+            return findConstructor(Class.forName(cls), params);
         } catch (ClassNotFoundException e) {
             return null;
         }

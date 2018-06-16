@@ -57,12 +57,12 @@ public class ServerConfig {
         this.threadPriority = conn.getIntParam("threadPriority", Thread.NORM_PRIORITY);
     }
 
-    @Deprecated  // Do not use for new servers! Use ConfigParser instead
+    // Do not use for new servers! Use ConfigParser instead
     public static ServerConfig from(String conn) {
         return new ServerConfig(new ConnectionString(conn));
     }
 
-    @Deprecated  // Do not use for new servers! Use ConfigParser instead
+    // Do not use for new servers! Use ConfigParser instead
     public static ServerConfig from(ConnectionString conn) {
         return new ServerConfig(conn);
     }

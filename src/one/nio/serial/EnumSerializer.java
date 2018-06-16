@@ -46,6 +46,7 @@ public class EnumSerializer extends Serializer<Enum> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         String[] constants = new String[in.readUnsignedShort()];
         for (int i = 0; i < constants.length; i++) {
