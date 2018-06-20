@@ -33,6 +33,16 @@ import java.util.Set;
 public class Management {
     private static final Log log = LogFactory.getLog(Management.class);
 
+    static {
+        try {
+            // After registering this magic instance, new HotSpot internal MBeans appear:
+            // HotspotRuntimeMBean, getHotspotMemoryMBean etc.
+            ManagementFactory.getPlatformMBeanServer().createMBean("sun.management.HotspotInternal", null);
+        } catch (Exception e) {
+            log.warn("Cannot register HotspotInternal: " + e);
+        }
+    }
+
     public static void registerMXBean(Object object, String name) {
         registerMXBean(object, null, name);
     }
