@@ -10,7 +10,7 @@ import static org.junit.Assert.assertFalse;
 
 public class RequestParametersTest {
     private static Iterator<Map.Entry<String, String>> from(final String path) {
-        return new Request(Request.METHOD_GET, path, true).getParameters();
+        return new Request(Request.METHOD_GET, path, true).getParameters().iterator();
     }
 
     @Test
