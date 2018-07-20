@@ -70,9 +70,7 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
         return parse(parameter);
     }
 
-    /**
-     * Skip '&'s and position at the next parameter or stops
-     */
+    // Skip '&'s and position at the next parameter or stops
     private void advance() {
         assert cur >= 0;
 
@@ -87,9 +85,7 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
         }
     }
 
-    /**
-     * Parse {@code key[=[value]]} parameter
-     */
+    // Parse {@code key[=[value]]} parameter
     private static Map.Entry<String, String> parse(final String parameter) {
         assert parameter != null;
         assert !parameter.isEmpty();
@@ -109,9 +105,7 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
         throw new UnsupportedOperationException("Query parameter removal is not supported");
     }
 
-    /**
-     * Query parameter with lazily URL decoded value without memoization
-     */
+    // Query parameter with lazily URL decoded value without memoization
     private static final class QueryParameter implements Map.Entry<String, String> {
         private final String key;
         private final String rawValue;
