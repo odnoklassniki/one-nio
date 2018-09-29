@@ -17,7 +17,7 @@ public class HttpServerMethodTest {
     private static HttpServer server;
     private static HttpClient client;
     private static final String URL = "http://127.0.0.1:8181";
-    private static final int allMethods[] = {Request.METHOD_GET, Request.METHOD_POST, Request.METHOD_HEAD, Request.METHOD_OPTIONS,
+    private static final Integer allMethods[] = {Request.METHOD_GET, Request.METHOD_POST, Request.METHOD_HEAD, Request.METHOD_OPTIONS,
             Request.METHOD_PUT, Request.METHOD_DELETE, Request.METHOD_TRACE, Request.METHOD_CONNECT, Request.METHOD_PATCH };
     private static final int STATUS_NOT_FOUND = 404;
     boolean checkMethods(final Set<Integer> allowedMethods, String uri) throws Exception
@@ -71,6 +71,11 @@ public class HttpServerMethodTest {
     }
 
     @Test
+    public void testAllMethods() throws Exception{
+        assertTrue(checkMethods(new HashSet<>(Arrays.asList(allMethods)), "/allMethods"));
+    }
+
+    @Test
     public void testSimilarPath() throws Exception{
         Response response = client.invoke(client.createRequest(Request.METHOD_GET, "/similarPathMethod"));
         assertEquals(Integer.toString(Request.METHOD_GET), response.getBodyUtf8());
@@ -85,6 +90,8 @@ public class HttpServerMethodTest {
         TestServer(HttpServerConfig config) throws IOException {
             super(config);
         }
+        @Path("/allMethods")
+        public Response allMethods(Request request) {return Response.ok(Integer.toString(request.getMethod()));}
 
         @Path("/getMethod")
         @HttpMethod(Request.METHOD_GET)
