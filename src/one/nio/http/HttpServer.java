@@ -94,6 +94,9 @@ public class HttpServer extends Server {
             return null;
         }
         RequestHandler[] handlers = pathHandlers.get(request.getPath());
+        if (handlers == null) {
+            return null;
+        }
         return handlers[request.getMethod()] == null ? handlers[ALLOW_ALL_METHODS] : handlers[request.getMethod()] ;
     }
 
