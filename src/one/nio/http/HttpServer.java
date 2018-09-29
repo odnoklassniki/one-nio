@@ -117,20 +117,20 @@ public class HttpServer extends Server {
         return null;
     }
 
-    private MethodToHandlerMap addHttpMethods(MethodToHandlerMap currHadlers, RequestHandler newHandler, HttpMethod methhods) {
-        if (currHadlers == null) {
-            currHadlers = new MethodToHandlerMap();
+    private MethodToHandlerMap addHttpMethods(MethodToHandlerMap currHandlers, RequestHandler newHandler, HttpMethod methhods) {
+        if (currHandlers == null) {
+            currHandlers = new MethodToHandlerMap();
         }
         if (methhods == null) {
-            currHadlers.put(ALLOW_ALL_METHODS, newHandler);
+            currHandlers.put(ALLOW_ALL_METHODS, newHandler);
         } else
         {
             for (int i : methhods.value())
             {
-                currHadlers.put(i, newHandler);
+                currHandlers.put(i, newHandler);
             }
         }
-        return currHadlers;
+        return currHandlers;
     }
 
     public void addRequestHandlers(Object router) {
