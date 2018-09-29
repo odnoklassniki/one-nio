@@ -74,6 +74,13 @@ public class VirtualHostTest {
         assertEquals("set_response_2", request("r2b.example.com", "/set"));
     }
 
+    @Test
+    public void httpMethod() throws Exception
+    {
+        assertEquals("Error404", request("R2A.example.com", "/postMethod"));
+        assertEquals("get_method_response_1", request("r1.example.org", "/getMethod"));
+    }
+
     private String request(String host, String path) throws Exception {
         Request request = new Request(Request.METHOD_GET, path, false);
         if (host != null) {
@@ -98,6 +105,10 @@ public class VirtualHostTest {
     @VirtualHost("router1")
     public static class Router1 {
 
+        @Path("/getMethod")
+        @HttpMethod(Request.METHOD_GET)
+        public Response methodGet1() { return Response.ok("get_method_response_1"); }
+
         @Path("/get")
         public Response get1() {
             return Response.ok("get_response_1");
@@ -106,6 +117,10 @@ public class VirtualHostTest {
 
     @VirtualHost({"router2a", "router2b"})
     public static class Router2 {
+
+        @Path("/postMethod")
+        @HttpMethod(Request.METHOD_POST)
+        public Response methodGet2() { return Response.ok("post_method_response_2"); }
 
         @Path("/get")
         public Response get2() {

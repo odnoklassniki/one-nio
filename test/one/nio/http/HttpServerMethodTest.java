@@ -77,6 +77,9 @@ public class HttpServerMethodTest {
 
         response = client.invoke(client.createRequest(Request.METHOD_POST, "/similarPathMethod"));
         assertEquals(Integer.toString(Request.METHOD_POST), response.getBodyUtf8());
+
+        HashSet<Integer> allowedMethods = new HashSet<>(Arrays.asList(Request.METHOD_GET, Request.METHOD_POST));
+        assertTrue(checkMethods(allowedMethods, "/similarPathMethod"));
     }
     public static class TestServer extends HttpServer {
         TestServer(HttpServerConfig config) throws IOException {
