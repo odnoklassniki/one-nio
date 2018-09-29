@@ -28,16 +28,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HttpServer extends Server {
-    private final Map<String, RequestHandler> defaultHandlers = new HashMap<>();
-    private final Map<String, Map<String, RequestHandler>> handlersByAlias = new HashMap<>();
-    private final Map<String, Map<String, RequestHandler>> handlersByHost = new HashMap<>();
+    class MethodToHandlerMap extends HashMap<Integer, RequestHandler> {}
+    private final Map<String, MethodToHandlerMap> defaultHandlers = new HashMap<>();
+    private final Map<String, Map<String, MethodToHandlerMap>> handlersByAlias = new HashMap<>();
+    private final Map<String, Map<String, MethodToHandlerMap>> handlersByHost = new HashMap<>();
+    private static final int ALLOW_ALL_METHODS = 0;
 
     public HttpServer(HttpServerConfig config, Object... routers) throws IOException {
         super(config);
 
         if (config.virtualHosts != null) {
             for (Map.Entry<String, String[]> virtualHost : config.virtualHosts.entrySet()) {
-                Map<String, RequestHandler> handlers = new HashMap<>();
+                Map<String, MethodToHandlerMap> handlers = new HashMap<>();
                 handlersByAlias.put(virtualHost.getKey(), handlers);
                 for (String host : virtualHost.getValue()) {
                     handlersByHost.put(host.toLowerCase(), handlers);
@@ -59,7 +61,11 @@ public class HttpServer extends Server {
     public void handleRequest(Request request, HttpSession session) throws IOException {
         RequestHandler handler = findHandlerByHost(request);
         if (handler == null) {
-            handler = defaultHandlers.get(request.getPath());
+            MethodToHandlerMap handlers =  defaultHandlers.get(request.getPath());
+            if (handlers != null) {
+                RequestHandler methodHandler =  handlers.get(request.getMethod());
+                handler = methodHandler == null ? handlers.get(ALLOW_ALL_METHODS) : methodHandler;
+            }
         }
 
         if (handler != null) {
@@ -84,12 +90,47 @@ public class HttpServer extends Server {
             return null;
         }
 
-        Map<String, RequestHandler> handlers = handlersByHost.get(host.toLowerCase());
+        Map<String, MethodToHandlerMap> pathHandlers = handlersByHost.get(host.toLowerCase());
+        if (pathHandlers == null) {
+            return null;
+        }
+        MethodToHandlerMap handlers = pathHandlers.get(request.getPath());
         if (handlers == null) {
             return null;
         }
+        RequestHandler methodHandler =  handlers.get(request.getMethod());
+        return methodHandler == null ? handlers.get(ALLOW_ALL_METHODS) : methodHandler;
+    }
 
-        return handlers.get(request.getPath());
+    private MethodToHandlerMap getRequstHandlers(String path, String[] aliases)
+    {
+        if (aliases == null || aliases.length == 0) {
+            return defaultHandlers.get(path);
+        } else {
+            for (String alias : aliases) {
+                Map<String, MethodToHandlerMap> handlers = handlersByAlias.get(alias);
+                if (handlers != null) {
+                    return handlers.get(path);
+                }
+            }
+        }
+        return null;
+    }
+
+    private MethodToHandlerMap addHttpMethods(MethodToHandlerMap currHandlers, RequestHandler newHandler, HttpMethod methhods) {
+        if (currHandlers == null) {
+            currHandlers = new MethodToHandlerMap();
+        }
+        if (methhods == null) {
+            currHandlers.put(ALLOW_ALL_METHODS, newHandler);
+        } else
+        {
+            for (int i : methhods.value())
+            {
+                currHandlers.put(i, newHandler);
+            }
+        }
+        return currHandlers;
     }
 
     public void addRequestHandlers(Object router) {
@@ -107,6 +148,7 @@ public class HttpServer extends Server {
 
             for (Method m : cls.getMethods()) {
                 Path annotation = m.getAnnotation(Path.class);
+                HttpMethod methods = m.getAnnotation(HttpMethod.class);
                 if (annotation == null) {
                     continue;
                 }
@@ -117,13 +159,14 @@ public class HttpServer extends Server {
                         throw new IllegalArgumentException("Path '" + path + "' is not absolute");
                     }
 
+                    MethodToHandlerMap currHandlers = addHttpMethods(getRequstHandlers(path, aliases), requestHandler, methods);
                     if (aliases == null || aliases.length == 0) {
-                        defaultHandlers.put(path, requestHandler);
+                        defaultHandlers.put(path, currHandlers);
                     } else {
                         for (String alias : aliases) {
-                            Map<String, RequestHandler> handlers = handlersByAlias.get(alias);
+                            Map<String, MethodToHandlerMap> handlers = handlersByAlias.get(alias);
                             if (handlers != null) {
-                                handlers.put(path, requestHandler);
+                                handlers.put(path, currHandlers);
                             }
                         }
                     }
