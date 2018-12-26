@@ -19,6 +19,7 @@ package one.nio.rpc;
 import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
 import one.nio.pool.SocketPool;
+import one.nio.rpc.stream.RpcStreamImpl;
 import one.nio.serial.CalcSizeStream;
 import one.nio.serial.DataStream;
 import one.nio.serial.DeserializeStream;
@@ -30,7 +31,7 @@ import one.nio.serial.SerializerNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 public class RpcClient extends SocketPool implements InvocationHandler {
     protected static final byte[][] uidLocks = new byte[64][0];
@@ -44,12 +45,16 @@ public class RpcClient extends SocketPool implements InvocationHandler {
     }
 
     public Object invoke(Object request, int timeout) throws Exception {
-        byte[] buffer = invokeRaw(request, timeout);
+        Object rawResponse = invokeRaw(request, timeout);
 
-        for (;;) {
+        while (true) {
+            if (!(rawResponse instanceof byte[])) {
+                return rawResponse;
+            }
+
             Object response;
             try {
-                response = new DeserializeStream(buffer).readObject();
+                response = new DeserializeStream((byte[]) rawResponse).readObject();
             } catch (SerializerNotFoundException e) {
                 long uid = e.getUid();
                 synchronized (uidLockFor(uid)) {
@@ -65,7 +70,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
             } else if (response instanceof SerializerNotFoundException) {
                 long uid = ((SerializerNotFoundException) response).getUid();
                 provideSerializer(Repository.requestSerializer(uid));
-                buffer = invokeRaw(request, readTimeout);
+                rawResponse = invokeRaw(request, readTimeout);
             } else {
                 throw (Exception) response;
             }
@@ -74,6 +79,10 @@ public class RpcClient extends SocketPool implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object... args) throws Exception {
+        if (method.getDeclaringClass() == Object.class) {
+            // toString(), hashCode() etc. are not remote methods
+            return method.invoke(this, args);
+        }
         return invoke(new RemoteCall(method, args));
     }
 
@@ -90,7 +99,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
     }
 
     protected Object invokeServiceRequest(Object request) throws Exception {
-        byte[] rawResponse = invokeRaw(request, readTimeout);
+        byte[] rawResponse = (byte[]) invokeRaw(request, readTimeout);
         Object response = new DeserializeStream(rawResponse).readObject();
         if (response instanceof Exception) {
             throw (Exception) response;
@@ -98,27 +107,50 @@ public class RpcClient extends SocketPool implements InvocationHandler {
         return response;
     }
 
-    private byte[] invokeRaw(Object request, int timeout) throws Exception {
+    private Object invokeRaw(Object request, int timeout) throws Exception {
         byte[] buffer = serialize(request);
 
         Socket socket = borrowObject();
         try {
             try {
                 sendRequest(socket, buffer, timeout);
-            } catch (SocketException e) {
+            } catch (SocketTimeoutException e) {
+                throw e;
+            } catch (IOException e) {
                 // Stale connection? Retry on a fresh socket
                 destroyObject(socket);
                 socket = createObject();
                 sendRequest(socket, buffer, timeout);
             }
 
-            int responseSize = RpcPacket.getSize(buffer, socket);
+            int responseSize = RpcPacket.getSize(buffer);
+            if (responseSize == RpcPacket.STREAM_HEADER) {
+                return new RpcStreamImpl(socket) {
+                    {
+                        socket.setTos(Socket.IPTOS_THROUGHPUT);
+                    }
+
+                    @Override
+                    public void close() {
+                        super.close();
+
+                        if (error) {
+                            invalidateObject(socket);
+                        } else {
+                            socket.setTos(0);
+                            returnObject(socket);
+                        }
+                    }
+                };
+            }
+
+            RpcPacket.checkSize(responseSize, socket);
             if (responseSize > 4) buffer = new byte[responseSize];
             socket.readFully(buffer, 0, responseSize);
 
             returnObject(socket);
             return buffer;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             invalidateObject(socket);
             throw e;
         }

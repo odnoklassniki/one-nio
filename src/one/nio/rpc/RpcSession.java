@@ -16,20 +16,26 @@
 
 package one.nio.rpc;
 
+import one.nio.http.Request;
 import one.nio.net.Session;
 import one.nio.net.Socket;
+import one.nio.rpc.stream.RpcStreamImpl;
+import one.nio.rpc.stream.StreamProxy;
 import one.nio.serial.CalcSizeStream;
 import one.nio.serial.DataStream;
 import one.nio.serial.DeserializeStream;
+import one.nio.serial.Repository;
 import one.nio.serial.SerializeStream;
 import one.nio.serial.SerializerNotFoundException;
+import one.nio.util.Utf8;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.RejectedExecutionException;
 
 public class RpcSession<S, M> extends Session {
-    private static final int BUFFER_SIZE = 8000;
+    protected static final int BUFFER_SIZE = 8000;
+    protected static final byte HTTP_REQUEST_UID = (byte) Repository.get(Request.class).uid();
 
     protected final RpcServer<S> server;
     protected final InetSocketAddress peer;
@@ -48,29 +54,36 @@ public class RpcSession<S, M> extends Session {
     @Override
     protected void processRead(byte[] unusedBuffer) throws Exception {
         byte[] buffer = this.buffer;
-        int bytesRead = this.bytesRead;
         int requestSize = this.requestSize;
 
         // Read 4-bytes header
         if (requestSize == 0) {
-            bytesRead += super.read(buffer, bytesRead, 4 - bytesRead);
-            if (bytesRead < 4) {
-                this.bytesRead = bytesRead;
+            if (bytesRead < 4 && (bytesRead += super.read(buffer, bytesRead, 4 - bytesRead)) < 4) {
                 return;
             }
-            bytesRead = 0;
 
-            requestSize = this.requestSize = RpcPacket.getSize(buffer, socket);
-            if (requestSize > buffer.length) {
-                buffer = this.buffer = new byte[requestSize];
+            requestSize = RpcPacket.getSize(buffer);
+            if (requestSize >= RpcPacket.HTTP_GET && RpcPacket.isHttpHeader(requestSize)) {
+                // Looks like HTTP request - try to parse as HTTP
+                if ((requestSize = readHttpHeader()) < 0) {
+                    // HTTP headers not yet complete
+                    return;
+                }
+            } else {
+                bytesRead = 0;
             }
+
+            RpcPacket.checkSize(requestSize, socket);
+            if (requestSize > buffer.length) {
+                this.buffer = buffer = expandBuffer(requestSize);
+            }
+
+            this.requestSize = requestSize;
             this.requestStartTime = selector.lastWakeupTime();
         }
 
         // Read request
-        bytesRead += super.read(buffer, bytesRead, requestSize - bytesRead);
-        if (bytesRead < requestSize) {
-            this.bytesRead = bytesRead;
+        if ((bytesRead += super.read(buffer, bytesRead, requestSize - bytesRead)) < requestSize) {
             return;
         }
 
@@ -96,7 +109,7 @@ public class RpcSession<S, M> extends Session {
         }
 
         // Perform the invocation
-        if (server.getWorkersUsed()) {
+        if (isAsyncRequest(request)) {
             try {
                 server.asyncExecute(new AsyncRequest(request, meta));
                 server.incRequestsProcessed();
@@ -108,6 +121,55 @@ public class RpcSession<S, M> extends Session {
             invoke(request, meta);
             server.incRequestsProcessed();
         }
+    }
+
+    private byte[] expandBuffer(int requestSize) {
+        byte[] newBuffer = new byte[requestSize];
+        System.arraycopy(buffer, 0, newBuffer, 0, bytesRead);
+        return newBuffer;
+    }
+
+    private int readHttpHeader() throws IOException {
+        byte[] buffer = this.buffer;
+        int bytesRead = this.bytesRead;
+
+        bytesRead += super.read(buffer, bytesRead, BUFFER_SIZE - bytesRead);
+        this.bytesRead = bytesRead;
+
+        int contentLength = 0;
+        int lineStart = 4;
+        for (int i = 4; i < bytesRead; i++) {
+            // Parse line by line
+            if (buffer[i] == '\n') {
+                if (buffer[i - 1] == '\n' || buffer[i - 1] == '\r' && buffer[i - 2] == '\n') {
+                    // Make HTTP request deserializable with the standard DeserializeStream
+                    buffer[0] = HTTP_REQUEST_UID;
+                    return i + 1 + contentLength;
+                } else if (i - lineStart > 16 && startsWith(buffer, lineStart, "content-length: ")) {
+                    int end =  buffer[i - 1] == '\r' ? i - 1 : i;
+                    contentLength = (int) Utf8.parseLong(buffer, lineStart + 16, end - (lineStart + 16));
+                }
+                lineStart = i + 1;
+            }
+        }
+
+        // The headers are not yet complete. Return error if the buffer is already full.
+        return bytesRead < BUFFER_SIZE ? -1 : Integer.MAX_VALUE;
+    }
+
+    private static boolean startsWith(byte[] buffer, int from, String s) {
+        int length = s.length();
+        for (int i = 0; i < length; i++) {
+            // Make letters case-insensitive
+            if ((buffer[from + i] | 32) != s.charAt(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected boolean isAsyncRequest(Object request) {
+        return server.getWorkersUsed();
     }
 
     // To be overridden
@@ -129,10 +191,38 @@ public class RpcSession<S, M> extends Session {
         return responseSize;
     }
 
+    @SuppressWarnings("unchecked")
+    protected void streamCommunicate(StreamProxy streamProxy) throws IOException {
+        selector.disable(this);
+        socket.setBlocking(true);
+        socket.setTos(Socket.IPTOS_THROUGHPUT);
+        socket.writeFully(RpcPacket.STREAM_HEADER_ARRAY, 0, 4);
+
+        try (RpcStreamImpl stream = new RpcStreamImpl(socket)) {
+            streamProxy.handler.communicate(stream);
+            streamProxy.bytesRead = stream.getBytesRead();
+            streamProxy.bytesWritten = stream.getBytesWritten();
+        } catch (ClassNotFoundException e) {
+            close();
+            throw new IOException(e);
+        } catch (Throwable e) {
+            close();
+            throw e;
+        }
+
+        socket.setTos(0);
+        socket.setBlocking(false);
+        selector.enable(this);
+    }
+
     protected void invoke(Object request, M meta) throws Exception {
         RemoteCall remoteCall = (RemoteCall) request;
         Object response = remoteCall.method().invoke(server.service, remoteCall.args());
-        writeResponse(response);
+        if (response instanceof StreamProxy) {
+            streamCommunicate((StreamProxy) response);
+        } else {
+            writeResponse(response);
+        }
     }
 
     protected void handleDeserializationException(Exception e) throws IOException {
