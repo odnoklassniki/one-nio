@@ -127,7 +127,10 @@ public final class Base64 {
     }
 
     public static byte[] decode(byte[] s) {
-        int len = s.length;
+        return decode(s, s.length);
+    }
+
+    public static byte[] decode(byte[] s, int len) {
         while (len > 0 && s[len - 1] == '=') {
             len--;
         }
@@ -156,7 +159,10 @@ public final class Base64 {
     }
 
     public static byte[] decodeFromChars(char[] s) {
-        int len = s.length;
+        return decodeFromChars(s, s.length);
+    }
+
+    public static byte[] decodeFromChars(char[] s, int len) {
         while (len > 0 && s[len - 1] == '=') {
             len--;
         }

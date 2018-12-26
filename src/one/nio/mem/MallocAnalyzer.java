@@ -36,13 +36,14 @@ public class MallocAnalyzer extends MallocMT {
     
     public void segmentInfo() {
         out.println("=== Segment Info ===");
-        out.println("Segment Total\t" + Long.toHexString(base) + "\t" +
-                    getTotalMemory() + "\t" + getUsedMemory() + "\t" + getFreeMemory());
+        out.println("Segment #\tBase\tTotal\tUsed\tFree");
         for (int i = 0; i < segments(); i++) {
             Malloc segment = segment(i);
             out.println("Segment " + i + "\t" + Long.toHexString(segment.base) + "\t" +
                         segment.getTotalMemory() + "\t" + segment.getUsedMemory() + "\t" + segment.getFreeMemory());
         }
+        out.println("Total\t" + Long.toHexString(base) + "\t" +
+                getTotalMemory() + "\t" + getUsedMemory() + "\t" + getFreeMemory());
         out.println();
     }
 
@@ -116,12 +117,15 @@ public class MallocAnalyzer extends MallocMT {
         long base = mmap.getAddr();
         long size = mmap.getSize();
 
-        if (unsafe.getLong(base) == 0xA0014B4F236D6873L || unsafe.getLong(base) == 0xA0015444236D6873L) {
-            long offset = unsafe.getLong(base + 16);
+        long signature = unsafe.getLong(base);
+        long shmMask = SharedMemoryMap.SIGNATURE_CLEAR & SharedMemoryMap.SIGNATURE_DIRTY & SharedMemoryMap.SIGNATURE_LEGACY;
+        if ((signature & shmMask) == shmMask) {
+            long capacity = unsafe.getLong(base + SharedMemoryMap.CAPACITY_OFFSET);
+            long offset = SharedMemoryMap.MAP_OFFSET + capacity * 8;
             base += offset;
             size -= offset;
-        } else if (unsafe.getInt(base) == 0x30667247 || unsafe.getInt(base) == 0x44667247) {
-            long offset = (long) unsafe.getInt(base + 4) * 16 + 32;
+        } else if (signature == 0xA0014B4F236D6873L || signature == 0xA0015444236D6873L) {
+            long offset = unsafe.getLong(base + 16);
             base += offset;
             size -= offset;
         }

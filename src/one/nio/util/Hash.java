@@ -42,6 +42,26 @@ public class Hash {
         return (key + 1) * 0x7ffffbffffdfffffL;
     }
 
+    public static int murmur3_step(int state, int value) {
+        value *= 0xcc9e2d51;
+        value = (value << 15) | (value >>> 17);
+        value *= 0x1b873593;
+
+        state ^= value;
+        state = (state << 13) | (state >>> 19);
+        return state * 5 + 0xe6546b64;
+    }
+
+    public static int murmur3_final(int state, int length) {
+        state ^= length;
+        state ^= state >>> 16;
+        state *= 0x85ebca6b;
+        state ^= state >>> 13;
+        state *= 0xc2b2ae35;
+        state ^= state >>> 16;
+        return state;
+    }
+
     // Effective alternative to String.hashCode()
     public static int murmur3(String s) {
         int h1 = 0xa9b4de21;
@@ -50,30 +70,16 @@ public class Hash {
 
         for (; count >= 2; count -= 2) {
             int k1 = s.charAt(off++) | (s.charAt(off++) << 16);
-            k1 *= 0xcc9e2d51;
-            k1 = (k1 << 15) | (k1 >>> 17);
-            k1 *= 0x1b873593;
-
-            h1 ^= k1;
-            h1 = (h1 << 13) | (h1 >>> 19);
-            h1 = h1 * 5 + 0xe6546b64;
+            h1 = murmur3_step(h1, k1);
         }
 
         if (count > 0) {
-            int k1 = s.charAt(off);
-            k1 *= 0xcc9e2d51;
+            int k1 = s.charAt(off) * 0xcc9e2d51;
             k1 = (k1 << 15) | (k1 >>> 17);
-            k1 *= 0x1b873593;
-            h1 ^= k1;
+            h1 ^= k1 * 0x1b873593;
         }
 
-        h1 ^= s.length() * 2;
-        h1 ^= h1 >>> 16;
-        h1 *= 0x85ebca6b;
-        h1 ^= h1 >>> 13;
-        h1 *= 0xc2b2ae35;
-        h1 ^= h1 >>> 16;
-        return h1;
+        return murmur3_final(h1, s.length() * 2);
     }
 
     // Murmur3_x86_32 hash code
@@ -82,16 +88,8 @@ public class Hash {
         int remain;
 
         for (remain = count; remain >= 4; remain -= 4) {
-            int k1 = unsafe.getInt(obj, offset);
+            h1 = murmur3_step(h1, unsafe.getInt(obj, offset));
             offset += 4;
-
-            k1 *= 0xcc9e2d51;
-            k1 = (k1 << 15) | (k1 >>> 17);
-            k1 *= 0x1b873593;
-
-            h1 ^= k1;
-            h1 = (h1 << 13) | (h1 >>> 19);
-            h1 = h1 * 5 + 0xe6546b64;
         }
 
         int k1 = 0;
@@ -110,13 +108,7 @@ public class Hash {
                 h1 ^= k1;
         }
 
-        h1 ^= count;
-        h1 ^= h1 >>> 16;
-        h1 *= 0x85ebca6b;
-        h1 ^= h1 >>> 13;
-        h1 *= 0xc2b2ae35;
-        h1 ^= h1 >>> 16;
-        return h1;
+        return murmur3_final(h1, count);
     }
 
     public static int murmur3(byte[] array, int start, int length) {

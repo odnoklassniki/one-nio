@@ -16,14 +16,16 @@
 
 package one.nio.util;
 
-import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Replacement for sun.misc.Cleaner
+ * Replacement for sun.misc.Cleaner.
+ * Use WeakReference instead of PhantomReference because of
+ * https://bugs.openjdk.java.net/browse/JDK-8071507
  */
-public class Cleaner extends PhantomReference<Object> {
+public class Cleaner extends WeakReference<Object> {
 
     public Cleaner(Object referent) {
         super(referent, CleanerThread.queue);

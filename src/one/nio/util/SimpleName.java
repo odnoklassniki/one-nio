@@ -17,6 +17,26 @@
 package one.nio.util;
 
 public class SimpleName {
+    private final Class cls;
+
+    public SimpleName(Class cls) {
+        this.cls = cls;
+    }
+
+    @Override
+    public int hashCode() {
+        return cls.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof SimpleName && ((SimpleName) obj).cls == cls;
+    }
+
+    @Override
+    public String toString() {
+        return of(cls);
+    }
 
     public static String of(Class cls) {
         String name = cls.getName();

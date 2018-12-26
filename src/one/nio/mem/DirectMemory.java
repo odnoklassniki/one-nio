@@ -50,6 +50,10 @@ public final class DirectMemory {
         return address;
     }
 
+    public static long allocateDirty(long size) {
+        return unsafe.allocateMemory(size);
+    }
+
     public static long allocateRaw(long size) {
         long address = unsafe.allocateMemory(size);
         clear(address, size);

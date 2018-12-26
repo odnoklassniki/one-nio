@@ -37,6 +37,7 @@ public class Request {
     public static final int METHOD_TRACE   = 7;
     public static final int METHOD_CONNECT = 8;
     public static final int METHOD_PATCH   = 9;
+    public static final int NUMBER_OF_METHODS = 10;
 
     public static final byte[] VERB_GET     = Utf8.toBytes("GET ");
     public static final byte[] VERB_POST    = Utf8.toBytes("POST ");
@@ -172,15 +173,15 @@ public class Request {
     }
 
     /**
-     * @return {@link Iterator} over {@code String} {@code key[=[value]]} parameters in order
+     * @return {@link Iterable} over {@code String} {@code key[=[value]]} parameters
      *         skipping empty parameters
      */
     public Iterable<Map.Entry<String, String>> getParameters() {
-        if (params == -1) {
+        if (params < 0) {
             return Collections.emptyList();
         }
 
-        return new Iterable<Map.Entry<String,String>>() {
+        return new Iterable<Map.Entry<String, String>>() {
             @Override
             public Iterator<Map.Entry<String, String>> iterator() {
                 return new QueryParameterIterator(uri.substring(params + 1));

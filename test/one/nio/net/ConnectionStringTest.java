@@ -30,14 +30,21 @@ public class ConnectionStringTest {
         conn = new ConnectionString("socket://1.2.3.4:80/");
         assertEquals("1.2.3.4", conn.getHost());
         assertEquals(80, conn.getPort());
+        
+        conn = new ConnectionString("socket://1.2.3.4:80?");
+        assertEquals("1.2.3.4", conn.getHost());
+        assertEquals(80, conn.getPort());
+        assertEquals("?", conn.getPath());
 
         conn = new ConnectionString("localhost");
         assertEquals("localhost", conn.getHost());
         assertEquals(0, conn.getPort());
+        assertEquals("", conn.getPath());
 
         conn = new ConnectionString("http://example.com/?param=/case1&question=?&int=345");
         assertEquals("example.com", conn.getHost());
         assertEquals(0, conn.getPort());
+        assertEquals("/?param=/case1&question=?&int=345", conn.getPath());
         assertEquals("/case1", conn.getStringParam("param"));
         assertEquals("?", conn.getStringParam("question"));
         assertEquals(345, conn.getIntParam("int", 0));

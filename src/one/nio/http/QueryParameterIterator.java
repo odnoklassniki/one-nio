@@ -54,7 +54,7 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
         // Extract parameter
         final int next = query.indexOf('&', cur);
         final String parameter;
-        if (next == -1) {
+        if (next < 0) {
             // Last parameter
             parameter = query.substring(cur);
             cur = -1;
@@ -65,9 +65,13 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
             advance();
         }
 
-        assert !parameter.isEmpty();
-
-        return parse(parameter);
+        // Parse {@code key[=[value]]} parameter
+        final int q = parameter.indexOf('=');
+        if (q < 0) {
+            return new QueryParameter(parameter, "");
+        } else {
+            return new QueryParameter(parameter.substring(0, q), parameter.substring(q + 1));
+        }
     }
 
     // Skip '&'s and position at the next parameter or stops
@@ -85,21 +89,6 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
         }
     }
 
-    // Parse {@code key[=[value]]} parameter
-    private static Map.Entry<String, String> parse(final String parameter) {
-        assert parameter != null;
-        assert !parameter.isEmpty();
-
-        final int delimiter = parameter.indexOf('=');
-        if (delimiter == -1) {
-            return new QueryParameter(parameter, "");
-        } else {
-            return new QueryParameter(
-                    parameter.substring(0, delimiter),
-                    parameter.substring(delimiter + 1));
-        }
-    }
-
     @Override
     public void remove() {
         throw new UnsupportedOperationException("Query parameter removal is not supported");
@@ -110,9 +99,8 @@ final class QueryParameterIterator implements Iterator<Map.Entry<String, String>
         private final String key;
         private final String rawValue;
 
-        private QueryParameter(String key, String rawValue) {
-            assert key != null;
-            assert !key.isEmpty();
+        QueryParameter(String key, String rawValue) {
+            assert key != null && !key.isEmpty();
             assert rawValue != null;
 
             this.key = key;

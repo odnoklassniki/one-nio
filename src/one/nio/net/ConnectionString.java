@@ -37,15 +37,21 @@ public class ConnectionString {
 
     protected String protocol;
     protected String host;
-    protected String path;
     protected int port;
+    protected String path;
     protected Map<String, String> params;
 
     protected ConnectionString() {
     }
 
     public ConnectionString(String connectionString) {
-        connectionString = expand(connectionString);
+        this(connectionString, true);
+    }
+
+    public ConnectionString(String connectionString, boolean expand) {
+        if (expand) {
+            connectionString = expand(connectionString);
+        }
 
         int p = connectionString.indexOf("//");
         if (p > 1) {
@@ -194,7 +200,7 @@ public class ConnectionString {
         }
     }
 
-    private static Map<String, String> parseParameters(String parameters) {
+    public static Map<String, String> parseParameters(String parameters) {
         HashMap<String, String> result = new HashMap<>();
         for (StringTokenizer tokenizer = new StringTokenizer(parameters, "&"); tokenizer.hasMoreTokens(); ) {
             String param = tokenizer.nextToken();
