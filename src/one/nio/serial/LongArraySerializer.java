@@ -17,6 +17,7 @@
 package one.nio.serial;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 class LongArraySerializer extends Serializer<long[]> {
     private static final long[] EMPTY_LONG_ARRAY = new long[0];
@@ -69,5 +70,24 @@ class LongArraySerializer extends Serializer<long[]> {
             }
         }
         builder.append(']');
+    }
+
+    @Override
+    public long[] fromJson(JsonReader in) throws IOException {
+        long[] result = new long[10];
+        int count = 0;
+
+        in.expect('[', "Expected array");
+        for (boolean needComma = false; in.skipWhitespace() != ']'; needComma = true) {
+            if (needComma) {
+                in.expect(',', "Unexpected end of array");
+                in.skipWhitespace();
+            }
+            if (count >= result.length) result = Arrays.copyOf(result, count * 2);
+            result[count++] = in.readLong();
+        }
+        in.read();
+
+        return Arrays.copyOf(result, count);
     }
 }

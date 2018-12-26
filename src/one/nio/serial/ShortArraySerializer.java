@@ -17,6 +17,7 @@
 package one.nio.serial;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 class ShortArraySerializer extends Serializer<short[]> {
     private static final short[] EMPTY_SHORT_ARRAY = new short[0];
@@ -69,5 +70,24 @@ class ShortArraySerializer extends Serializer<short[]> {
             }
         }
         builder.append(']');
+    }
+
+    @Override
+    public short[] fromJson(JsonReader in) throws IOException {
+        short[] result = new short[10];
+        int count = 0;
+
+        in.expect('[', "Expected array");
+        for (boolean needComma = false; in.skipWhitespace() != ']'; needComma = true) {
+            if (needComma) {
+                in.expect(',', "Unexpected end of array");
+                in.skipWhitespace();
+            }
+            if (count >= result.length) result = Arrays.copyOf(result, count * 2);
+            result[count++] = in.readShort();
+        }
+        in.read();
+
+        return Arrays.copyOf(result, count);
     }
 }

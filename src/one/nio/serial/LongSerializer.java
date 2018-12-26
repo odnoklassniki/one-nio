@@ -50,4 +50,14 @@ class LongSerializer extends Serializer<Long> {
     public void toJson(Long obj, StringBuilder builder) {
         builder.append(obj.longValue());
     }
+
+    @Override
+    public Long fromJson(JsonReader in) throws IOException {
+        return in.readLong();
+    }
+
+    @Override
+    public Long fromString(String s) {
+        return Long.valueOf(s);
+    }
 }

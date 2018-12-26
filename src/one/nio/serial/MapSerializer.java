@@ -106,6 +106,11 @@ public class MapSerializer extends Serializer<Map> {
         builder.append('}');
     }
 
+    @Override
+    public Map fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        return in.readMap();
+    }
+
     @SuppressWarnings("unchecked")
     private Constructor findConstructor() {
         try {

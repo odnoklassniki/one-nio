@@ -19,6 +19,7 @@ package one.nio.mem;
 import one.nio.rpc.cache.Entity;
 import one.nio.serial.CalcSizeStream;
 import one.nio.serial.DataStream;
+import one.nio.serial.JsonReader;
 import one.nio.serial.Serializer;
 
 import java.io.IOException;
@@ -78,6 +79,11 @@ public class CustomSerializerMapTest {
 
         @Override
         public void toJson(Entity obj, StringBuilder builder) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Entity fromJson(JsonReader in) throws IOException, ClassNotFoundException {
             throw new UnsupportedOperationException();
         }
     }

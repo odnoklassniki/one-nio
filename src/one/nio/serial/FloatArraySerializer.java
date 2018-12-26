@@ -17,6 +17,7 @@
 package one.nio.serial;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 class FloatArraySerializer extends Serializer<float[]> {
     private static final float[] EMPTY_FLOAT_ARRAY = new float[0];
@@ -69,5 +70,24 @@ class FloatArraySerializer extends Serializer<float[]> {
             }
         }
         builder.append(']');
+    }
+
+    @Override
+    public float[] fromJson(JsonReader in) throws IOException {
+        float[] result = new float[10];
+        int count = 0;
+
+        in.expect('[', "Expected array");
+        for (boolean needComma = false; in.skipWhitespace() != ']'; needComma = true) {
+            if (needComma) {
+                in.expect(',', "Unexpected end of array");
+                in.skipWhitespace();
+            }
+            if (count >= result.length) result = Arrays.copyOf(result, count * 2);
+            result[count++] = in.readFloat();
+        }
+        in.read();
+
+        return Arrays.copyOf(result, count);
     }
 }

@@ -16,8 +16,6 @@
 
 package one.nio.serial;
 
-import one.nio.util.Base64;
-
 import java.io.IOException;
 
 class ByteArraySerializer extends Serializer<byte[]> {
@@ -59,6 +57,11 @@ class ByteArraySerializer extends Serializer<byte[]> {
 
     @Override
     public void toJson(byte[] obj, StringBuilder builder) {
-        builder.append('"').append(Base64.encodeToChars(obj)).append('"');
+        Json.appendBinary(builder, obj);
+    }
+
+    @Override
+    public byte[] fromJson(JsonReader in) throws IOException {
+        return in.readBinary();
     }
 }

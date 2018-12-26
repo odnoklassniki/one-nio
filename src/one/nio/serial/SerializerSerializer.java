@@ -16,6 +16,7 @@
 
 package one.nio.serial;
 
+import java.io.Externalizable;
 import java.io.IOException;
 
 import static one.nio.util.JavaInternals.unsafe;
@@ -52,5 +53,10 @@ class SerializerSerializer extends ExternalizableSerializer {
         in.register(serializer);
         serializer.readExternal(in);
         return serializer;
+    }
+
+    @Override
+    public void toJson(Externalizable obj, StringBuilder builder) {
+        ((Serializer) obj).toJson(builder);
     }
 }

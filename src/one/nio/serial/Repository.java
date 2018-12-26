@@ -70,7 +70,7 @@ public class Repository {
     public static final int CUSTOM_STUBS     = 16;
     public static final int DEFAULT_OPTIONS  = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS | CUSTOM_STUBS;
 
-    private static long nextBootstrapUid = -10;
+    private static byte nextBootstrapUid = DataStream.FIRST_APP_UID;
     private static int options = Integer.getInteger("one.nio.serial.options", DEFAULT_OPTIONS);
 
     static {
@@ -129,6 +129,16 @@ public class Repository {
         addBootstrap(new TimestampSerializer());
         addBootstrap(new RemoteCallSerializer());
         addBootstrap(new SerializerSerializer(MethodSerializer.class));
+        addBootstrap(new HttpRequestSerializer());
+
+        classMap.put(int.class, classMap.get(Integer.class));
+        classMap.put(long.class, classMap.get(Long.class));
+        classMap.put(boolean.class, classMap.get(Boolean.class));
+        classMap.put(byte.class, classMap.get(Byte.class));
+        classMap.put(short.class, classMap.get(Short.class));
+        classMap.put(char.class, classMap.get(Character.class));
+        classMap.put(float.class, classMap.get(Float.class));
+        classMap.put(double.class, classMap.get(Double.class));
 
         // Unable to run readObject/writeObject for the following classes.
         // Fortunately standard serialization works well for them.
@@ -231,6 +241,13 @@ public class Repository {
         }
     }
 
+    public static Serializer removeSerializer(long uid) {
+        if (uid < 0) {
+            bootstrapSerializers[128 + (int) uid] = null;
+        }
+        return uidMap.remove(uid);
+    }
+
     public static void setOptions(String className, int options) {
         try {
             Class cls = Class.forName(className, false, BytecodeGenerator.INSTANCE);
@@ -300,20 +317,28 @@ public class Repository {
     }
 
     private static Serializer generateFor(Class<?> cls) {
+        if ((cls.getModifiers() & ENUM) != 0 && cls.getSuperclass() != Enum.class) {
+            // This is a customized enum constant.
+            // Recursively get serializer for its base class out of the lock to avoid deadlock.
+            Serializer serializer = get(cls.getSuperclass());
+            classMap.put(cls, serializer);
+            return serializer;
+        }
+
         synchronized (classLockFor(cls)) {
             Serializer serializer = classMap.get(cls);
             if (serializer != null) {
                 return serializer;
             }
 
-            if (cls.isAnonymousClass() && (cls.getModifiers() & ENUM) == 0) {
+            if (cls.isAnonymousClass()) {
                 log.warn("Trying to serialize anonymous class: " + cls.getName());
                 anonymousClasses.incrementAndGet();
             }
 
             SerialOptions options = cls.getAnnotation(SerialOptions.class);
             if (options != null) {
-                setOptions(cls, options.value());
+                serializationOptions.put(cls, options.value());
             }
 
             Renamed renamed = cls.getAnnotation(Renamed.class);
@@ -322,14 +347,8 @@ public class Repository {
             }
 
             if (cls.isArray()) {
-                get(cls.getComponentType());
                 serializer = new ObjectArraySerializer(cls);
-            } else if ((cls.getModifiers() & ENUM) != 0) {
-                if (cls.getSuperclass() != Enum.class) {
-                    serializer = get(cls.getSuperclass());
-                    classMap.put(cls, serializer);
-                    return serializer;
-                }
+            } else if (cls.isEnum()) {
                 serializer = new EnumSerializer(cls);
             } else if (Externalizable.class.isAssignableFrom(cls)) {
                 if (Serializer.class.isAssignableFrom(cls)) {

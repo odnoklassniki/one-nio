@@ -50,4 +50,14 @@ class ByteSerializer extends Serializer<Byte> {
     public void toJson(Byte obj, StringBuilder builder) {
         builder.append(obj.byteValue());
     }
+
+    @Override
+    public Byte fromJson(JsonReader in) throws IOException {
+        return in.readByte();
+    }
+
+    @Override
+    public Byte fromString(String s) {
+        return Byte.valueOf(s);
+    }
 }

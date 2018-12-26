@@ -29,6 +29,9 @@ public class FieldDescriptor {
     private boolean useGetter;
     private boolean useSetter;
 
+    // Ad-hoc linked list
+    public FieldDescriptor next;
+
     FieldDescriptor(String nameDescriptor, TypeDescriptor typeDescriptor) {
         this.nameDescriptor = nameDescriptor;
         this.typeDescriptor = typeDescriptor;

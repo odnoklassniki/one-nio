@@ -17,6 +17,7 @@
 package one.nio.serial;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 class BooleanArraySerializer extends Serializer<boolean[]> {
     private static final boolean[] EMPTY_BOOLEAN_ARRAY = new boolean[0];
@@ -69,5 +70,24 @@ class BooleanArraySerializer extends Serializer<boolean[]> {
             }
         }
         builder.append(']');
+    }
+
+    @Override
+    public boolean[] fromJson(JsonReader in) throws IOException {
+        boolean[] result = new boolean[10];
+        int count = 0;
+
+        in.expect('[', "Expected array");
+        for (boolean needComma = false; in.skipWhitespace() != ']'; needComma = true) {
+            if (needComma) {
+                in.expect(',', "Unexpected end of array");
+                in.skipWhitespace();
+            }
+            if (count >= result.length) result = Arrays.copyOf(result, count * 2);
+            result[count++] = in.readBoolean();
+        }
+        in.read();
+
+        return Arrays.copyOf(result, count);
     }
 }

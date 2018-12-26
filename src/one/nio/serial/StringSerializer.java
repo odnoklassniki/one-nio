@@ -57,4 +57,14 @@ class StringSerializer extends Serializer<String> {
     public void toJson(String obj, StringBuilder builder) {
         Json.appendString(builder, obj);
     }
+
+    @Override
+    public String fromJson(JsonReader in) throws IOException {
+        return in.readString();
+    }
+
+    @Override
+    public String fromString(String s) {
+        return s;
+    }
 }

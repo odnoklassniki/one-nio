@@ -23,6 +23,7 @@ import one.nio.serial.gen.StubGenerator;
 
 import java.io.Externalizable;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.Field;
@@ -133,6 +134,23 @@ public class GeneratedSerializer extends Serializer {
     @Override
     public void toJson(Object obj, StringBuilder builder) throws IOException {
         delegate.toJson(obj, builder);
+    }
+
+    @Override
+    public Object fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        return delegate.fromJson(in);
+    }
+
+    @Override
+    public void toJson(StringBuilder sb) {
+        sb.append("{\"cls\":\"").append(descriptor).append("\",\"uid\":").append(uid).append(",\"fields\":{");
+
+        for (int i = 0; i < fds.length; i++) {
+            if (i != 0) sb.append(',');
+            sb.append('\"').append(fds[i].name()).append("\":\"").append(fds[i].type()).append('\"');
+        }
+
+        sb.append("}}");
     }
 
     @Override

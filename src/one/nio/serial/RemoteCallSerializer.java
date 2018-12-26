@@ -19,6 +19,7 @@ package one.nio.serial;
 import one.nio.rpc.RemoteCall;
 
 import java.io.IOException;
+import java.io.NotSerializableException;
 
 class RemoteCallSerializer extends Serializer<RemoteCall> {
 
@@ -81,5 +82,10 @@ class RemoteCallSerializer extends Serializer<RemoteCall> {
             }
         }
         builder.append("]}");
+    }
+
+    @Override
+    public RemoteCall fromJson(JsonReader in) throws NotSerializableException {
+        throw new NotSerializableException(descriptor);
     }
 }

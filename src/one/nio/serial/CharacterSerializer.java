@@ -50,4 +50,14 @@ class CharacterSerializer extends Serializer<Character> {
     public void toJson(Character v, StringBuilder builder) {
         Json.appendChar(builder, v);
     }
+
+    @Override
+    public Character fromJson(JsonReader in) throws IOException {
+        return in.readChar();
+    }
+
+    @Override
+    public Character fromString(String s) {
+        return s.charAt(0);
+    }
 }

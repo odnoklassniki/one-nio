@@ -54,4 +54,14 @@ class InvalidSerializer extends Serializer {
     public void toJson(Object obj, StringBuilder builder) throws NotSerializableException {
         throw new NotSerializableException(descriptor);
     }
+
+    @Override
+    public Object fromJson(JsonReader in) throws NotSerializableException {
+        throw new NotSerializableException(descriptor);
+    }
+
+    @Override
+    public Object fromString(String s) throws NotSerializableException {
+        throw new NotSerializableException(descriptor);
+    }
 }

@@ -50,4 +50,14 @@ class BooleanSerializer extends Serializer<Boolean> {
     public void toJson(Boolean v, StringBuilder builder) {
         builder.append(v.booleanValue());
     }
+
+    @Override
+    public Boolean fromJson(JsonReader in) throws IOException {
+        return in.readBoolean();
+    }
+
+    @Override
+    public Boolean fromString(String s) {
+        return Boolean.valueOf(s);
+    }
 }

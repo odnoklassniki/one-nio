@@ -16,6 +16,7 @@
 
 package one.nio.serial;
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
@@ -59,5 +60,35 @@ class ClassSerializer extends Serializer<Class<?>> {
     @Override
     public void toJson(Class<?> obj, StringBuilder builder) {
         builder.append('"').append(obj.getName()).append('"');
+    }
+
+    @Override
+    public Class<?> fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        return fromString(in.readString());
+    }
+
+    @Override
+    public Class<?> fromString(String s) throws ClassNotFoundException {
+        switch (s) {
+            case "int":
+                return int.class;
+            case "long":
+                return long.class;
+            case "boolean":
+                return boolean.class;
+            case "byte":
+                return byte.class;
+            case "short":
+                return short.class;
+            case "char":
+                return char.class;
+            case "float":
+                return float.class;
+            case "double":
+                return double.class;
+            case "void":
+                return void.class;
+        }
+        return Class.forName(s, false, BytecodeGenerator.INSTANCE);
     }
 }

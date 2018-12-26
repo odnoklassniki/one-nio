@@ -75,4 +75,9 @@ class ArrayListSerializer extends Serializer<ArrayList> {
         }
         builder.append(']');
     }
+
+    @Override
+    public ArrayList fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        return in.readArray();
+    }
 }

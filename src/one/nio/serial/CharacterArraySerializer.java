@@ -63,4 +63,9 @@ class CharacterArraySerializer extends Serializer<char[]> {
     public void toJson(char[] obj, StringBuilder builder) {
         Json.appendChars(builder, obj);
     }
+
+    @Override
+    public char[] fromJson(JsonReader in) throws IOException {
+        return in.readString().toCharArray();
+    }
 }

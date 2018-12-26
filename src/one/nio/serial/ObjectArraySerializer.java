@@ -19,6 +19,7 @@ package one.nio.serial;
 import java.io.ObjectInput;
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.util.ArrayList;
 
 public class ObjectArraySerializer extends Serializer<Object[]> {
     private Class componentType;
@@ -87,5 +88,11 @@ public class ObjectArraySerializer extends Serializer<Object[]> {
             }
         }
         builder.append(']');
+    }
+
+    @Override
+    public Object[] fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        ArrayList<Object> list = in.readArray();
+        return list.toArray((Object[]) Array.newInstance(componentType, list.size()));
     }
 }

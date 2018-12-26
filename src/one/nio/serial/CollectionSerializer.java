@@ -103,6 +103,11 @@ public class CollectionSerializer extends Serializer<Collection> {
         builder.append(']');
     }
 
+    @Override
+    public Collection fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        return in.readArray();
+    }
+
     @SuppressWarnings("unchecked")
     private Constructor findConstructor() {
         try {

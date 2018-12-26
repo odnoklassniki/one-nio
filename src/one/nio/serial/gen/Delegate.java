@@ -18,6 +18,7 @@ package one.nio.serial.gen;
 
 import one.nio.serial.CalcSizeStream;
 import one.nio.serial.DataStream;
+import one.nio.serial.JsonReader;
 
 import java.io.IOException;
 
@@ -27,4 +28,5 @@ public interface Delegate {
     Object read(DataStream in) throws IOException, ClassNotFoundException;
     void skip(DataStream in) throws IOException, ClassNotFoundException;
     void toJson(Object obj, StringBuilder builder) throws IOException;
+    Object fromJson(JsonReader in) throws IOException, ClassNotFoundException;
 }

@@ -50,4 +50,14 @@ class ShortSerializer extends Serializer<Short> {
     public void toJson(Short obj, StringBuilder builder) {
         builder.append(obj.shortValue());
     }
+
+    @Override
+    public Short fromJson(JsonReader in) throws IOException {
+        return in.readShort();
+    }
+
+    @Override
+    public Short fromString(String s) {
+        return Short.valueOf(s);
+    }
 }

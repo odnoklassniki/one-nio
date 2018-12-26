@@ -17,6 +17,7 @@
 package one.nio.serial;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 class IntegerArraySerializer extends Serializer<int[]> {
     private static final int[] EMPTY_INT_ARRAY = new int[0];
@@ -69,5 +70,24 @@ class IntegerArraySerializer extends Serializer<int[]> {
             }
         }
         builder.append(']');
+    }
+
+    @Override
+    public int[] fromJson(JsonReader in) throws IOException {
+        int[] result = new int[10];
+        int count = 0;
+
+        in.expect('[', "Expected array");
+        for (boolean needComma = false; in.skipWhitespace() != ']'; needComma = true) {
+            if (needComma) {
+                in.expect(',', "Unexpected end of array");
+                in.skipWhitespace();
+            }
+            if (count >= result.length) result = Arrays.copyOf(result, count * 2);
+            result[count++] = in.readInt();
+        }
+        in.read();
+
+        return Arrays.copyOf(result, count);
     }
 }

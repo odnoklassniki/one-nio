@@ -20,6 +20,7 @@ import one.nio.util.DigestStream;
 
 import java.io.Externalizable;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
@@ -83,6 +84,10 @@ public abstract class Serializer<T> implements Externalizable {
         }
     }
 
+    public void toJson(StringBuilder sb) {
+        sb.append("{\"cls\":\"").append(descriptor).append("\",\"uid\":").append(uid).append('}');
+    }
+
     @Override
     public String toString() {
         return "Class: " + descriptor + '\n' +
@@ -109,6 +114,11 @@ public abstract class Serializer<T> implements Externalizable {
     public abstract T read(DataStream in) throws IOException, ClassNotFoundException;
     public abstract void skip(DataStream in) throws IOException, ClassNotFoundException;
     public abstract void toJson(T obj, StringBuilder builder) throws IOException;
+    public abstract T fromJson(JsonReader in) throws IOException, ClassNotFoundException;
+
+    public T fromString(String s) throws IOException, ClassNotFoundException {
+        throw new NotSerializableException(descriptor);
+    }
 
     public static int sizeOf(Object obj) throws IOException {
         CalcSizeStream css = new CalcSizeStream();

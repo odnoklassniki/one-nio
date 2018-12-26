@@ -16,6 +16,7 @@
 
 package one.nio.serial;
 
+import one.nio.serial.sample.Sample;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -427,5 +428,10 @@ public class SerializationTest {
     public void testHierarchy() throws IOException, ClassNotFoundException {
         checkSerialize(new Parent());
         checkSerialize(new Child());
+    }
+
+    @Test
+    public void testChatSample() throws IOException, ClassNotFoundException {
+        checkSerialize(Sample.createChat());
     }
 }

@@ -50,4 +50,14 @@ class IntegerSerializer extends Serializer<Integer> {
     public void toJson(Integer obj, StringBuilder builder) {
         builder.append(obj.intValue());
     }
+
+    @Override
+    public Integer fromJson(JsonReader in) throws IOException {
+        return in.readInt();
+    }
+
+    @Override
+    public Integer fromString(String s) {
+        return Integer.valueOf(s);
+    }
 }

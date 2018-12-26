@@ -16,7 +16,10 @@
 
 package one.nio.serial;
 
+import one.nio.util.Base64;
+
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 public class Json {
 
@@ -52,6 +55,10 @@ public class Json {
         builder.append('"').append(s).append('"');
     }
 
+    public static void appendBinary(StringBuilder builder, byte[] array) {
+        builder.append('"').append(Base64.encodeToChars(array)).append('"');
+    }
+
     @SuppressWarnings("unchecked")
     public static void appendObject(StringBuilder builder, Object obj) throws IOException {
         if (obj == null) {
@@ -72,5 +79,10 @@ public class Json {
             serializer.toJson(obj, builder);
             return builder.toString();
         }
+    }
+
+    public static Object fromJson(String s) throws IOException, ClassNotFoundException {
+        JsonReader reader = new JsonReader(s.getBytes(StandardCharsets.UTF_8));
+        return reader.readObject();
     }
 }

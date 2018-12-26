@@ -99,6 +99,12 @@ public class MethodSerializer<T> extends Serializer<T> {
     }
 
     @Override
+    public void toJson(StringBuilder sb) {
+        sb.append("{\"cls\":\"").append(descriptor).append("\",\"uid\":").append(uid)
+                .append(",\"method\":\"").append(method).append("\"}");
+    }
+
+    @Override
     public String toString() {
         return super.toString() +
                 "Method: " + method + '\n';
@@ -132,6 +138,12 @@ public class MethodSerializer<T> extends Serializer<T> {
     @Override
     public void toJson(T obj, StringBuilder builder) throws IOException {
         Json.appendString(builder, method.getName());
+    }
+
+    @Override
+    public T fromJson(JsonReader in) throws IOException, ClassNotFoundException {
+        // Possibly overridden in subclasses
+        throw new NotSerializableException(cls.getName());
     }
 
     private Method findMatchingMethod() throws ClassNotFoundException {

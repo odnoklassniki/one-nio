@@ -16,8 +16,9 @@
 
 package one.nio.serial;
 
+import one.nio.util.Base64;
+
 import java.io.IOException;
-import java.io.NotSerializableException;
 import java.nio.LongBuffer;
 import java.util.BitSet;
 
@@ -57,7 +58,17 @@ class BitSetSerializer extends Serializer<BitSet> {
     }
 
     @Override
-    public void toJson(BitSet obj, StringBuilder builder) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+    public void toJson(BitSet obj, StringBuilder builder) {
+        Json.appendBinary(builder, obj.toByteArray());
+    }
+
+    @Override
+    public BitSet fromJson(JsonReader in) throws IOException {
+        return BitSet.valueOf(in.readBinary());
+    }
+
+    @Override
+    public BitSet fromString(String s) {
+        return BitSet.valueOf(Base64.decodeFromChars(s.toCharArray()));
     }
 }

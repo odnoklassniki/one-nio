@@ -59,6 +59,11 @@ public class ExternalizableSerializer extends Serializer<Externalizable> {
 
     @Override
     public void toJson(Externalizable obj, StringBuilder builder) throws NotSerializableException {
-        throw new NotSerializableException(cls.getName());
+        throw new NotSerializableException(descriptor);
+    }
+
+    @Override
+    public Externalizable fromJson(JsonReader in) throws NotSerializableException {
+        throw new NotSerializableException(descriptor);
     }
 }

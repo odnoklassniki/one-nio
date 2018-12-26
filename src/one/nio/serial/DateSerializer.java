@@ -51,4 +51,14 @@ class DateSerializer extends Serializer<Date> {
     public void toJson(Date obj, StringBuilder builder) {
         builder.append(obj.getTime());
     }
+
+    @Override
+    public Date fromJson(JsonReader in) throws IOException {
+        return new Date(in.readLong());
+    }
+
+    @Override
+    public Date fromString(String s) {
+        return new Date(Long.parseLong(s));
+    }
 }

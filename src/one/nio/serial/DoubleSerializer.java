@@ -50,4 +50,14 @@ class DoubleSerializer extends Serializer<Double> {
     public void toJson(Double obj, StringBuilder builder) {
         builder.append(obj.doubleValue());
     }
+
+    @Override
+    public Double fromJson(JsonReader in) throws IOException {
+        return in.readDouble();
+    }
+
+    @Override
+    public Double fromString(String s) {
+        return Double.valueOf(s);
+    }
 }

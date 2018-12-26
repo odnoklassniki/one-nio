@@ -50,4 +50,14 @@ class FloatSerializer extends Serializer<Float> {
     public void toJson(Float obj, StringBuilder builder) {
         builder.append(obj.floatValue());
     }
+
+    @Override
+    public Float fromJson(JsonReader in) throws IOException {
+        return in.readFloat();
+    }
+
+    @Override
+    public Float fromString(String s) {
+        return Float.valueOf(s);
+    }
 }

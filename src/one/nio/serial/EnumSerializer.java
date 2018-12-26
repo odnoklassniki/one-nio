@@ -118,6 +118,18 @@ public class EnumSerializer extends Serializer<Enum> {
         builder.append('"').append(obj.name()).append('"');
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public Enum fromJson(JsonReader in) throws IOException {
+        return Enum.valueOf(cls, in.readString());
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Enum fromString(String s) {
+        return Enum.valueOf(cls, s);
+    }
+
     @SuppressWarnings("unchecked")
     private Enum findMatch(String name, EnumSet found) {
         try {

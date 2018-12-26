@@ -53,4 +53,14 @@ class TimestampSerializer extends Serializer<Timestamp> {
     public void toJson(Timestamp obj, StringBuilder builder) {
         builder.append(obj.getTime());
     }
+
+    @Override
+    public Timestamp fromJson(JsonReader in) throws IOException {
+        return new Timestamp(in.readLong());
+    }
+
+    @Override
+    public Timestamp fromString(String s) {
+        return new Timestamp(Long.parseLong(s));
+    }
 }

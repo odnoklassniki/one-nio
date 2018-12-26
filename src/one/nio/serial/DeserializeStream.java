@@ -22,7 +22,7 @@ import java.util.Arrays;
 import static one.nio.util.JavaInternals.byteArrayOffset;
 
 public class DeserializeStream extends DataStream {
-    static final int INITIAL_CAPACITY = 24;
+    private static final int INITIAL_CAPACITY = 24;
 
     protected Object[] context;
     protected int contextSize;
