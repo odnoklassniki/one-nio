@@ -56,4 +56,21 @@ public final class Proc {
      * @return the policy for the thread (a nonnegative integer)
      */
     public static native int sched_getscheduler(int pid);
+
+    public static final int CLONE_NEWCGROUP = 0x02000000;
+    public static final int CLONE_NEWUTS    = 0x04000000;
+    public static final int CLONE_NEWIPC    = 0x08000000;
+    public static final int CLONE_NEWUSER   = 0x10000000;
+    public static final int CLONE_NEWPID    = 0x20000000;
+    public static final int CLONE_NEWNET    = 0x40000000;
+
+    /**
+     * @param fd is a file descriptor referring to one of the
+     *        namespace entries in a /proc/[pid]/ns/ directory
+     * @param nstype specifies which type of namespace the calling
+     *        thread may be reassociated with. One of CLONE_* constants
+     *        or 0 to allow any type of namespace to be joined
+     * @return 0 on success or errno on failure
+     */
+    public static native int setns(int fd, int nstype);
 }

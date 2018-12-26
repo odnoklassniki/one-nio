@@ -21,6 +21,10 @@
 #include <unistd.h>
 #include <jni.h>
 
+#ifndef __NR_setns
+#define __NR_setns 308
+#endif
+
 JNIEXPORT jint JNICALL
 Java_one_nio_os_Proc_gettid(JNIEnv* env, jclass cls) {
     return syscall(SYS_gettid);
@@ -89,4 +93,9 @@ Java_one_nio_os_Proc_sched_1setscheduler(JNIEnv* env, jclass cls, jint pid, jint
 JNIEXPORT jint JNICALL
 Java_one_nio_os_Proc_sched_1getscheduler(JNIEnv* env, jclass cls, jint pid) {
     return sched_getscheduler((pid_t)pid);
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_setns(JNIEnv* env, jclass cls, jint fd, jint nstype) {
+    return syscall(__NR_setns, fd, nstype) == 0 ? 0 : errno;
 }
