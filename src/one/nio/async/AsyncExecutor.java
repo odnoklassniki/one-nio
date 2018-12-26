@@ -45,7 +45,7 @@ public class AsyncExecutor {
     }
 
     public static void fork(final int workers, final ParallelTask task) throws AsyncException {
-        final AtomicReference<Exception> exception = new AtomicReference<>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
         Thread[] threads = new Thread[workers];
 
         for (int i = 0; i < threads.length; i++) {
@@ -55,7 +55,7 @@ public class AsyncExecutor {
                 public void run() {
                     try {
                         task.execute(taskNum, workers);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         exception.compareAndSet(null, e);
                     }
                 }
@@ -71,7 +71,7 @@ public class AsyncExecutor {
             Thread.currentThread().interrupt();
         }
 
-        Exception e = exception.get();
+        Throwable e = exception.get();
         if (e != null) {
             throw new AsyncException(e);
         }

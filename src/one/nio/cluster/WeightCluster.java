@@ -180,7 +180,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
                 if (provider.available()) {
                     cancel();
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 log.warn(provider + " is not available because of " + e);
             }
         }
