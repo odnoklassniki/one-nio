@@ -65,7 +65,7 @@ public class Server implements ServerMXBean {
         this.selectors = selectors;
 
         this.useWorkers = config.maxWorkers > 0;
-        this.workers = new WorkerPool(config.minWorkers, Math.max(config.maxWorkers, 1), config.queueTime, config.threadPriority);
+        this.workers = new WorkerPool(config.minWorkers, useWorkers ? config.maxWorkers : 2, config.queueTime, config.threadPriority);
 
         this.cleanup = new CleanupThread(selectors, config.keepAlive);
 
@@ -77,7 +77,7 @@ public class Server implements ServerMXBean {
         workers.setCorePoolSize(config.minWorkers);
 
         useWorkers = config.maxWorkers > 0;
-        workers.setMaximumPoolSize(Math.max(config.maxWorkers, 1));
+        workers.setMaximumPoolSize(useWorkers ? config.maxWorkers : 2);
 
         workers.setQueueTime(config.queueTime);
 

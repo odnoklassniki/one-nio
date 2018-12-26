@@ -19,6 +19,7 @@ package one.nio.mem;
 import one.nio.async.AsyncExecutor;
 import one.nio.async.ParallelTask;
 import one.nio.lock.RWLock;
+import one.nio.os.BatchThread;
 import one.nio.util.JavaInternals;
 import one.nio.util.QuickSelect;
 
@@ -657,7 +658,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         void visit(WritableRecord<K, V> record);
     }
 
-    public class BasicCleanup extends Thread {
+    public class BasicCleanup extends BatchThread {
         protected final Object waitLock = new Object();
 
         public BasicCleanup(String name) {
@@ -667,6 +668,8 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
 
         @Override
         public void run() {
+            adjustPriority();
+
             while (!isInterrupted()) {
                 try {
                     synchronized (waitLock) {

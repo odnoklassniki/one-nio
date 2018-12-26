@@ -17,10 +17,11 @@
 package one.nio.server;
 
 import one.nio.net.Session;
+import one.nio.os.BatchThread;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class CleanupThread extends Thread {
+public class CleanupThread extends BatchThread {
     private static final Log log = LogFactory.getLog(CleanupThread.class);
 
     private volatile SelectorThread[] selectors;
@@ -67,6 +68,8 @@ public class CleanupThread extends Thread {
 
     @Override
     public void run() {
+        adjustPriority();
+
         while (!isInterrupted()) {
             try {
                 long keepAlive = waitKeepAlive();
