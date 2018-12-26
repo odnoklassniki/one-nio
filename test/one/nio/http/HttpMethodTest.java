@@ -75,7 +75,7 @@ public class HttpMethodTest {
     @Test
     public void put() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_PUT),
+                "echoMethodOnPut",
                 client.put(ENDPOINT).getBodyUtf8());
     }
 
@@ -157,6 +157,12 @@ public class HttpMethodTest {
         @Path(ENDPOINT)
         public Response echoMethod(Request request) throws IOException {
             return Response.ok(Integer.toString(request.getMethod()));
+        }
+
+        @Path(ENDPOINT)
+        @RequestMethod(Request.METHOD_PUT)
+        public Response echoMethodOnPut(Request request) {
+            return Response.ok("echoMethodOnPut");
         }
     }
 }

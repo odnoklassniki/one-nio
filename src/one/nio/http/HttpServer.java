@@ -28,19 +28,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HttpServer extends Server {
-    private final Map<String, RequestHandler> defaultHandlers = new HashMap<>();
-    private final Map<String, Map<String, RequestHandler>> handlersByAlias = new HashMap<>();
-    private final Map<String, Map<String, RequestHandler>> handlersByHost = new HashMap<>();
+    private final PathMapper defaultMapper = new PathMapper();
+    private final Map<String, PathMapper> mappersByAlias = new HashMap<>();
+    private final Map<String, PathMapper> mappersByHost = new HashMap<>();
 
     public HttpServer(HttpServerConfig config, Object... routers) throws IOException {
         super(config);
 
         if (config.virtualHosts != null) {
             for (Map.Entry<String, String[]> virtualHost : config.virtualHosts.entrySet()) {
-                Map<String, RequestHandler> handlers = new HashMap<>();
-                handlersByAlias.put(virtualHost.getKey(), handlers);
+                PathMapper mapper = new PathMapper();
+                mappersByAlias.put(virtualHost.getKey(), mapper);
                 for (String host : virtualHost.getValue()) {
-                    handlersByHost.put(host.toLowerCase(), handlers);
+                    mappersByHost.put(host.toLowerCase(), mapper);
                 }
             }
         }
@@ -59,7 +59,7 @@ public class HttpServer extends Server {
     public void handleRequest(Request request, HttpSession session) throws IOException {
         RequestHandler handler = findHandlerByHost(request);
         if (handler == null) {
-            handler = defaultHandlers.get(request.getPath());
+            handler = defaultMapper.find(request.getPath(), request.getMethod());
         }
 
         if (handler != null) {
@@ -72,24 +72,6 @@ public class HttpServer extends Server {
     public void handleDefault(Request request, HttpSession session) throws IOException {
         Response response = new Response(Response.NOT_FOUND, Response.EMPTY);
         session.sendResponse(response);
-    }
-
-    private RequestHandler findHandlerByHost(Request request) {
-        if (handlersByHost.isEmpty()) {
-            return null;
-        }
-
-        String host = request.getHost();
-        if (host == null) {
-            return null;
-        }
-
-        Map<String, RequestHandler> handlers = handlersByHost.get(host.toLowerCase());
-        if (handlers == null) {
-            return null;
-        }
-
-        return handlers.get(request.getPath());
     }
 
     public void addRequestHandlers(Object router) {
@@ -111,6 +93,9 @@ public class HttpServer extends Server {
                     continue;
                 }
 
+                RequestMethod requestMethod = m.getAnnotation(RequestMethod.class);
+                int[] methods = requestMethod == null ? null : requestMethod.value();
+
                 RequestHandler requestHandler = generator.generateFor(m, router);
                 for (String path : annotation.value()) {
                     if (!path.startsWith("/")) {
@@ -118,17 +103,30 @@ public class HttpServer extends Server {
                     }
 
                     if (aliases == null || aliases.length == 0) {
-                        defaultHandlers.put(path, requestHandler);
+                        defaultMapper.add(path, methods, requestHandler);
                     } else {
                         for (String alias : aliases) {
-                            Map<String, RequestHandler> handlers = handlersByAlias.get(alias);
-                            if (handlers != null) {
-                                handlers.put(path, requestHandler);
+                            PathMapper mapper = mappersByAlias.get(alias);
+                            if (mapper != null) {
+                                mapper.add(path, methods, requestHandler);
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    protected RequestHandler findHandlerByHost(Request request) {
+        if (!mappersByHost.isEmpty()) {
+            String host = request.getHost();
+            if (host != null) {
+                PathMapper mapper = mappersByHost.get(host.toLowerCase());
+                if (mapper != null) {
+                    return mapper.find(request.getPath(), request.getMethod());
+                }
+            }
+        }
+        return null;
     }
 }
