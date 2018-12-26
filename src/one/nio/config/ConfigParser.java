@@ -135,7 +135,8 @@ public class ConfigParser {
                 int colon = line.indexOf(':', level);
                 if (colon < 0) throw new IllegalArgumentException("Field expected: " + line);
 
-                Field f = fields.get(line.substring(level, colon));
+                String key = line.substring(level, colon).trim();
+                Field f = fields.get(key);
                 if (f == null) {
                     throw new IllegalArgumentException("Unknown field: " + line);
                 }
@@ -150,7 +151,7 @@ public class ConfigParser {
                     value = parseValue(f.getGenericType(), level + 1);
                 }
                 f.set(obj, value);
-            } while (nextLine() == level);
+            } while (isSameLevel(nextLine(), level, minLevel));
         }
     }
 
@@ -233,7 +234,7 @@ public class ConfigParser {
             throw new IllegalArgumentException("Array is expected");
         } else {
             int level = nextLine();
-            if (level >= minLevel && line.charAt(level) == '-') {
+            if (level >= minLevel - 1 && line.charAt(level) == '-') { // arrays allowed at the same position as parent
                 do {
                     skipSpaces(level + 1);
                     Object value = parseValue(elementType, level + 1);
@@ -262,14 +263,23 @@ public class ConfigParser {
                 int colon = line.indexOf(':', level);
                 if (colon < 0) throw new IllegalArgumentException("Key expected: " + line);
 
-                String key = line.substring(level, colon);
+                String key = line.substring(level, colon).trim();
                 skipSpaces(colon + 1);
                 Object value = parseValue(valueType, level + 1);
                 map.put(key, value);
-            } while (nextLine() == level);
+            } while (isSameLevel(nextLine(), level, minLevel));
         }
 
         return map;
+    }
+
+    private boolean isSameLevel(int newLevel, int prevLevel, int minLevel) {
+        if (newLevel == prevLevel) {
+            return true;
+        } else if (newLevel < minLevel) {
+            return false;
+        }
+        throw new IllegalArgumentException("Level differs: " + newLevel + " != " + prevLevel + " at " + line);
     }
 
     private boolean isScalar(Class<?> type) {
