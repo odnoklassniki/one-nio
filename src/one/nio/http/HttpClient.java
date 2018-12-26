@@ -17,6 +17,7 @@
 package one.nio.http;
 
 import one.nio.net.ConnectionString;
+import one.nio.net.HttpProxy;
 import one.nio.net.Socket;
 import one.nio.net.SslContext;
 import one.nio.pool.PoolException;
@@ -24,7 +25,7 @@ import one.nio.pool.SocketPool;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
-import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 
 public class HttpClient extends SocketPool {
@@ -52,6 +53,18 @@ public class HttpClient extends SocketPool {
         if (port == 0) {
             port = https ? 443 : 80;
         }
+
+        String proxyAddr = conn.getStringParam("proxy");
+        if (proxyAddr != null) {
+            int p = proxyAddr.lastIndexOf(':');
+            if (p >= 0) {
+                String proxyHost = proxyAddr.substring(0, p);
+                int proxyPort = Integer.parseInt(proxyAddr.substring(p + 1));
+                setProxy(new HttpProxy(proxyHost, proxyPort));
+            } else {
+                setProxy(new HttpProxy(proxyAddr, 3128));
+            }
+        }
     }
 
     public Response invoke(Request request) throws InterruptedException, PoolException, IOException, HttpException {
@@ -65,7 +78,9 @@ public class HttpClient extends SocketPool {
             try {
                 socket.writeFully(rawRequest, 0, rawRequest.length);
                 responseReader = new ResponseReader(socket, BUFFER_SIZE);
-            } catch (SocketException e) {
+            } catch (SocketTimeoutException e) {
+                throw e;
+            } catch (IOException e) {
                 // Stale connection? Retry on a fresh socket
                 destroyObject(socket);
                 socket = createObject();
