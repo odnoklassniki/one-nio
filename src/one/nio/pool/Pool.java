@@ -21,6 +21,8 @@ import java.util.LinkedList;
 
 public abstract class Pool<T> extends LinkedList<T> implements Closeable {
     protected boolean closed;
+    protected boolean keepEmpty;
+    protected boolean fifo;
     protected int initialCount;
     protected int createdCount;
     protected int maxCount;
@@ -36,8 +38,7 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
 
     public synchronized void close() {
         invalidateAll();
-        closed = true;
-        createdCount = 0;
+        closed = keepEmpty = true;
     }
 
     public String name() {
@@ -88,23 +89,23 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
             }
         }
 
-        T object = null;
         try {
-            return object = createObject();
-        } finally {
-            if (object == null) decreaseCount();
+            return createObject();
+        } catch (Throwable e) {
+            decreaseCount();
+            throw e;
         }
     }
 
     public final void returnObject(T object) {
         synchronized (this) {
-            if (!closed) {
+            if (!keepEmpty) {
                 if (waitingThreads > 0) notify();
-                addFirst(object);
+                if (fifo) addLast(object); else addFirst(object);
                 return;
             }
         }
-        destroyObject(object);
+        invalidateObject(object);
     }
 
     public final void invalidateObject(T object) {
@@ -138,9 +139,7 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
     }
 
     private synchronized void decreaseCount() {
-        if (!closed) {
-            createdCount--;
-            if (waitingThreads > 0) notify();
-        }
+        createdCount--;
+        if (waitingThreads > 0) notify();
     }
 }

@@ -18,6 +18,7 @@ package one.nio.pool;
 
 import one.nio.mgt.Management;
 import one.nio.net.ConnectionString;
+import one.nio.net.Proxy;
 import one.nio.net.Socket;
 import one.nio.net.SslContext;
 
@@ -28,6 +29,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected int connectTimeout;
     protected int tos;
     protected SslContext sslContext;
+    protected Proxy proxy;
 
     public SocketPool(ConnectionString conn) {
         super(conn.getIntParam("clientMinPoolSize", 0),
@@ -39,6 +41,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
         this.readTimeout = conn.getIntParam("readTimeout", timeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", 1000);
         this.tos = conn.getIntParam("tos", 0);
+        this.fifo = conn.getBooleanParam("fifo", false);
 
         setProperties(conn);
         initialize();
@@ -120,6 +123,24 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     }
 
     @Override
+    public boolean getFifo() {
+        return fifo;
+    }
+
+    @Override
+    public void setFifo(boolean fifo) {
+        this.fifo = fifo;
+    }
+
+    public Proxy getProxy() {
+        return proxy;
+    }
+
+    public void setProxy(Proxy proxy) {
+        this.proxy = proxy;
+    }
+
+    @Override
     public Socket createObject() throws PoolException {
         Socket socket = null;
         try {
@@ -132,7 +153,11 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
             }
 
             socket.setTimeout(connectTimeout);
-            socket.connect(host, port);
+            if (proxy == null) {
+                socket.connect(host, port);
+            } else {
+                proxy.connect(socket, host, port);
+            }
             socket.setTimeout(readTimeout);
 
             if (sslContext != null) {
@@ -142,7 +167,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
             return socket;
         } catch (Exception e) {
             if (socket != null) socket.close();
-            throw new PoolException(name() + " createObject failed", e);
+            throw new PoolException(name() + " createObject failed: " + e, e);
         }
     }
 

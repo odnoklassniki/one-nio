@@ -30,5 +30,7 @@ public interface SocketPoolMXBean {
     void setReadTimeout(int readTimeout);
     int getConnectTimeout();
     void setConnectTimeout(int connectTimeout);
+    boolean getFifo();
+    void setFifo(boolean fifo);
     void invalidateAll();
 }
