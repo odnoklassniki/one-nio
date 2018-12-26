@@ -16,6 +16,8 @@
 
 package one.nio.serial;
 
+import java.util.Arrays;
+
 class SerializationContext {
     private static final int INITIAL_CAPACITY = 64;
 
@@ -67,6 +69,20 @@ class SerializationContext {
         }
 
         return -1;
+    }
+
+    public void clear() {
+        this.first = null;
+        this.size = 1;
+
+        if (keys != null) {
+            if (keys.length > INITIAL_CAPACITY) {
+                this.keys = null;
+                this.values = null;
+            } else {
+                Arrays.fill(keys, null);
+            }
+        }
     }
 
     private Object[] init() {
