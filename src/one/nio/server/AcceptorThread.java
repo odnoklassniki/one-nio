@@ -105,8 +105,7 @@ final class AcceptorThread extends Thread {
         while (serverSocket.isOpen()) {
             Socket socket = null;
             try {
-                socket = serverSocket.accept();
-                socket.setBlocking(false);
+                socket = serverSocket.acceptNonBlocking();
                 Session session = server.createSession(socket);
                 server.register(session);
                 acceptedSessions++;

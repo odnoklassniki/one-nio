@@ -18,6 +18,7 @@
 #include <sys/resource.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -46,6 +47,7 @@ static int use_IPv6;
 #ifndef TCP_FASTOPEN
 #define TCP_FASTOPEN 23
 #endif
+
 
 static int check_IPv6(JNIEnv* env) {
     int s = socket(PF_INET6, SOCK_STREAM, 0);
@@ -84,7 +86,7 @@ static int sockaddr_from_java(JNIEnv* env, jbyteArray address, jint port, struct
     }
 }
 
-static int isUDPSocket(int fd) {
+static int is_udp_socket(int fd) {
     int type = 0;
     int length = sizeof(type);
     return getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length) == 0 && type == SOCK_DGRAM;
@@ -96,6 +98,18 @@ static void sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_sto
     tmpBuf[0] = (jbyte)len;
     memcpy(tmpBuf + 1, sa, len);
     (*env)->SetByteArrayRegion(env, buffer, 0, len + 1, tmpBuf);
+}
+
+static int accept_with_flags(int fd, jboolean nonblock) {
+#if defined(__NR_accept4) && defined(SOCK_NONBLOCK)
+    return syscall(__NR_accept4, fd, NULL, NULL, nonblock ? SOCK_NONBLOCK : 0);
+#else
+    int result = accept(fd, NULL, NULL);
+    if (result != -1 && nonblock) {
+        fcntl(result, F_SETFL, O_NONBLOCK);
+    }
+    return result;
+#endif
 }
 
 static void wakeup_handler(int sig) {
@@ -168,14 +182,14 @@ Java_one_nio_net_NativeSocket_socket1(JNIEnv* env, jclass cls) {
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_accept0(JNIEnv* env, jobject self) {
+Java_one_nio_net_NativeSocket_accept0(JNIEnv* env, jobject self, jboolean nonblock) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
         return -1;
     } else {
         pthread_t* fd_lock = start_blocking_call(fd);
-        int result = accept(fd, NULL, NULL);
+        int result = accept_with_flags(fd, nonblock);
         end_blocking_call(fd_lock);
 
         if (result == -1) {
@@ -460,7 +474,7 @@ Java_one_nio_net_NativeSocket_recvFrom(JNIEnv* env, jobject self, jlong buffer, 
 
         int result = recvfrom(fd, (void*)buffer, count, flags, (struct sockaddr*)&sa, &len);
 
-        if (result > 0 || result == 0 && isUDPSocket(fd)) {
+        if (result > 0 || result == 0 && is_udp_socket(fd)) {
             sockaddr_to_java(env, address, &sa, 0);
             return result;
         } else if (result == 0) {

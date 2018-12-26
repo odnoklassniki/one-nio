@@ -41,7 +41,12 @@ class NativeSslSocket extends NativeSocket {
 
     @Override
     public NativeSocket accept() throws IOException {
-        return new NativeSslSocket(accept0(), context, true);
+        return new NativeSslSocket(accept0(false), context, true);
+    }
+
+    @Override
+    public Socket acceptNonBlocking() throws IOException {
+        return new NativeSslSocket(accept0(true), context, true);
     }
 
     @Override

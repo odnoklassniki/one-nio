@@ -28,6 +28,8 @@ public abstract class Selector implements Iterable<Session>, Closeable {
     public abstract void close();
     public abstract void register(Session session);
     public abstract void unregister(Session session);
+    public abstract void enable(Session session);
+    public abstract void disable(Session session);
     public abstract void listen(Session session, int events);
     public abstract Iterator<Session> iterator();
     public abstract Iterator<Session> select();

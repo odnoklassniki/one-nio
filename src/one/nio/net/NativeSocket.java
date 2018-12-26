@@ -47,7 +47,12 @@ class NativeSocket extends Socket {
     
     @Override
     public NativeSocket accept() throws IOException {
-        return new NativeSocket(accept0());
+        return new NativeSocket(accept0(false));
+    }
+
+    @Override
+    public Socket acceptNonBlocking() throws IOException {
+        return new NativeSocket(accept0(true));
     }
 
     @Override
@@ -168,6 +173,30 @@ class NativeSocket extends Socket {
     }
 
     @Override
+    public int read(ByteBuffer dst) throws IOException {
+        int bytes;
+        if (dst.hasArray()) {
+            bytes = read(dst.array(), dst.arrayOffset() + dst.position(), dst.remaining(), 0);
+        } else {
+            bytes = readRaw(DirectMemory.getAddress(dst) + dst.position(), dst.remaining(), 0);
+        }
+        dst.position(dst.position() + bytes);
+        return bytes;
+    }
+
+    @Override
+    public int write(ByteBuffer src) throws IOException {
+        int bytes;
+        if (src.hasArray()) {
+            bytes = write(src.array(), src.arrayOffset() + src.position(), src.remaining(), 0);
+        } else {
+            bytes = writeRaw(DirectMemory.getAddress(src) + src.position(), src.remaining(), 0);
+        }
+        src.position(src.position() + bytes);
+        return bytes;
+    }
+
+    @Override
     public final native void setBlocking(boolean blocking);
 
     @Override
@@ -213,7 +242,7 @@ class NativeSocket extends Socket {
     native void connect1(String path) throws IOException;
     native void bind1(String path) throws IOException;
 
-    native int accept0() throws IOException;
+    native int accept0(boolean nonblock) throws IOException;
     native long sendFile0(int sourceFD, long offset, long count) throws IOException;
     native void getsockname(byte[] buffer);
     native void getpeername(byte[] buffer);

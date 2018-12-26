@@ -21,8 +21,8 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 import java.nio.channels.CancelledKeyException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.util.Collections;
 import java.util.Iterator;
@@ -63,17 +63,27 @@ final class JavaSelector extends Selector {
     @Override
     public final void register(Session session) {
         session.selector = this;
+        enable(session);
+    }
+
+    @Override
+    public final void unregister(Session session) {
+        session.selector = null;
+        disable(session);
+    }
+
+    @Override
+    public final void enable(Session session) {
         pendingSessions.add(session);
         impl.wakeup();
     }
 
     @Override
-    public final void unregister(Session session) {
+    public final void disable(Session session) {
         SelectionKey key = ((SelectableJavaSocket) session.socket).getSelectableChannel().keyFor(impl);
         if (key != null) {
             key.cancel();
         }
-        session.selector = null;
     }
 
     @Override
@@ -112,12 +122,17 @@ final class JavaSelector extends Selector {
         return lastWakeupTime;
     }
 
-    private void registerPendingSessions() throws ClosedChannelException {
+    private void registerPendingSessions() throws IOException {
         for (Session session; (session = pendingSessions.poll()) != null; ) {
+            SelectableChannel ch = ((SelectableJavaSocket) session.socket).getSelectableChannel();
             try {
-                ((SelectableJavaSocket) session.socket).getSelectableChannel().register(impl, session.eventsToListen, session);
-            } catch (CancelledKeyException key) {
-                log.warn("Cannot register session: " + session.toString(), key);
+                ch.register(impl, session.eventsToListen, session);
+            } catch (CancelledKeyException e) {
+                // Deregister happens on select(), so a cancelled key may still remain in the cache.
+                // Run select() to force deregister and then retry registration.
+                // See https://github.com/netty/netty/issues/943
+                impl.selectNow();
+                ch.register(impl, session.eventsToListen, session);
             }
         }
     }

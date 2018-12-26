@@ -249,6 +249,10 @@ public class Session implements Closeable {
             return this;
         }
 
+        public QueueItem next() {
+            return next;
+        }
+
         public int remaining() {
             return 0;
         }

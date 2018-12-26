@@ -15,6 +15,7 @@
  */
 
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <time.h>
 #include <jni.h>
@@ -54,7 +55,13 @@ Java_one_nio_net_NativeSelector_epollCtl(JNIEnv* env, jclass cls, jint epfd, jin
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSelector_epollClose(JNIEnv* env, jclass cls, jint epfd) {
-    // Wake up any pending epoll_wait by registring ready-to-write event on stdout
-    Java_one_nio_net_NativeSelector_epollCtl(env, cls, epfd, EPOLL_CTL_ADD, 1, -1, EPOLLOUT);
+    static int wakeup_socket = -1;
+
+     if (wakeup_socket == -1) {
+         wakeup_socket = socket(PF_INET, SOCK_DGRAM, 0);
+     }
+
+    // Wake up any pending epoll_wait by registring ready-to-write UDP socket
+    Java_one_nio_net_NativeSelector_epollCtl(env, cls, epfd, EPOLL_CTL_ADD, wakeup_socket, -1, EPOLLOUT);
     close(epfd);
 }

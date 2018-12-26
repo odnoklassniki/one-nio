@@ -86,7 +86,7 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
+    public final int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
         return ch.send(data, new InetSocketAddress(address, port));
     }
 
@@ -101,7 +101,7 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
+    public final InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
         return (InetSocketAddress) ch.receive(buffer);
     }
 
@@ -113,6 +113,16 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     @Override
     public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public final int read(ByteBuffer dst) throws IOException {
+        return ch.read(dst);
+    }
+
+    @Override
+    public final int write(ByteBuffer src) throws IOException {
+        return ch.write(src);
     }
 
     @Override

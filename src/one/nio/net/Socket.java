@@ -18,15 +18,15 @@ package one.nio.net;
 
 import one.nio.os.NativeLibrary;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 
-public abstract class Socket implements Closeable {
+public abstract class Socket implements ByteChannel {
     // Levels for getOption()
     public static final int SOL_SOCKET    = 1;
     public static final int SOL_IP        = 0;
@@ -52,6 +52,13 @@ public abstract class Socket implements Closeable {
     public static final int MSG_DONTWAIT  = 0x40;
     public static final int MSG_WAITALL   = 0x100;
     public static final int MSG_MORE      = 0x8000;
+
+    // Options for setTos
+
+    public static final int IPTOS_MINCOST     = 0x02;
+    public static final int IPTOS_RELIABILITY = 0x04;
+    public static final int IPTOS_THROUGHPUT  = 0x08;
+    public static final int IPTOS_LOWDELAY    = 0x10;
 
     public abstract boolean isOpen();
     public abstract void close();
@@ -86,12 +93,26 @@ public abstract class Socket implements Closeable {
     public abstract Socket sslUnwrap();
     public abstract SslContext getSslContext();
 
+    public Socket acceptNonBlocking() throws IOException {
+        Socket s = accept();
+        s.setBlocking(false);
+        return s;
+    }
+
     public void connect(String host, int port) throws IOException {
         connect(InetAddress.getByName(host), port);
     }
 
     public void bind(String host, int port, int backlog) throws IOException {
         bind(InetAddress.getByName(host), port, backlog);
+    }
+
+    public int write(byte[] data, int offset, int count) throws IOException {
+        return write(data, offset, count, 0);
+    }
+
+    public int read(byte[] data, int offset, int count) throws IOException {
+        return read(data, offset, count, 0);
     }
 
     public static Socket create() throws IOException {
