@@ -3,4 +3,5 @@ dist: trusty
 jdk:
   - oraclejdk8
   - openjdk8
+  - openjdk11
 install: mvn install -DskipTests=true -Dgpg.skip=true -B -V
