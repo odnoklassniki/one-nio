@@ -219,6 +219,8 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitLdcInsn(unsafe.objectFieldOffset(parentField));
                 mv.visitTypeInsn(NEW, Type.getInternalName(parentField.getType()));
+                mv.visitInsn(DUP);
+                mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V");
                 mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", "putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V");
             }
 
@@ -508,6 +510,8 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitVarInsn(ALOAD, 2);
             mv.visitLdcInsn(unsafe.objectFieldOffset(parentField));
             mv.visitTypeInsn(NEW, Type.getInternalName(parentField.getType()));
+            mv.visitInsn(DUP);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V");
             mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", "putObject", "(Ljava/lang/Object;JLjava/lang/Object;)V");
         }
 
