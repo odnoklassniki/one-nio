@@ -97,4 +97,12 @@ public final class Mem {
             throw new IllegalStateException("Should not happen");
         }
     }
+
+    public static void setFD(FileDescriptor fd, int val) {
+        try {
+            fdField.setInt(fd, val);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("Should not happen");
+        }
+    }
 }

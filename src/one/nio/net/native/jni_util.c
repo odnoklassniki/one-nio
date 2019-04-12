@@ -47,6 +47,10 @@ void throw_socket_closed(JNIEnv* env) {
     throw_by_name(env, "one/nio/net/SocketClosedException", "Socket closed");
 }
 
+void throw_channel_closed(JNIEnv* env) {
+    throw_by_name(env, "java/nio/channels/ClosedChannelException", NULL);
+}
+
 void throw_io_exception(JNIEnv* env) {
     int error_code = errno;
     switch (error_code) {
