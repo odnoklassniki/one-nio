@@ -26,6 +26,7 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
+import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class StubGenerator extends BytecodeGenerator {
@@ -47,6 +48,7 @@ public class StubGenerator extends BytecodeGenerator {
         mv.visitEnd();
 
         if (fds != null) {
+            HashSet<String> generatedFields = new HashSet<>();
             for (FieldDescriptor fd : fds) {
                 String name = fd.name();
                 String oldName = null;
@@ -57,7 +59,13 @@ public class StubGenerator extends BytecodeGenerator {
                     name = name.substring(0, p);
                 }
 
-                FieldVisitor fv = cv.visitField(ACC_PRIVATE, name, Type.getDescriptor(fd.type().resolve()), null, null);
+                String type = Type.getDescriptor(fd.type().resolve());
+                if (!generatedFields.add(name + ':' + type)) {
+                    Repository.log.warn("Skipping duplicate field: " + className + '.' + name);
+                    continue;
+                }
+
+                FieldVisitor fv = cv.visitField(ACC_PRIVATE, name, type, null, null);
                 if (oldName != null) {
                     AnnotationVisitor av = fv.visitAnnotation("Lone/nio/serial/Renamed;", true);
                     av.visit("from", oldName);
