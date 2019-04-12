@@ -43,7 +43,7 @@ public class ConnectionStringTest {
 
         conn = new ConnectionString("http://example.com/?param=/case1&question=?&int=345");
         assertEquals("example.com", conn.getHost());
-        assertEquals(0, conn.getPort());
+        assertEquals(80, conn.getPort());
         assertEquals("/?param=/case1&question=?&int=345", conn.getPath());
         assertEquals("/case1", conn.getStringParam("param"));
         assertEquals("?", conn.getStringParam("question"));

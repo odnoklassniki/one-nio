@@ -34,6 +34,13 @@ import java.util.regex.Pattern;
 
 public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
+    private static final Map<String, Integer> WELL_KNOWN_PORTS = new HashMap<>();
+
+    static {
+        WELL_KNOWN_PORTS.put("ssh", 22);
+        WELL_KNOWN_PORTS.put("http", 80);
+        WELL_KNOWN_PORTS.put("https", 443);
+    }
 
     protected String protocol;
     protected String host;
@@ -76,7 +83,7 @@ public class ConnectionString {
             this.port = Integer.parseInt(connectionString.substring(p + 1, addrEnd));
         } else {
             this.host = connectionString.substring(addrStart, addrEnd);
-            this.port = 0;
+            this.port = WELL_KNOWN_PORTS.getOrDefault(this.protocol, 0);
         }
         this.path = connectionString.substring(addrEnd);
     }
