@@ -16,50 +16,39 @@
 
 package one.nio.mgt;
 
-import java.io.File;
-import java.io.IOException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import javax.management.JMException;
+import javax.management.ObjectName;
 import java.io.OutputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
+import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ThreadDumper {
+    private static final Log log = LogFactory.getLog(ThreadDumper.class);
     private static final AtomicLong dumpTime = new AtomicLong();
-    private static Method dumpMethod;
 
-    // tools.jar must be in class path when loading ThreadDumper implementation
-    private static Method getDumpMethod() throws IOException, ClassNotFoundException, NoSuchMethodException {
-        File javaHome = new File(System.getProperty("java.home"));
-        String toolsPath = javaHome.getName().equalsIgnoreCase("jre") ? "../lib/tools.jar" : "lib/tools.jar";
-
-        URL[] urls = new URL[] {
-                ThreadDumper.class.getProtectionDomain().getCodeSource().getLocation(),
-                new File(javaHome, toolsPath).getCanonicalFile().toURI().toURL(),
-        };
-
-        URLClassLoader loader = new URLClassLoader(urls, null);
-        return loader.loadClass("one.nio.mgt.ThreadDumperImpl").getMethod("dump", OutputStream.class);
-    }
-
-    public static synchronized void dump(OutputStream out) throws IOException {
+    public static void dump(OutputStream out) {
+        Object threadDump;
         try {
-            if (dumpMethod == null) {
-                dumpMethod = getDumpMethod();
-            }
-            dumpMethod.invoke(null, out);
-        } catch (IOException e) {
-            throw e;
-        } catch (InvocationTargetException e) {
-            Throwable target = e.getTargetException();
-            throw target instanceof IOException ? (IOException) target : new IOException(target);
-        } catch (Exception e) {
-            throw new IOException(e);
+            threadDump = ManagementFactory.getPlatformMBeanServer().invoke(
+                    new ObjectName("com.sun.management:type=DiagnosticCommand"),
+                    "threadPrint",
+                    new Object[]{null},
+                    new String[]{"[Ljava.lang.String;"}
+            );
+        } catch (JMException e) {
+            log.warn("Failed to get threads dump: " + e);
+            return;
         }
+
+        PrintStream printStream = out == null ? System.out : new PrintStream(out);
+        printStream.println(threadDump);
     }
 
-    public static void dump(OutputStream out, long minDumpInterval) throws IOException {
+    public static void dump(OutputStream out, long minDumpInterval) {
         long currentTime = System.currentTimeMillis();
         long lastDumpTime = dumpTime.get();
         if (currentTime - lastDumpTime >= minDumpInterval && dumpTime.compareAndSet(lastDumpTime, currentTime)) {

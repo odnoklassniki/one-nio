@@ -14,10 +14,9 @@
         <available file="${lib.dir}" type="dir" property="lib.dir.exists"/>
         <path id="classpath.ref">
             <fileset dir="${lib.dir}" includes="*.jar"/>
-            <fileset file="${java.home}/../lib/tools.jar"/>
         </path>
     </target>
-    
+
     <target name="retrieve-libs" unless="lib.dir.exists">
         <echo message="Downloading external libraries..."/>
         <mkdir dir="${lib.dir}"/>
