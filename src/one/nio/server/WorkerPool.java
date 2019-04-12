@@ -39,7 +39,7 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
     }
 
     void setQueueTime(long queueTime) {
-        ((WaitingSynchronousQueue) getQueue()).setQueueTime(queueTime);
+        ((WaitingSynchronousQueue) getQueue()).setQueueTime(queueTime); // lgtm [java/abstract-to-concrete-cast]
     }
 
     void gracefulShutdown(long timeout) {
