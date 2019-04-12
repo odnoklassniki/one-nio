@@ -109,7 +109,8 @@ public class ConfigParser {
                 return ref != null ? ref : parseCollection(rawType, ptype.getActualTypeArguments()[0], level);
             } else if (Map.class.isAssignableFrom(rawType) && ptype.getActualTypeArguments().length >= 2) {
                 Object ref = parseReference();
-                return ref != null ? ref : parseMap(rawType, ptype.getActualTypeArguments()[1], level);
+                Type[] mapArgs = ptype.getActualTypeArguments();
+                return ref != null ? ref : parseMap(rawType, mapArgs[0], mapArgs[1], level);
             }
         } else if (type instanceof GenericArrayType) {
             Object ref = parseReference();
@@ -247,15 +248,19 @@ public class ConfigParser {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> parseMap(Class<?> rawType, Type valueType, int minLevel) throws ReflectiveOperationException {
+    private Map<Object, Object> parseMap(Class<?> rawType, Type keyType, Type valueType, int minLevel) throws ReflectiveOperationException {
         if (rawType == Map.class) {
-            return parseMap(new HashMap<String, Object>(), valueType, minLevel);
+            return parseMap(new HashMap<>(), keyType, valueType, minLevel);
         }
-        return parseMap((Map<String, Object>) rawType.getDeclaredConstructor().newInstance(), valueType, minLevel);
+        return parseMap((Map<Object, Object>) rawType.getDeclaredConstructor().newInstance(), keyType, valueType, minLevel);
     }
 
-    private <T extends Map<String, Object>> T parseMap(T map, Type valueType, int minLevel) throws ReflectiveOperationException {
+    private <T extends Map<Object, Object>> T parseMap(T map, Type keyType, Type valueType, int minLevel) throws ReflectiveOperationException {
         registerReference(map);
+
+        Class<?> keyClass = keyType instanceof Class && isScalar((Class) keyType)
+                ? (Class) keyType
+                : String.class;
 
         int level = nextLine();
         if (level >= minLevel) {
@@ -263,7 +268,7 @@ public class ConfigParser {
                 int colon = line.indexOf(':', level);
                 if (colon < 0) throw new IllegalArgumentException("Key expected: " + line);
 
-                String key = line.substring(level, colon).trim();
+                Object key = parseScalar(keyClass, line.substring(level, colon).trim());
                 skipSpaces(colon + 1);
                 Object value = parseValue(valueType, level + 1);
                 map.put(key, value);
@@ -292,9 +297,11 @@ public class ConfigParser {
                 || type == Long.class
                 || type == Float.class
                 || type == Double.class
-                || type == Character.class;
+                || type == Character.class
+                || type.isEnum();
     }
 
+    @SuppressWarnings("unchecked")
     private Object parseScalar(Class<?> type, String value) {
         if (type == String.class) {
             return value;
@@ -314,6 +321,8 @@ public class ConfigParser {
             return Double.parseDouble(value);
         } else if (type == char.class || type == Character.class) {
             return value.charAt(0);
+        } else if (type.isEnum()) {
+            return Enum.valueOf((Class<Enum>) type, value);
         }
         return null;
     }
