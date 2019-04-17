@@ -1,3 +1,4 @@
 queries:
+  - exclude: java/integer-multiplication-cast-to-long
   - exclude: java/non-sync-override
   - exclude: java/unsynchronized-getter
