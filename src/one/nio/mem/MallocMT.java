@@ -110,7 +110,7 @@ public class MallocMT extends Malloc {
     }
 
     @Override
-    public void free(long address) { // lgtm [java/non-sync-override]
+    public void free(long address) {
         segmentByAddress(address).free(address);
     }
 
@@ -123,7 +123,7 @@ public class MallocMT extends Malloc {
     }
 
     @Override
-    public void verify() { // lgtm [java/non-sync-override]
+    public void verify() {
         for (Malloc segment : segments) {
             segment.verify();
         }

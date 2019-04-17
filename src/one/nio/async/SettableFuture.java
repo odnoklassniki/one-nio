@@ -42,7 +42,7 @@ public class SettableFuture<V> implements RunnableFuture<V> {
     }
 
     @Override
-    public V get() throws InterruptedException, ExecutionException { // lgtm [java/unsynchronized-getter]
+    public V get() throws InterruptedException, ExecutionException {
         if (!done) {
             waitForCompletion();
         }
@@ -53,7 +53,7 @@ public class SettableFuture<V> implements RunnableFuture<V> {
     }
 
     @Override
-    public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException { // lgtm [java/unsynchronized-getter]
+    public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         if (!done) {
             waitForCompletion(unit.toMillis(timeout));
         }
