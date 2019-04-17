@@ -1,7 +1,3 @@
-extraction:
-  java:
-    index:
-      java_version: 8
 queries:
   - exclude: java/non-sync-override
   - exclude: java/unsynchronized-getter
