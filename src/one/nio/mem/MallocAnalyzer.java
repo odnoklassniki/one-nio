@@ -66,7 +66,7 @@ public class MallocAnalyzer extends MallocMT {
 
             BinStats alt = altStats[i] = new BinStats();
             for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
-                long chunk = segment(i).base + ((long) bin) * BIN_SIZE;
+                long chunk = segment(i).base + bin * BIN_SIZE;
                 while ((chunk = unsafe.getLong(chunk + NEXT_OFFSET)) != 0) {
                     int size = unsafe.getInt(chunk + SIZE_OFFSET) & FREE_MASK;
                     alt.addChunk(bin, size);

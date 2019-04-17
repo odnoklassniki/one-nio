@@ -183,7 +183,7 @@ public class ByteArrayBuilder {
         }
         
         int i = count;
-        for (long limit = 10; n >= limit && limit > 0; limit *= 10) { // lgtm [java/constant-comparison]
+        for (long limit = 10; n >= limit && limit > 0; limit *= 10) {
             i++;
         }
         count = i + 1;

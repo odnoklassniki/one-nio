@@ -333,7 +333,7 @@ public class Malloc implements Allocator, MallocMXBean {
 
     // Relocate absolute pointers when the heap is loaded from a snapshot
     private void relocate(long delta) {
-        for (long bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
+        for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
             long prev = base + bin * BIN_SIZE;
             for (long chunk; (chunk = unsafe.getLong(prev + NEXT_OFFSET)) != 0; prev = chunk) {
                 chunk += delta;
@@ -349,7 +349,7 @@ public class Malloc implements Allocator, MallocMXBean {
         // Unlink
         long[] firstChunk = new long[BIN_COUNT];
         for (int bin = getBin(MIN_CHUNK); bin < BIN_COUNT; bin++) {
-            long binAddress = base + ((long) bin) * BIN_SIZE + NEXT_OFFSET;
+            long binAddress = base + bin * BIN_SIZE + NEXT_OFFSET;
             firstChunk[bin] = unsafe.getLong(binAddress);
             unsafe.putLong(binAddress, 0);
         }
@@ -373,7 +373,7 @@ public class Malloc implements Allocator, MallocMXBean {
 
     // Find a suitable chunk starting from the given bin
     private long getChunk(int bin, int size) {
-        long binAddress = base + ((long) bin) * BIN_SIZE;
+        long binAddress = base + bin * BIN_SIZE;
         long chunk = unsafe.getLong(binAddress + NEXT_OFFSET);
         if (chunk == 0) {
             return 0;
@@ -410,7 +410,7 @@ public class Malloc implements Allocator, MallocMXBean {
         unsafe.putInt(address + SIZE_OFFSET, size);
         unsafe.putInt(address + size + LEFT_OFFSET, size);
 
-        long binAddress = base + ((long) chooseBin(size)) * BIN_SIZE;
+        long binAddress = base + chooseBin(size) * BIN_SIZE;
         long head = unsafe.getLong(binAddress + NEXT_OFFSET);
         unsafe.putLong(address + NEXT_OFFSET, head);
         unsafe.putLong(address + PREV_OFFSET, binAddress);

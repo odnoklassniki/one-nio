@@ -135,7 +135,7 @@ final class NativeSelector extends Selector {
 
         return new Iterator<Session>() {
             private long nextAddr = epollStruct;
-            private long lastAddr = nextAddr + ((long) count) * EPOLL_STRUCT_SIZE;
+            private long lastAddr = nextAddr + count * EPOLL_STRUCT_SIZE;
             private Session next = findNext();
 
             private Session findNext() {
