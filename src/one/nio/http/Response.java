@@ -73,10 +73,10 @@ public class Response {
 
     protected int headerCount;
     protected String[] headers;
-    protected final byte[] body;
-    protected final int bodyArrayOffset;
-    protected final long bodyNativeAddr;
-    protected final int bodyLength;
+    protected byte[] body;
+    protected int bodyArrayOffset;
+    protected long bodyNativeAddr;
+    protected int bodyLength;
     protected final ResponseListener listener;
 
 
@@ -231,11 +231,40 @@ public class Response {
     }
 
     public void setBody(byte[] body) {
-        throw new IllegalStateException("Content is immutable.");
+        setBody(body, 0, body.length);
+    }
+
+    public void setBody(byte[] body, int offset, int length) {
+        this.body = body;
+        this.bodyArrayOffset = offset;
+        this.bodyNativeAddr = 0;
+        this.bodyLength = length;
+    }
+
+    public void setBody(ByteBuffer body) {
+        if (body.hasArray()) {
+            setBody(body.array(), body.position(), body.remaining());
+        } else {
+            setBody(DirectMemory.getAddress(body) + body.position(), body.remaining());
+        }
+    }
+
+    public void setBody(long nativeAddress, int length) {
+        this.body = null;
+        this.bodyArrayOffset = 0;
+        this.bodyNativeAddr = nativeAddress;
+        this.bodyLength = length;
     }
 
     public String getBodyUtf8() {
-        return body == null ? null : new String(body, StandardCharsets.UTF_8);
+        if (body != null) {
+            return new String(body, bodyArrayOffset, bodyLength, StandardCharsets.UTF_8);
+        }
+        if (bodyNativeAddr > 0) {
+            return Utf8.read(null, bodyNativeAddr, bodyLength);
+        }
+
+        return null;
     }
 
     public ResponseListener getListener() {

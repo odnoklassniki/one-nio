@@ -21,8 +21,17 @@ import one.nio.os.BatchThread;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.util.concurrent.TimeoutException;
+
 public class CleanupThread extends BatchThread {
     private static final Log log = LogFactory.getLog(CleanupThread.class);
+
+    public static final TimeoutException TIMEOUT_EXCEPTION = new TimeoutException(){
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
+        }
+    };
 
     private volatile SelectorThread[] selectors;
     private volatile long keepAlive;
@@ -90,7 +99,7 @@ public class CleanupThread extends BatchThread {
                             } else {
                                 staleCount++;
                             }
-                            session.close();
+                            session.close(TIMEOUT_EXCEPTION);
                         }
                     }
                 }

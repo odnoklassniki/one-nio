@@ -203,10 +203,10 @@ public class RpcSession<S, M> extends Session {
             streamProxy.bytesRead = stream.getBytesRead();
             streamProxy.bytesWritten = stream.getBytesWritten();
         } catch (ClassNotFoundException e) {
-            close();
+            close(e);
             throw new IOException(e);
         } catch (Throwable e) {
-            close();
+            close(e);
             throw e;
         }
 

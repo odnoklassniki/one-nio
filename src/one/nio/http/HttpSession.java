@@ -263,25 +263,9 @@ public class HttpSession extends Session {
 
     protected void writeResponse(Response response, boolean includeBody) throws IOException {
         byte[] bytes = response.toBytes(includeBody);
-
-        if (response.getBodyNativeAddr() > 0) {
-            super.write(new ArrayAndNativeQueueItem(bytes, 0, bytes.length, response.getBodyNativeAddr(), response.getBodyLength(), 0) {
-                @Override
-                public void release(Exception problem) {
-                    if (response.getListener() != null) {
-                        response.getListener().onDone(written, totalCount, problem);
-                    }
-                }
-            });
-        } else {
-            super.write(new ArrayQueueItem(bytes, 0, bytes.length, 0) {
-                @Override
-                public void release(Exception problem) {
-                    if (response.getListener() != null) {
-                        response.getListener().onDone(written, count, problem);
-                    }
-                }
-            });
-        }
+        super.write(new ArrayAndNativeQueueItem(
+                bytes, bytes.length,
+                response.bodyNativeAddr, response.bodyNativeAddr > 0 ? response.bodyLength : 0,
+                response.listener));
     }
 }

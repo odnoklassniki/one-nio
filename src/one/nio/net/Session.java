@@ -16,6 +16,7 @@
 
 package one.nio.net;
 
+import one.nio.http.ResponseListener;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -86,7 +87,11 @@ public class Session implements Closeable {
 
     @Override
     public synchronized void close() {
-        QueueItem.releaseChain(queueHead, null);
+        close(null);
+    }
+
+    public synchronized void close(Throwable t) {
+        QueueItem.releaseChain(queueHead, t);
         queueHead = null;
 
         if (socket.isOpen()) {
@@ -234,7 +239,7 @@ public class Session implements Closeable {
         } else {
             log.error("Cannot process session from " + getRemoteHost(), e);
         }
-        close();
+        close(e);
     }
 
     public static abstract class QueueItem {
@@ -257,11 +262,11 @@ public class Session implements Closeable {
             return 0;
         }
 
-        public void release(Exception problem) {
+        public void release(Throwable problem) {
             // Override in subclasses to release associated resources
         }
 
-        public static void releaseChain(QueueItem item, Exception problem) {
+        public static void releaseChain(QueueItem item, Throwable problem) {
             for (; item != null; item = item.next) {
                 item.release(problem);
             }
@@ -299,16 +304,22 @@ public class Session implements Closeable {
         }
     }
 
-    public static class ArrayAndNativeQueueItem extends ArrayQueueItem {
+    public static class ArrayAndNativeQueueItem extends QueueItem {
+        protected final byte[] array;
+        protected final int arrayLength;
         protected final long nativeAddr;
         protected final int nativeCount;
+        protected final ResponseListener listener;
         protected final int totalCount;
+        protected int written;
 
-        public ArrayAndNativeQueueItem(byte[] data, int arrayOffset, int arrayCount, long nativeAddr, int nativeCount, int flags) {
-            super(data, arrayOffset, arrayCount, flags);
+        public ArrayAndNativeQueueItem(byte[] array, int arrayLength, long nativeAddr, int nativeLength, ResponseListener listener){
+            this.array = array;
+            this.arrayLength = arrayLength;
             this.nativeAddr = nativeAddr;
-            this.nativeCount = nativeCount;
-            this.totalCount = arrayCount + nativeCount;
+            this.nativeCount = nativeLength;
+            this.listener = listener;
+            this.totalCount = arrayLength + nativeLength;
         }
 
         @Override
@@ -318,26 +329,29 @@ public class Session implements Closeable {
 
         @Override
         public int write(Socket socket) throws IOException {
-            // handle byte[] first, i.e. the http response headers
             int arrayWritten = 0;
-            if (written < count) {
-
-                arrayWritten = socket.write(data, offset + written, count - written, flags);
+            if (written < arrayLength) {
+                arrayWritten = socket.write(array, written, arrayLength - written, 0);
                 if (arrayWritten > 0) {
                     written += arrayWritten;
                 }
-                if (written < count) {
+                if (written < arrayLength | nativeAddr <= 0) {
                     return arrayWritten;
                 }
             }
-            // handle native, main content
-            int nativeWritten = socket.writeRaw(nativeAddr, totalCount - written, flags);
 
+            int nativeWritten = socket.writeRaw(nativeAddr, totalCount - written, 0);
             if (nativeWritten > 0) {
                 written += nativeWritten;
             }
-
             return arrayWritten + nativeWritten;
+        }
+
+        @Override
+        public void release(Throwable problem) {
+            if (listener != null) {
+                listener.onDone(written, totalCount, problem);
+            }
         }
     }
 }

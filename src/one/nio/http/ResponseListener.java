@@ -2,5 +2,5 @@ package one.nio.http;
 
 @FunctionalInterface
 public interface ResponseListener {
-    void onDone(int bytesSent, int totalToSend, Exception problem);
+    void onDone(int bytesSent, int totalToSend, Throwable problem);
 }
