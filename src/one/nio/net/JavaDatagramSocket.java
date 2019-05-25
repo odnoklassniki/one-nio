@@ -16,6 +16,8 @@
 
 package one.nio.net;
 
+import one.nio.mem.DirectMemory;
+
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
@@ -29,6 +31,7 @@ import java.nio.channels.SelectableChannel;
 /**
  * @author ivan.grigoryev
  */
+// cannot have a single class for UDP/TCP due to DatagramChannel and SocketChannel not having a suitable shared base
 final class JavaDatagramSocket extends SelectableJavaSocket {
     final DatagramChannel ch;
 
@@ -51,14 +54,13 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final JavaSocket accept() throws IOException {
+    public final Socket accept() {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public final void connect(InetAddress address, int port) throws IOException {
-        // It will be quite easy to add support for "connected" mode if it is needed in future
-        throw new UnsupportedOperationException();
+        ch.connect(new InetSocketAddress(address, port));
     }
 
     @Override
@@ -68,21 +70,22 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
 
     @Override
     public final void listen(int backlog) throws IOException {
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public final int writeRaw(long buf, int count, int flags) throws IOException {
-        throw new UnsupportedOperationException();
+        return ch.write(DirectMemory.wrap(buf, count));
     }
 
     @Override
     public final int write(byte[] data, int offset, int count, int flags) throws IOException {
-        throw new UnsupportedOperationException();
+        return ch.write(ByteBuffer.wrap(data, offset, count));
     }
 
     @Override
     public final void writeFully(byte[] data, int offset, int count) throws IOException {
-        throw new UnsupportedOperationException();
+        ch.write(ByteBuffer.wrap(data, offset, count));
     }
 
     @Override
@@ -92,12 +95,20 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
 
     @Override
     public final int readRaw(long buf, int count, int flags) throws IOException {
-        throw new UnsupportedOperationException();
+        int result = ch.read(DirectMemory.wrap(buf, count));
+        if (result < 0) {
+            throw new SocketClosedException();
+        }
+        return result;
     }
 
     @Override
     public final int read(byte[] data, int offset, int count, int flags) throws IOException {
-        throw new UnsupportedOperationException();
+        int result = ch.read(ByteBuffer.wrap(data, offset, count));
+        if (result < 0) {
+            throw new SocketClosedException();
+        }
+        return result;
     }
 
     @Override
@@ -107,12 +118,18 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
 
     @Override
     public final void readFully(byte[] data, int offset, int count) throws IOException {
-        throw new UnsupportedOperationException();
+        ByteBuffer dst = ByteBuffer.wrap(data, offset, count);
+        while (dst.hasRemaining()) {
+            int bytes = ch.read(dst);
+            if (bytes < 0) {
+                throw new SocketClosedException();
+            }
+        }
     }
 
     @Override
     public final long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
-        throw new UnsupportedOperationException();
+        return file.getChannel().transferTo(offset, count, ch);
     }
 
     @Override
@@ -192,7 +209,11 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
 
     @Override
     public final void setSendBuffer(int sendBuf) {
-        // Ignore
+        try {
+            ch.setOption(StandardSocketOptions.SO_SNDBUF, sendBuf);
+        } catch (IOException e) {
+            // Ignore
+        }
     }
 
     @Override
@@ -216,7 +237,11 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
 
     @Override
     public final InetSocketAddress getRemoteAddress() {
-        throw new UnsupportedOperationException();
+        try {
+            return (InetSocketAddress) ch.getRemoteAddress();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @Override
