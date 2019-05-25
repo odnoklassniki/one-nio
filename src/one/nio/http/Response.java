@@ -16,9 +16,11 @@
 
 package one.nio.http;
 
+import one.nio.mem.DirectMemory;
 import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -66,31 +68,104 @@ public class Response {
 
     public static final byte[] EMPTY = new byte[0];
 
-    private static final byte[] HTTP11_HEADER = Utf8.toBytes("HTTP/1.1 ");
-    private static final int PROTOCOL_HEADER_LENGTH = 11;
+    protected static final byte[] HTTP11_HEADER = Utf8.toBytes("HTTP/1.1 ");
+    protected static final int PROTOCOL_HEADER_LENGTH = 11;
 
-    private int headerCount;
-    private String[] headers;
-    private byte[] body;
+    protected int headerCount;
+    protected String[] headers;
+    protected final byte[] body;
+    protected final int bodyArrayOffset;
+    protected final long bodyNativeAddr;
+    protected final int bodyLength;
+    protected final ResponseListener listener;
+
 
     public Response(String resultCode) {
+        this(resultCode, (ResponseListener) null);
+    }
+
+    public Response(String resultCode, ResponseListener listener){
         this.headerCount = 1;
         this.headers = new String[4];
         this.headers[0] = resultCode;
+        this.body = null;
+        this.bodyArrayOffset = 0;
+        this.bodyNativeAddr = 0;
+        this.bodyLength = 0;
+        this.listener = listener;
     }
-    
+
     public Response(String resultCode, byte[] body) {
+        this(resultCode, body, 0, body.length, null);
+    }
+
+    public Response(String resultCode, byte[] body, ResponseListener listener) {
+        this(resultCode, body, 0, body.length, listener);
+    }
+
+    public Response(String resultCode, byte[] body, int offset, int count) {
+        this(resultCode, body, offset, count, null);
+    }
+
+    public Response(String resultCode, byte[] array, int arrayOffset, int arrayCount, ResponseListener listener){
         this.headerCount = 2;
         this.headers = new String[4];
         this.headers[0] = resultCode;
-        this.headers[1] = "Content-Length: " + body.length;
-        this.body = body;
+        this.headers[1] = "Content-Length: " + arrayCount;
+        this.body = array;
+        this.bodyArrayOffset = arrayOffset;
+        this.bodyNativeAddr = 0;
+        this.bodyLength = arrayCount;
+        this.listener = listener;
+    }
+
+    public Response(String resultCode, long nativeAddr, int count) {
+        this(resultCode, nativeAddr, count, null);
+    }
+
+    public Response(String resultCode, long nativeAddr, int nativeCount, ResponseListener listener){
+        this.headerCount = 2;
+        this.headers = new String[4];
+        this.headers[0] = resultCode;
+        this.headers[1] = "Content-Length: " + nativeCount;
+        this.body = null;
+        this.bodyArrayOffset = 0;
+        this.bodyNativeAddr = nativeAddr;
+        this.bodyLength = nativeCount;
+        this.listener = listener;
+    }
+
+    public Response(String resultCode, ByteBuffer body) {
+        this(resultCode, body, null);
+    }
+
+    public Response(String resultCode, ByteBuffer body, ResponseListener listener) {
+        this.headerCount = 2;
+        this.headers = new String[4];
+        this.headers[0] = resultCode;
+        this.headers[1] = "Content-Length: " + body.remaining();
+
+        if (body.hasArray()) {
+            this.body = body.array();
+            this.bodyArrayOffset = body.position();
+            this.bodyNativeAddr = 0;
+        }else{
+            this.body = null;
+            this.bodyArrayOffset = 0;
+            this.bodyNativeAddr = DirectMemory.getAddress(body) + body.position();
+        }
+        this.bodyLength = body.remaining();
+        this.listener = listener;
     }
 
     public Response(Response prototype) {
         this.headerCount = prototype.headerCount;
         this.headers = Arrays.copyOf(prototype.headers, prototype.headerCount + 4);
         this.body = prototype.body;
+        this.bodyArrayOffset = prototype.bodyArrayOffset;
+        this.bodyNativeAddr = prototype.bodyNativeAddr;
+        this.bodyLength = prototype.bodyLength;
+        this.listener = prototype.listener;
     }
 
     public static Response ok(byte[] body) {
@@ -108,7 +183,7 @@ public class Response {
         response.addHeader("Location: " + url);
         return response;
     }
-    
+
     public void addHeader(String header) {
         if (headerCount >= headers.length) {
             headers = Arrays.copyOf(headers, headers.length + 4);
@@ -143,12 +218,28 @@ public class Response {
         return body;
     }
 
+    public int getBodyArrayOffset() {
+        return bodyArrayOffset;
+    }
+
+    public long getBodyNativeAddr() {
+        return bodyNativeAddr;
+    }
+
+    public int getBodyLength() {
+        return bodyLength;
+    }
+
     public void setBody(byte[] body) {
-        this.body = body;
+        throw new IllegalStateException("Content is immutable.");
     }
 
     public String getBodyUtf8() {
         return body == null ? null : new String(body, StandardCharsets.UTF_8);
+    }
+
+    public ResponseListener getListener() {
+        return listener;
     }
 
     public byte[] toBytes(boolean includeBody) {
@@ -157,7 +248,7 @@ public class Response {
             estimatedSize += headers[i].length();
         }
         if (includeBody && body != null) {
-            estimatedSize += body.length;
+            estimatedSize += bodyLength;
         }
 
         ByteArrayBuilder builder = new ByteArrayBuilder(estimatedSize);
@@ -167,7 +258,7 @@ public class Response {
         }
         builder.append('\r').append('\n');
         if (includeBody && body != null) {
-            builder.append(body);
+            builder.append(body, bodyArrayOffset, bodyLength);
         }
         return builder.buffer();
     }

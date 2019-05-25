@@ -20,6 +20,7 @@ import one.nio.net.Socket;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class HttpServerTest extends HttpServer {
 
@@ -30,6 +31,17 @@ public class HttpServerTest extends HttpServer {
     @Path("/simple")
     public Response handleSimple() {
         return Response.ok("Simple");
+    }
+
+    @Path("/native")
+    public Response nativeResponse() {
+        byte[] out = "<html><body><h1>Hi!</ht1></body></html>".getBytes();
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(out.length);
+        byteBuffer.put(out);
+        byteBuffer.flip();
+        Response response = new Response(Response.OK, byteBuffer, (bytesSent, totalToSend, problem) -> System.out.println("Response complete. bytesSent=" + bytesSent + " total: " + totalToSend + " err: " + problem));
+        response.addHeader("Content-Type: text/html; charset=utf-8");
+        return response;
     }
 
     @Path({"/multi1", "/multi2"})

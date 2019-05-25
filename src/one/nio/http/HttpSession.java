@@ -26,11 +26,11 @@ import java.nio.BufferOverflowException;
 import java.util.LinkedList;
 
 public class HttpSession extends Session {
-    private static final int MAX_HEADERS = 48;
-    private static final int MAX_FRAGMENT_LENGTH = 2048;
-    private static final int MAX_PIPELINE_LENGTH = 256;
-    private static final int MAX_REQUEST_BODY_LENGTH = 65536;
-    private static final int HTTP_VERSION_LENGTH = 9;  // " HTTP/1.0"
+    protected static final int MAX_HEADERS = 48;
+    protected static final int MAX_FRAGMENT_LENGTH = 2048;
+    protected static final int MAX_PIPELINE_LENGTH = 256;
+    protected static final int MAX_REQUEST_BODY_LENGTH = 65536;
+    protected static final int HTTP_VERSION_LENGTH = 9;  // " HTTP/1.0"
 
     protected static final Request FIN = new Request(0, "", false);
 
@@ -263,6 +263,25 @@ public class HttpSession extends Session {
 
     protected void writeResponse(Response response, boolean includeBody) throws IOException {
         byte[] bytes = response.toBytes(includeBody);
-        super.write(bytes, 0, bytes.length);
+
+        if (response.getBodyNativeAddr() > 0) {
+            super.write(new ArrayAndNativeQueueItem(bytes, 0, bytes.length, response.getBodyNativeAddr(), response.getBodyLength(), 0) {
+                @Override
+                public void release(Exception problem) {
+                    if (response.getListener() != null) {
+                        response.getListener().onDone(written, totalCount, problem);
+                    }
+                }
+            });
+        } else {
+            super.write(new ArrayQueueItem(bytes, 0, bytes.length, 0) {
+                @Override
+                public void release(Exception problem) {
+                    if (response.getListener() != null) {
+                        response.getListener().onDone(written, count, problem);
+                    }
+                }
+            });
+        }
     }
 }

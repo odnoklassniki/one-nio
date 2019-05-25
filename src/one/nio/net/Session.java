@@ -86,7 +86,7 @@ public class Session implements Closeable {
 
     @Override
     public synchronized void close() {
-        QueueItem.releaseChain(queueHead);
+        QueueItem.releaseChain(queueHead, null);
         queueHead = null;
 
         if (socket.isOpen()) {
@@ -167,7 +167,7 @@ public class Session implements Closeable {
                         listen(written >= 0 ? WRITEABLE : SSL | READABLE);
                         break;
                     } else {
-                        item.release();
+                        item.release(null);
                     }
                     item = item.next;
                 }
@@ -176,7 +176,7 @@ public class Session implements Closeable {
                 queueHead.append(item);
             }
         } catch (IOException e) {
-            QueueItem.releaseChain(item);
+            QueueItem.releaseChain(item, e);
             throw e;
         }
     }
@@ -196,7 +196,7 @@ public class Session implements Closeable {
                 listen(written >= 0 ? WRITEABLE : SSL | READABLE);
                 return;
             }
-            item.release();
+            item.release(null);
         }
 
         if (closing) {
@@ -257,13 +257,13 @@ public class Session implements Closeable {
             return 0;
         }
 
-        public void release() {
+        public void release(Exception problem) {
             // Override in subclasses to release associated resources
         }
 
-        public static void releaseChain(QueueItem item) {
+        public static void releaseChain(QueueItem item, Exception problem) {
             for (; item != null; item = item.next) {
-                item.release();
+                item.release(problem);
             }
         }
 
@@ -271,12 +271,12 @@ public class Session implements Closeable {
     }
 
     public static class ArrayQueueItem extends QueueItem {
-        protected byte[] data;
-        protected int offset;
-        protected int count;
+        protected final byte[] data;
+        protected final int offset;
+        protected final int count;
         protected int written;
-        protected int flags;
-        
+        protected final int flags;
+
         public ArrayQueueItem(byte[] data, int offset, int count, int flags) {
             this.data = data;
             this.offset = offset;
@@ -296,6 +296,48 @@ public class Session implements Closeable {
                 written += bytes;
             }
             return bytes;
+        }
+    }
+
+    public static class ArrayAndNativeQueueItem extends ArrayQueueItem {
+        protected final long nativeAddr;
+        protected final int nativeCount;
+        protected final int totalCount;
+
+        public ArrayAndNativeQueueItem(byte[] data, int arrayOffset, int arrayCount, long nativeAddr, int nativeCount, int flags) {
+            super(data, arrayOffset, arrayCount, flags);
+            this.nativeAddr = nativeAddr;
+            this.nativeCount = nativeCount;
+            this.totalCount = arrayCount + nativeCount;
+        }
+
+        @Override
+        public int remaining() {
+            return totalCount - written;
+        }
+
+        @Override
+        public int write(Socket socket) throws IOException {
+            // handle byte[] first, i.e. the http response headers
+            int arrayWritten = 0;
+            if (written < count) {
+
+                arrayWritten = socket.write(data, offset + written, count - written, flags);
+                if (arrayWritten > 0) {
+                    written += arrayWritten;
+                }
+                if (written < count) {
+                    return arrayWritten;
+                }
+            }
+            // handle native, main content
+            int nativeWritten = socket.writeRaw(nativeAddr, totalCount - written, flags);
+
+            if (nativeWritten > 0) {
+                written += nativeWritten;
+            }
+
+            return arrayWritten + nativeWritten;
         }
     }
 }
