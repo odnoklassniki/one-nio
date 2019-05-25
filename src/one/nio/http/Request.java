@@ -49,7 +49,7 @@ public class Request {
     public static final byte[] VERB_CONNECT = Utf8.toBytes("CONNECT ");
     public static final byte[] VERB_PATCH   = Utf8.toBytes("PATCH ");
 
-    static final byte[][] VERBS = {
+    protected static final byte[][] VERBS = {
             new byte[0],
             VERB_GET,
             VERB_POST,
@@ -62,17 +62,17 @@ public class Request {
             VERB_PATCH
     };
 
-    private static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
-    private static final byte[] HTTP11_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
-    private static final int PROTOCOL_HEADER_LENGTH = 13;
+    protected static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
+    protected static final byte[] HTTP11_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
+    protected static final int PROTOCOL_HEADER_LENGTH = 13;
 
-    private int method;
-    private String uri;
-    private boolean http11;
-    private int params; // -1 if no query parameters
-    private int headerCount;
-    private String[] headers;
-    private byte[] body;
+    protected int method;
+    protected String uri;
+    protected boolean http11;
+    protected int params; // -1 if no query parameters
+    protected int headerCount;
+    protected String[] headers;
+    protected byte[] body;
 
     public Request(int method, String uri, boolean http11) {
         this.method = method;
