@@ -92,6 +92,19 @@ static int is_udp_socket(int fd) {
     return getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length) == 0 && type == SOCK_DGRAM;
 }
 
+static int get_int_socket_opt(int fd, int level, int optname){
+    int optval = 0;
+    socklen_t length = sizeof(optval);
+    if(getsockopt(fd, level, optname, &optval, &length) == 0){
+        return optval;
+    }
+    return 0;
+}
+
+static int get_bool_socket_opt(int fd, int level, int optname){
+    return get_int_socket_opt(fd, level, optname) > 0;
+}
+
 static void sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_storage* sa, int err) {
     jbyte tmpBuf[25];
     int len = err == 0 ? (sa->ss_family == AF_INET6 ? 24 : 8) : 0;
@@ -239,7 +252,7 @@ Java_one_nio_net_NativeSocket_connect1(JNIEnv* env, jobject self, jstring path) 
         sun.sun_family = AF_UNIX;
         strncpy(sun.sun_path, npath, UNIX_PATH_MAX);
         (*env)->ReleaseStringUTFChars(env, path, npath);
-        
+
         while (connect(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
             if (errno != EINTR) {
                 throw_io_exception(env);
@@ -510,6 +523,12 @@ Java_one_nio_net_NativeSocket_setBlocking(JNIEnv* env, jobject self, jboolean bl
     fcntl(fd, F_SETFL, blocking ? 0 : O_NONBLOCK);
 }
 
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_isBlocking(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return (fcntl(fd, F_GETFL) & O_NONBLOCK) != O_NONBLOCK;
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setTimeout(JNIEnv* env, jobject self, jint timeout) {
     int fd = (*env)->GetIntField(env, self, f_fd);
@@ -520,11 +539,28 @@ Java_one_nio_net_NativeSocket_setTimeout(JNIEnv* env, jobject self, jint timeout
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 }
 
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_getTimeout(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    struct timeval tv;
+    socklen_t len = sizeof(tv);
+    if(getsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, &len) == 0){
+       return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    }
+    return 0;
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setKeepAlive(JNIEnv* env, jobject self, jboolean keepAlive) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     int value = (int) keepAlive;
     setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof(value));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getKeepAlive(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_SOCKET, SO_KEEPALIVE);
 }
 
 JNIEXPORT void JNICALL
@@ -534,6 +570,12 @@ Java_one_nio_net_NativeSocket_setNoDelay(JNIEnv* env, jobject self, jboolean noD
     setsockopt(fd, SOL_TCP, TCP_NODELAY, &value, sizeof(value));
 }
 
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getNoDelay(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_TCP, TCP_NODELAY);
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setTcpFastOpen(JNIEnv* env, jobject self, jboolean tcpFastOpen) {
     int fd = (*env)->GetIntField(env, self, f_fd);
@@ -541,11 +583,23 @@ Java_one_nio_net_NativeSocket_setTcpFastOpen(JNIEnv* env, jobject self, jboolean
     setsockopt(fd, SOL_TCP, TCP_FASTOPEN, &value, sizeof(value));
 }
 
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getTcpFastOpen(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_TCP, TCP_FASTOPEN);
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setDeferAccept(JNIEnv* env, jobject self, jboolean deferAccept) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     int value = (int) deferAccept;
     setsockopt(fd, SOL_TCP, TCP_DEFER_ACCEPT, &value, sizeof(value));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getDeferAccept(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_TCP, TCP_DEFER_ACCEPT);
 }
 
 JNIEXPORT void JNICALL
@@ -557,10 +611,28 @@ Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean r
     setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
 }
 
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getReuseAddr(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_SOCKET, SO_REUSEADDR);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getReusePort(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_SOCKET, SO_REUSEPORT);
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setRecvBuffer(JNIEnv* env, jobject self, jint recvBuf) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &recvBuf, sizeof(recvBuf));
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_getRecvBuffer(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_int_socket_opt(fd, SOL_SOCKET, SO_RCVBUF) / 2;
 }
 
 JNIEXPORT void JNICALL
@@ -569,10 +641,23 @@ Java_one_nio_net_NativeSocket_setSendBuffer(JNIEnv* env, jobject self, jint send
     setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendBuf, sizeof(sendBuf));
 }
 
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_getSendBuffer(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_int_socket_opt(fd, SOL_SOCKET, SO_SNDBUF) / 2;
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setTos(JNIEnv* env, jobject self, jint tos) {
     int fd = (*env)->GetIntField(env, self, f_fd);
+    // todo: tos mask, IPV6_FLOWINFO_SEND, IPV6_TCLASS?
     setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_getTos(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_int_socket_opt(fd, IPPROTO_IP, IP_TOS);
 }
 
 JNIEXPORT jbyteArray JNICALL

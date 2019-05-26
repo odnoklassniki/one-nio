@@ -16,7 +16,13 @@
 
 package one.nio.net;
 
+import one.nio.os.NativeLibrary;
+import org.junit.Test;
+
 import java.io.IOException;
+
+import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class SocketTest {
 
@@ -46,5 +52,99 @@ public class SocketTest {
     public static void main(String[] args) throws Exception {
         testIPv4();
         testIPv6();
+    }
+
+    @Test
+    public void testNativeSocketOpts() throws IOException {
+        if (NativeLibrary.IS_SUPPORTED) {
+            SocketTest.testSocketOpts(new NativeSocket(false), false);
+        }
+    }
+
+    @Test
+    public void testJavaSocketOpts() throws IOException {
+        SocketTest.testSocketOpts(new JavaSocket(), false);
+    }
+
+    @Test
+    public void testJavaDatagramSocketOpts() throws IOException {
+        SocketTest.testSocketOpts(new JavaDatagramSocket(), true);
+    }
+
+    @Test
+    public void testJavaServerSocketOpts() throws IOException {
+        SocketTest.testSocketOpts(new JavaServerSocket(), true);
+    }
+
+    public static void testSocketOpts(Socket socket, boolean datagram)
+    {
+        try
+        {
+            socket.setBlocking(false);
+            assertFalse(socket.isBlocking());
+            socket.setBlocking(true);
+            assertTrue(socket.isBlocking());
+
+            socket.setTimeout(0);
+            assertEquals(0, socket.getTimeout());
+            socket.setTimeout(12348);
+            assertEquals(12348, socket.getTimeout());
+
+            socket.setKeepAlive(false);
+            assertFalse(socket.getKeepAlive());
+            socket.setKeepAlive(true);
+            assertEquals(!datagram, socket.getKeepAlive());
+
+            socket.setNoDelay(false);
+            assertFalse(socket.getNoDelay());
+            socket.setNoDelay(true);
+            assertEquals(!datagram, socket.getNoDelay());
+
+            socket.setTcpFastOpen(false);
+            assertFalse(socket.getTcpFastOpen());
+            socket.setTcpFastOpen(true);
+            assertEquals(!datagram & socket instanceof NativeSocket, socket.getTcpFastOpen());
+
+            socket.setDeferAccept(false);
+            assertFalse(socket.getDeferAccept());
+            socket.setDeferAccept(true);
+            assertEquals(!datagram & socket instanceof NativeSocket, socket.getDeferAccept());
+
+            socket.setReuseAddr(false, false);
+            assertFalse(socket.getReuseAddr());
+            assertFalse(socket.getReusePort());
+            socket.setReuseAddr(true, false);
+            assertTrue(socket.getReuseAddr());
+            assertFalse(socket.getReusePort());
+            socket.setReuseAddr(false, true);
+            assertFalse(socket.getReuseAddr());
+            assertEquals(socket instanceof NativeSocket, socket.getReusePort());
+            socket.setReuseAddr(true, true);
+            assertTrue(socket.getReuseAddr());
+            assertEquals(socket instanceof NativeSocket, socket.getReusePort());
+
+            assertTrue(socket.getRecvBuffer() > 0);
+            socket.setRecvBuffer(4 * 1048);
+            assertEquals(4 * 1048, socket.getRecvBuffer());
+
+            if (!(socket instanceof JavaServerSocket))
+            {
+                assertTrue(socket.getSendBuffer() > 0);
+                socket.setSendBuffer(8 * 1048 + 12345);
+                assertEquals(8 * 1048 + 12345, socket.getSendBuffer());
+
+                assertEquals(0, socket.getTos());
+                socket.setTos(96);
+                assertEquals(96, socket.getTos());
+            }
+        }
+        catch (Exception e)
+        {
+            throw e;
+        }
+        finally
+        {
+            socket.close();
+        }
     }
 }

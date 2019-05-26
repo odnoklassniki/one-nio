@@ -17,6 +17,7 @@
 package one.nio.http;
 
 import one.nio.net.ConnectionString;
+import one.nio.net.Socket;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -34,7 +35,6 @@ import static org.junit.Assert.assertEquals;
  * @author Vadim Tsesko <mail@incubos.org>
  */
 public class HttpRequestBodyTest {
-    private static final String URL = "http://127.0.0.1:8181";
     private static final String ENDPOINT = "/echoBody";
     private static final int MAX_REQUEST_BODY_LENGTH = 65536;
 
@@ -43,9 +43,10 @@ public class HttpRequestBodyTest {
 
     @BeforeClass
     public static void beforeAll() throws IOException {
-        server = new TestServer(HttpServerConfigFactory.create(8181));
+        int availablePort = Socket.getFreePort();
+        server = new TestServer(HttpServerConfigFactory.create(availablePort));
         server.start();
-        client = new HttpClient(new ConnectionString(URL));
+        client = new HttpClient(new ConnectionString("http://127.0.0.1:" + availablePort));
     }
 
     @AfterClass

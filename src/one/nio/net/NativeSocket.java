@@ -200,31 +200,64 @@ class NativeSocket extends Socket {
     public final native void setBlocking(boolean blocking);
 
     @Override
+    public final native boolean isBlocking();
+
+    @Override
     public final native void setTimeout(int timeout);
+
+    @Override
+    public final native int getTimeout();
 
     @Override
     public final native void setKeepAlive(boolean keepAlive);
 
     @Override
+    public final native boolean getKeepAlive();
+
+    @Override
     public final native void setNoDelay(boolean noDelay);
+
+    @Override
+    public final native boolean getNoDelay();
 
     @Override
     public final native void setTcpFastOpen(boolean tcpFastOpen);
 
     @Override
+    public final native boolean getTcpFastOpen();
+
+    @Override
     public final native void setDeferAccept(boolean deferAccept);
+
+    @Override
+    public final native boolean getDeferAccept();
 
     @Override
     public final native void setReuseAddr(boolean reuseAddr, boolean reusePort);
 
     @Override
+    public final native boolean getReuseAddr();
+
+    @Override
+    public final native boolean getReusePort();
+
+    @Override
     public final native void setRecvBuffer(int recvBuf);
+
+    @Override
+    public final native int getRecvBuffer();
 
     @Override
     public final native void setSendBuffer(int sendBuf);
 
     @Override
+    public final native int getSendBuffer();
+
+    @Override
     public final native void setTos(int tos);
+
+    @Override
+    public final native int getTos();
 
     @Override
     public native byte[] getOption(int level, int option);

@@ -23,6 +23,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.SocketException;
 
 import static org.junit.Assert.assertEquals;
@@ -34,7 +35,6 @@ import static org.junit.Assert.assertNull;
  * @author Vadim Tsesko <mail@incubos.org>
  */
 public class HttpMethodTest {
-    private static final String URL = "http://127.0.0.1:8181";
     private static final String ENDPOINT = "/echoMethod";
 
     private static HttpServer server;
@@ -42,9 +42,10 @@ public class HttpMethodTest {
 
     @BeforeClass
     public static void beforeAll() throws IOException {
-        server = new TestServer(HttpServerConfigFactory.create(8181));
+        int availablePort = Socket.getFreePort();
+        server = new TestServer(HttpServerConfigFactory.create(availablePort));
         server.start();
-        client = new HttpClient(new ConnectionString(URL));
+        client = new HttpClient(new ConnectionString("http://127.0.0.1:" + availablePort));
     }
 
     @AfterClass

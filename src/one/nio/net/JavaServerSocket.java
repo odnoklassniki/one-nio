@@ -132,6 +132,11 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public boolean isBlocking() {
+        return ch.isBlocking();
+    }
+
+    @Override
     public final void setTimeout(int timeout) {
         try {
             ch.socket().setSoTimeout(timeout);
@@ -141,8 +146,22 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public int getTimeout() {
+        try {
+            return ch.socket().getSoTimeout();
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    @Override
     public final void setKeepAlive(boolean keepAlive) {
         // Ignore
+    }
+
+    @Override
+    public boolean getKeepAlive() {
+        return false;
     }
 
     @Override
@@ -151,8 +170,18 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public boolean getNoDelay() {
+        return false;
+    }
+
+    @Override
     public final void setTcpFastOpen(boolean tcpFastOpen) {
         // Ignore
+    }
+
+    @Override
+    public boolean getTcpFastOpen() {
+        return false;
     }
 
     @Override
@@ -161,12 +190,32 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public boolean getDeferAccept() {
+        return false;
+    }
+
+    @Override
     public final void setReuseAddr(boolean reuseAddr, boolean reusePort) {
         try {
             ch.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
+            // todo: java 9+ SO_REUSEPORT
         } catch (IOException e) {
             // Ignore
         }
+    }
+
+    @Override
+    public boolean getReuseAddr() {
+        try {
+            return ch.getOption(StandardSocketOptions.SO_REUSEADDR);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean getReusePort() {
+        return false;
     }
 
     @Override
@@ -175,6 +224,15 @@ final class JavaServerSocket extends SelectableJavaSocket {
             ch.setOption(StandardSocketOptions.SO_RCVBUF, recvBuf);
         } catch (IOException e) {
             // Ignore
+        }
+    }
+
+    @Override
+    public int getRecvBuffer() {
+        try {
+            return ch.getOption(StandardSocketOptions.SO_RCVBUF);
+        } catch (IOException e) {
+            return 0;
         }
     }
 
@@ -188,8 +246,22 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public int getTos() {
+        try {
+            return ch.getOption(StandardSocketOptions.IP_TOS);
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    @Override
     public final void setSendBuffer(int sendBuf) {
         // Ignore
+    }
+
+    @Override
+    public int getSendBuffer() {
+        return 0;
     }
 
     @Override
