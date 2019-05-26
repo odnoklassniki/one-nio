@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 
@@ -76,15 +77,26 @@ public abstract class Socket implements ByteChannel {
     public abstract InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException;
     public abstract long sendFile(RandomAccessFile file, long offset, long count) throws IOException;
     public abstract void setBlocking(boolean blocking);
+    public abstract boolean isBlocking();
     public abstract void setTimeout(int timeout);
+    public abstract int getTimeout();
     public abstract void setKeepAlive(boolean keepAlive);
+    public abstract boolean getKeepAlive();
     public abstract void setNoDelay(boolean noDelay);
+    public abstract boolean getNoDelay();
     public abstract void setTcpFastOpen(boolean tcpFastOpen);
+    public abstract boolean getTcpFastOpen();
     public abstract void setDeferAccept(boolean deferAccept);
+    public abstract boolean getDeferAccept();
     public abstract void setReuseAddr(boolean reuseAddr, boolean reusePort);
+    public abstract boolean getReuseAddr();
+    public abstract boolean getReusePort();
     public abstract void setRecvBuffer(int recvBuf);
+    public abstract int getRecvBuffer();
     public abstract void setSendBuffer(int sendBuf);
+    public abstract int getSendBuffer();
     public abstract void setTos(int tos);
+    public abstract int getTos();
     public abstract byte[] getOption(int level, int option);
     public abstract boolean setOption(int level, int option, byte[] value);
     public abstract InetSocketAddress getLocalAddress();
@@ -166,5 +178,12 @@ public abstract class Socket implements ByteChannel {
             return new NativeSocket(fd);
         }
         throw new IOException("Operation is not supported");
+    }
+
+    public static int getFreePort() throws IOException {
+        ServerSocket serverSocket = new ServerSocket(0);
+        int localPort = serverSocket.getLocalPort();
+        serverSocket.close();
+        return localPort;
     }
 }

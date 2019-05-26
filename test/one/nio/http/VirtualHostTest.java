@@ -17,26 +17,29 @@
 package one.nio.http;
 
 import one.nio.config.ConfigParser;
+import one.nio.mgt.ThreadDumper;
 import one.nio.net.ConnectionString;
+import one.nio.net.Socket;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;
 
 public class VirtualHostTest {
-    private static final String URL = "http://127.0.0.1:8181";
-
     private static HttpServer server;
     private static HttpClient client;
 
     @BeforeClass
     public static void beforeAll() throws IOException {
+        int availablePort = Socket.getFreePort();
+
         String config =
                 "acceptors:\n" +
-                " - port: 8181\n" +
+                " - port: " + availablePort + "\n" +
                 "virtualHosts:\n" +
                 "  router1: r1.example.com, r1.example.org\n" +
                 "  router2a: r2a.example.com\n" +
@@ -45,7 +48,7 @@ public class VirtualHostTest {
             server = new HttpServer(ConfigParser.parse(config, HttpServerConfig.class),
                 new Router0(), new Router1(), new Router2());
         server.start();
-        client = new HttpClient(new ConnectionString(URL));
+        client = new HttpClient(new ConnectionString("http://127.0.0.1:" + availablePort));
     }
 
     @AfterClass
