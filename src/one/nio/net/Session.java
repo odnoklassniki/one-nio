@@ -321,6 +321,12 @@ public class Session implements Closeable {
             this.nativeCount = nativeLength;
             this.listener = listener;
             this.totalCount = arrayLength + nativeLength;
+            if (nativeAddr <= 0 & nativeLength > 0) {
+                throw new IllegalArgumentException("Specified non-zero native buffer length but missing native address.");
+            }
+            if (array == null & arrayLength > 0) {
+                throw new IllegalArgumentException("Specified non-zero array length but missing array reference.");
+            }
         }
 
         @Override
