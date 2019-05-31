@@ -312,6 +312,7 @@ public class Session implements Closeable {
         protected final ResponseListener listener;
         protected final int totalCount;
         protected int written;
+        protected int nativeWritten;
 
         public ArrayAndNativeQueueItem(byte[] array, int arrayLength, long nativeAddr, int nativeLength, ResponseListener listener){
             this.array = array;
@@ -329,22 +330,26 @@ public class Session implements Closeable {
 
         @Override
         public int write(Socket socket) throws IOException {
-            int arrayWritten = 0;
+            int arrayBytes = 0;
             if (written < arrayLength) {
-                arrayWritten = socket.write(array, written, arrayLength - written, 0);
-                if (arrayWritten > 0) {
-                    written += arrayWritten;
-                }
-                if (written < arrayLength | nativeAddr <= 0) {
-                    return arrayWritten;
+                arrayBytes = socket.write(array, written, arrayLength - written, 0);
+                if (arrayBytes > 0) {
+                    written += arrayBytes;
+                } else {
+                    return arrayBytes;
                 }
             }
 
-            int nativeWritten = socket.writeRaw(nativeAddr, totalCount - written, 0);
-            if (nativeWritten > 0) {
-                written += nativeWritten;
+            if (written >= arrayLength & written < totalCount) {
+                int nativeBytes = socket.writeRaw(nativeAddr + nativeWritten, totalCount - written, 0);
+                if (nativeBytes > 0) {
+                    nativeWritten += nativeBytes;
+                    written += nativeBytes;
+                }
+                return arrayBytes + nativeBytes;
             }
-            return arrayWritten + nativeWritten;
+
+            return arrayBytes;
         }
 
         @Override
