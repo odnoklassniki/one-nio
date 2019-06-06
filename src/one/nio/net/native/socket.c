@@ -88,7 +88,7 @@ static int sockaddr_from_java(JNIEnv* env, jbyteArray address, jint port, struct
 
 static int is_udp_socket(int fd) {
     int type = 0;
-    int length = sizeof(type);
+    socklen_t length = sizeof(type);
     return getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length) == 0 && type == SOCK_DGRAM;
 }
 
@@ -470,11 +470,11 @@ Java_one_nio_net_NativeSocket_recvFrom(JNIEnv* env, jobject self, jlong buffer, 
         throw_socket_closed(env);
     } else if (count != 0) {
         struct sockaddr_storage sa;
-        int len = sizeof(sa);
+        socklen_t len = sizeof(sa);
 
         int result = recvfrom(fd, (void*)buffer, count, flags, (struct sockaddr*)&sa, &len);
 
-        if (result > 0 || result == 0 && is_udp_socket(fd)) {
+        if (result > 0 || (result == 0 && is_udp_socket(fd))) {
             sockaddr_to_java(env, address, &sa, 0);
             return result;
         } else if (result == 0) {
@@ -490,7 +490,7 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_getsockname(JNIEnv* env, jobject self, jbyteArray buffer) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     struct sockaddr_storage sa;
-    int len = sizeof(sa);
+    socklen_t len = sizeof(sa);
     int err = getsockname(fd, (struct sockaddr*)&sa, &len);
     sockaddr_to_java(env, buffer, &sa, err);
 }
@@ -499,7 +499,7 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_getpeername(JNIEnv* env, jobject self, jbyteArray buffer) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     struct sockaddr_storage sa;
-    int len = sizeof(sa);
+    socklen_t len = sizeof(sa);
     int err = getpeername(fd, (struct sockaddr*)&sa, &len);
     sockaddr_to_java(env, buffer, &sa, err);
 }

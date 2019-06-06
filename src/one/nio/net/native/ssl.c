@@ -407,8 +407,8 @@ static int sni_callback(SSL* ssl, int* unused, void* arg) {
             int i;
             for (i = 0; names[0] != 0; i++) {
                 int names_len = strlen(names);
-                if (strcmp(servername, names) == 0 || names[0] == '*' && servername_len >= (names_len - 1) &&
-                    strcmp(servername + servername_len - (names_len - 1), names + 1) == 0) {
+                if (strcmp(servername, names) == 0 || (names[0] == '*' && servername_len >= (names_len - 1) &&
+                    strcmp(servername + servername_len - (names_len - 1), names + 1) == 0)) {
                     SSL_CTX* newctx = (SSL_CTX*)(intptr_t)appData->sni.contexts[i];
                     SSL_set_SSL_CTX(ssl, newctx);
                     SSL_set_verify(ssl, SSL_CTX_get_verify_mode(newctx), NULL);
