@@ -68,6 +68,10 @@ public class HttpClient extends SocketPool {
     }
 
     public Response invoke(Request request) throws InterruptedException, PoolException, IOException, HttpException {
+        return invoke(request, readTimeout);
+    }
+
+    public Response invoke(Request request, int timeout) throws InterruptedException, PoolException, IOException, HttpException {
         int method = request.getMethod();
         byte[] rawRequest = request.toBytes();
         ResponseReader responseReader;
@@ -76,6 +80,7 @@ public class HttpClient extends SocketPool {
         boolean keepAlive = false;
         try {
             try {
+                socket.setTimeout(timeout == 0 ? readTimeout : timeout);
                 socket.writeFully(rawRequest, 0, rawRequest.length);
                 responseReader = new ResponseReader(socket, BUFFER_SIZE);
             } catch (SocketTimeoutException e) {
