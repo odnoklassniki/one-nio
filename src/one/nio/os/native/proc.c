@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -93,6 +94,16 @@ Java_one_nio_os_Proc_sched_1setscheduler(JNIEnv* env, jclass cls, jint pid, jint
 JNIEXPORT jint JNICALL
 Java_one_nio_os_Proc_sched_1getscheduler(JNIEnv* env, jclass cls, jint pid) {
     return sched_getscheduler((pid_t)pid);
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_getpriority(JNIEnv* env, jclass cls, jint pid) {
+    return getpriority(PRIO_PROCESS, (id_t)pid);
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_setpriority(JNIEnv* env, jclass cls, jint pid, jint value) {
+    return setpriority(PRIO_PROCESS, (id_t)pid, value);
 }
 
 JNIEXPORT jint JNICALL

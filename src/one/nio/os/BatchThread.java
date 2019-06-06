@@ -42,6 +42,7 @@ public class BatchThread extends Thread {
     public static void adjustPriority() {
         if (Proc.IS_SUPPORTED) {
             Proc.sched_setscheduler(0, Proc.SCHED_BATCH);
+            Proc.setpriority(0, 19);
         }
     }
 }

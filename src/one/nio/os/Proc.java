@@ -57,6 +57,27 @@ public final class Proc {
      */
     public static native int sched_getscheduler(int pid);
 
+    /**
+     * Obtain the nice value of a process
+     * 
+     * @param pid pid or tid. 0 for current thread
+     * @return an integer in the range -{NZERO} to {NZERO}-1. Otherwise, -1 shall be returned and errno set to indicate the error.
+     */
+    public static native int getpriority(int pid);
+
+    /**
+     * Set the nice value of a process to value+ {NZERO}.
+     * The default nice value is {NZERO}; lower nice values shall cause more favorable scheduling. 
+     * While the range of valid nice values is [0,{NZERO}*2-1], implementations may enforce more restrictive limits. 
+     * If value+ {NZERO} is less than the system's lowest supported nice value, setpriority() shall set the nice value 
+     * to the lowest supported value; if value+ {NZERO} is greater than the system's highest supported nice value, 
+     * setpriority() shall set the nice value to the highest supported value.
+     * 
+     * @param pid pid or tid. 0 for current thread
+     * @return 0 on success; otherwise, -1 shall be returned and errno set to indicate the error.
+     */
+    public static native int setpriority(int pid, int value);
+
     public static final int CLONE_NEWCGROUP = 0x02000000;
     public static final int CLONE_NEWUTS    = 0x04000000;
     public static final int CLONE_NEWIPC    = 0x08000000;
