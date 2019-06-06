@@ -26,6 +26,7 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,6 +41,7 @@ public class Server implements ServerMXBean {
 
     protected final int port;
     protected final AcceptorThread[] acceptors;
+    protected final CountDownLatch startSync;
     protected volatile SelectorThread[] selectors;
     protected final WorkerPool workers;
     protected boolean useWorkers;
@@ -55,6 +57,7 @@ public class Server implements ServerMXBean {
         for (int i = 0; i < acceptors.length; i++) {
             acceptors[i] = new AcceptorThread(this, config.acceptors[i]);
         }
+        this.startSync = new CountDownLatch(acceptors.length);
 
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = new SelectorThread[config.selectors != 0 ? config.selectors : processors];
@@ -114,6 +117,14 @@ public class Server implements ServerMXBean {
         for (AcceptorThread acceptor : this.acceptors) {
             acceptor.start();
         }
+
+        // Wait until all AcceptorThreads are listening for incoming connections
+        try {
+            startSync.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         cleanup.start();
 
         Management.registerMXBean(this, "one.nio.server:type=Server,port=" + port);

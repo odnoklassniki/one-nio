@@ -98,8 +98,10 @@ final class AcceptorThread extends Thread {
         try {
             serverSocket.listen(backlog);
         } catch (IOException e) {
-            log.error("Cannot start listening at " + port);
+            log.error("Cannot start listening at " + port, e);
             return;
+        } finally {
+            server.startSync.countDown();
         }
 
         while (serverSocket.isOpen()) {

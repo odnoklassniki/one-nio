@@ -31,7 +31,8 @@ import java.nio.channels.SelectableChannel;
 /**
  * @author ivan.grigoryev
  */
-// cannot have a single class for UDP/TCP due to DatagramChannel and SocketChannel not having a suitable shared base
+// Cannot have a single class for UDP/TCP due to
+// DatagramChannel and SocketChannel not having a suitable shared base
 final class JavaDatagramSocket extends SelectableJavaSocket {
     final DatagramChannel ch;
 
