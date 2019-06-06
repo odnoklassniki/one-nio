@@ -213,7 +213,13 @@ public abstract class SslContext {
     void refresh() {
         long currentTime = System.currentTimeMillis();
         long refreshTime = nextRefresh.get();
-        if (currentTime < refreshTime || !nextRefresh.compareAndSet(refreshTime, currentTime + currentConfig.refreshInterval)) {
+        if (currentTime < refreshTime) {
+            return;
+        }
+
+        long refreshInterval = currentConfig.refreshInterval;
+        if (refreshInterval == 0) refreshInterval = SslConfig.DEFAULT_REFRESH_INTERVAL;
+        if (!nextRefresh.compareAndSet(refreshTime, currentTime + refreshInterval)) {
             return;
         }
 
