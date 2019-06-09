@@ -44,7 +44,7 @@ class NativeSocket extends Socket {
     public final boolean isOpen() {
         return fd >= 0;
     }
-    
+
     @Override
     public NativeSocket accept() throws IOException {
         return new NativeSocket(accept0(false));

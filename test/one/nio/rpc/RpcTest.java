@@ -18,7 +18,7 @@ package one.nio.rpc;
 
 import one.nio.config.ConfigParser;
 import one.nio.net.ConnectionString;
-import one.nio.net.Socket;
+import one.nio.net.SocketUtil;
 import one.nio.rpc.stream.BidiStream;
 import one.nio.serial.sample.Message;
 import one.nio.serial.sample.Sample;
@@ -45,7 +45,7 @@ public class RpcTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        int availablePort = Socket.getFreePort();
+        int availablePort = SocketUtil.getFreePort();
         ServerConfig config = ConfigParser.parse("acceptors:\n - port: " + availablePort, ServerConfig.class);
         server = new RpcServer<>(config, new TestServiceImpl());
         server.start();

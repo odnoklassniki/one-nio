@@ -22,7 +22,6 @@ import org.junit.Test;
 import java.io.IOException;
 
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertEquals;
 
 public class SocketTest {
 
@@ -76,10 +75,8 @@ public class SocketTest {
         SocketTest.testSocketOpts(new JavaServerSocket(), true);
     }
 
-    public static void testSocketOpts(Socket socket, boolean datagram)
-    {
-        try
-        {
+    public static void testSocketOpts(Socket socket, boolean datagram) {
+        try {
             socket.setBlocking(false);
             assertFalse(socket.isBlocking());
             socket.setBlocking(true);
@@ -127,8 +124,7 @@ public class SocketTest {
             socket.setRecvBuffer(4 * 1048);
             assertEquals(4 * 1048, socket.getRecvBuffer());
 
-            if (!(socket instanceof JavaServerSocket))
-            {
+            if (!(socket instanceof JavaServerSocket)) {
                 assertTrue(socket.getSendBuffer() > 0);
                 socket.setSendBuffer(8 * 1048 + 12345);
                 assertEquals(8 * 1048 + 12345, socket.getSendBuffer());
@@ -137,13 +133,9 @@ public class SocketTest {
                 socket.setTos(96);
                 assertEquals(96, socket.getTos());
             }
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             throw e;
-        }
-        finally
-        {
+        } finally {
             socket.close();
         }
     }

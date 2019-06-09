@@ -18,12 +18,12 @@ package one.nio.http;
 
 import one.nio.net.ConnectionString;
 import one.nio.net.Socket;
+import one.nio.net.SocketUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.SocketException;
 
 import static org.junit.Assert.assertEquals;
@@ -42,7 +42,7 @@ public class HttpMethodTest {
 
     @BeforeClass
     public static void beforeAll() throws IOException {
-        int availablePort = Socket.getFreePort();
+        int availablePort = SocketUtil.getFreePort();
         server = new TestServer(HttpServerConfigFactory.create(availablePort));
         server.start();
         client = new HttpClient(new ConnectionString("http://127.0.0.1:" + availablePort));

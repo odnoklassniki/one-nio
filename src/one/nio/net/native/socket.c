@@ -92,17 +92,17 @@ static int is_udp_socket(int fd) {
     return getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length) == 0 && type == SOCK_DGRAM;
 }
 
-static int get_int_socket_opt(int fd, int level, int optname){
-    int optval = 0;
+static jint get_int_socket_opt(int fd, int level, int optname) {
+    int optval;
     socklen_t length = sizeof(optval);
-    if(getsockopt(fd, level, optname, &optval, &length) == 0){
+    if (getsockopt(fd, level, optname, &optval, &length) == 0) {
         return optval;
     }
     return 0;
 }
 
-static int get_bool_socket_opt(int fd, int level, int optname){
-    return get_int_socket_opt(fd, level, optname) > 0;
+static jboolean get_bool_socket_opt(int fd, int level, int optname) {
+    return get_int_socket_opt(fd, level, optname) ? JNI_TRUE : JNI_FALSE;
 }
 
 static void sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_storage* sa, int err) {
@@ -544,8 +544,8 @@ Java_one_nio_net_NativeSocket_getTimeout(JNIEnv* env, jobject self) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     struct timeval tv;
     socklen_t len = sizeof(tv);
-    if(getsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, &len) == 0){
-       return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    if (getsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, &len) == 0) {
+        return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
     }
     return 0;
 }
@@ -650,7 +650,6 @@ Java_one_nio_net_NativeSocket_getSendBuffer(JNIEnv* env, jobject self) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setTos(JNIEnv* env, jobject self, jint tos) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    // todo: tos mask, IPV6_FLOWINFO_SEND, IPV6_TCLASS?
     setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
 }
 

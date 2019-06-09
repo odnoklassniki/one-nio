@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 
@@ -178,12 +177,5 @@ public abstract class Socket implements ByteChannel {
             return new NativeSocket(fd);
         }
         throw new IOException("Operation is not supported");
-    }
-
-    public static int getFreePort() throws IOException {
-        ServerSocket serverSocket = new ServerSocket(0);
-        int localPort = serverSocket.getLocalPort();
-        serverSocket.close();
-        return localPort;
     }
 }
