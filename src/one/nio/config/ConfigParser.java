@@ -329,7 +329,7 @@ public class ConfigParser {
 
     private void registerReference(Object ref) {
         if (hasTail() && line.charAt(indent) == '&') {
-            Object prev = references.put(line.substring(indent + 1), ref);
+            Object prev = references.put(line.substring(indent + 1).trim(), ref);
             if (prev != null) {
                 throw new IllegalArgumentException("Duplicate reference: " + line);
             }
@@ -339,7 +339,7 @@ public class ConfigParser {
 
     private Object parseReference() {
         if (hasTail() && line.charAt(indent) == '*') {
-            Object ref = references.get(line.substring(indent + 1));
+            Object ref = references.get(line.substring(indent + 1).trim());
             if (ref == null) {
                 throw new IllegalArgumentException("No such reference: " + line);
             }
@@ -394,7 +394,7 @@ public class ConfigParser {
     }
 
     private String tail() {
-        String result = indent >= 0 ? line.substring(indent) : "";
+        String result = indent >= 0 ? line.substring(indent).trim() : "";
         indent = -1;
         return result;
     }

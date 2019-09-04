@@ -47,16 +47,16 @@ public class ConfigParserTest {
             " - port: 9443\n" +
             "   ssl: *id1\n" +
             " - port: 80\n" +
-            "   backlog: 10000\n" +
+            "   backlog: 10000 \n" +
             "   deferAccept: false\n" +
             "   recvBuf: 32k\n" +
             "   sendBuf: 1M\n" +
             "\n" +
             "virtualHosts:\n" +
             "  admin: admin.example.com\n" +
-            "  default: &id2\n" +
-            "   - example.com\n" +
-            "   - www.example.com\n" +
+            "  default: &id2 \n" +
+            "   -   example.com\n" +
+            "   - www.example.com  \n" +
             "  invalid: *id2\n";
 
     @Test
