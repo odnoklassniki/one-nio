@@ -104,6 +104,11 @@ class NativeSocket extends Socket {
     }
 
     @Override
+    public <T> T getSslOption(SslOption<T> option) {
+        return null;
+    }
+
+    @Override
     public final void connect(InetAddress address, int port) throws IOException {
         connect0(address.getAddress(), port);
     }

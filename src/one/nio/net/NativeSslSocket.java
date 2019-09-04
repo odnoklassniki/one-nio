@@ -60,11 +60,25 @@ class NativeSslSocket extends NativeSocket {
     }
 
     @Override
-    public byte[] getOption(int level, int option) {
-        if (level == SOL_SSL) {
-            return sslGetOption(option);
+    @SuppressWarnings("unchecked")
+    public Object getSslOption(SslOption option) {
+        switch (option.id) {
+            case 1:
+                return sslPeerCertificate();
+            case 2:
+                return sslCertName(0);
+            case 3:
+                return sslCertName(1);
+            case 4:
+                return sslVerifyResult();
+            case 5:
+                return sslSessionReused();
+            case 6:
+                return sslSessionTicket();
+            case 7:
+                return sslCurrentCipher();
         }
-        return super.getOption(level, option);
+        return null;
     }
 
     @Override
@@ -90,7 +104,14 @@ class NativeSslSocket extends NativeSocket {
     @Override
     public synchronized native void readFully(byte[] data, int offset, int count) throws IOException;
 
-    private synchronized native byte[] sslGetOption(int option);
+    private synchronized native byte[] sslPeerCertificate();
+    private synchronized native String sslCertName(int which);
+    private synchronized native String sslVerifyResult();
+
+    private synchronized native boolean sslSessionReused();
+    private synchronized native int sslSessionTicket();
+
+    private synchronized native String sslCurrentCipher();
 
     static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
     static native void sslFree(long ssl);

@@ -15,12 +15,14 @@
  */
 
 #include <openssl/ssl.h>
+#include <openssl/bio.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
+#include <openssl/x509.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -39,13 +41,6 @@
 
 
 #define MAX_COUNTERS  32
-
-// Constants from Socket.java
-enum SOL_SSL {
-    SOL_SSL_SESSION        = 1,
-    SOL_SSL_SESSION_REUSED = 2,
-    SOL_SSL_SESSION_TICKET = 3
-};
 
 enum SSLFlags {
     SF_SERVER         = 1,
@@ -164,14 +159,6 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             throw_by_name(env, "javax/net/ssl/SSLException", buf);
             return 0;
     }
-}
-
-static jbyteArray int_to_bytes(JNIEnv* env, int value) {
-    jbyteArray result = (*env)->NewByteArray(env, sizeof(value));
-    if (result != NULL) {
-        (*env)->SetByteArrayRegion(env, result, 0, sizeof(value), (jbyte*)&value);
-    }
-    return result;
 }
 
 static char* ssl_get_peer_ip(const SSL* ssl, char* buf, size_t len) {
@@ -319,12 +306,13 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
     if (ticket == NULL) {
         // No ticket keys set
     } else if (new_session) {
-        RAND_pseudo_bytes(iv, 16);
-        memcpy(key_name, ticket->name, 16);
-        EVP_EncryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, ticket->aes_key, iv);
-        HMAC_Init_ex(hmac_ctx, ticket->hmac_key, 16, EVP_sha256(), NULL);
-        SSL_set_app_data(ssl, (char*)(SF_SERVER | SF_NEW_TICKET));
-        result = 1;
+        if (RAND_bytes(iv, EVP_MAX_IV_LENGTH)) {
+            memcpy(key_name, ticket->name, 16);
+            EVP_EncryptInit_ex(evp_ctx, EVP_aes_128_cbc(), NULL, ticket->aes_key, iv);
+            HMAC_Init_ex(hmac_ctx, ticket->hmac_key, 16, EVP_sha256(), NULL);
+            SSL_set_app_data(ssl, (char*)(SF_SERVER | SF_NEW_TICKET));
+            result = 1;
+        }
     } else {
         unsigned int i;
         for (i = 0; i < tickets->len; i++, ticket++) {
@@ -819,7 +807,9 @@ Java_one_nio_net_NativeSslContext_getSessionCounters(JNIEnv* env, jobject self, 
     }
 
     jlongArray values = (*env)->NewLongArray(env, MAX_COUNTERS);
-    (*env)->SetLongArrayRegion(env, values, 0, MAX_COUNTERS, raw_values);
+    if (values != NULL) {
+        (*env)->SetLongArrayRegion(env, values, 0, MAX_COUNTERS, raw_values);
+    }
     return values;
 }
 
@@ -848,23 +838,6 @@ Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) 
         SSL_shutdown(ssl);
     }
     SSL_free(ssl);
-}
-
-JNIEXPORT jbyteArray JNICALL
-Java_one_nio_net_NativeSslSocket_sslGetOption(JNIEnv* env, jobject self, jint option) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
-    if (ssl == NULL) {
-        return NULL;
-    }
-
-    switch (option) {
-        case SOL_SSL_SESSION_REUSED:
-            return int_to_bytes(env, SSL_session_reused(ssl));
-        case SOL_SSL_SESSION_TICKET:
-            return int_to_bytes(env, ((intptr_t)SSL_get_app_data(ssl) & SF_NEW_TICKET) >> 2);
-        default:
-            return NULL;
-    }
 }
 
 JNIEXPORT jint JNICALL
@@ -976,4 +949,108 @@ Java_one_nio_net_NativeSslSocket_readFully(JNIEnv* env, jobject self, jbyteArray
             }
         }
     }
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_one_nio_net_NativeSslSocket_sslPeerCertificate(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        return NULL;
+    }
+
+    X509* cert = SSL_get_peer_certificate(ssl);
+    if (cert == NULL) {
+        return NULL;
+    }
+
+    jbyteArray result = NULL;
+
+    unsigned char* buf = NULL;
+    int len = i2d_X509(cert, &buf);
+    if (buf != NULL) {
+        result = (*env)->NewByteArray(env, len);
+        if (result != NULL) {
+            (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte*)buf);
+        }
+        OPENSSL_free(buf);
+    }
+
+    X509_free(cert);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_one_nio_net_NativeSslSocket_sslCertName(JNIEnv* env, jobject self, jint which) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        return NULL;
+    }
+
+    X509* cert = SSL_get_peer_certificate(ssl);
+    if (cert == NULL) {
+        return NULL;
+    }
+
+    jstring result = NULL;
+
+    X509_NAME* name = which == 0 ? X509_get_subject_name(cert) : X509_get_issuer_name(cert);
+    if (name != NULL) {
+        BIO* mem = BIO_new(BIO_s_mem());
+        if (mem != NULL) {
+            X509_NAME_print_ex(mem, name, 0, XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_FN_SN |
+                                             (ASN1_STRFLGS_RFC2253 & ~ASN1_STRFLGS_ESC_MSB));
+            char zero = 0;
+            BIO_write(mem, &zero, 1);
+
+            char* data;
+            long len = BIO_get_mem_data(mem, &data);
+            if (len > 1) {
+                result = (*env)->NewStringUTF(env, data);
+            }
+
+            BIO_free(mem);
+        }
+    }
+
+    X509_free(cert);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_one_nio_net_NativeSslSocket_sslVerifyResult(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        return NULL;
+    }
+
+    long err = SSL_get_verify_result(ssl);
+    if (err == 0) {
+        return NULL;
+    }
+
+    const char* str = X509_verify_cert_error_string(err);
+    return str == NULL ? NULL : (*env)->NewStringUTF(env, str);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSslSocket_sslSessionReused(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    return ssl != NULL && SSL_session_reused(ssl) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSslSocket_sslSessionTicket(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    return ssl == NULL ? 0 : ((intptr_t)SSL_get_app_data(ssl) & SF_NEW_TICKET) >> 2;
+}
+
+JNIEXPORT jstring JNICALL
+Java_one_nio_net_NativeSslSocket_sslCurrentCipher(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        return NULL;
+    }
+
+    const char* name = SSL_CIPHER_get_name(SSL_get_current_cipher(ssl));
+    return name == NULL ? NULL : (*env)->NewStringUTF(env, name);
 }

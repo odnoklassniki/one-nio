@@ -152,8 +152,14 @@ public final class JavaInternals {
 
     // Useful for patching final fields
     public static void setObjectField(Object obj, String name, Object value) {
+        Class<?> cls = obj.getClass();
+        setObjectField(obj, cls, name, value);
+    }
+
+    // Useful for patching final fields
+    public static void setObjectField(Object obj, Class<?> cls, String name, Object value) {
         try {
-            Field field = obj.getClass().getDeclaredField(name);
+            Field field = cls.getDeclaredField(name);
             if (Modifier.isStatic(field.getModifiers())) {
                 throw new IllegalArgumentException("Object field expected");
             }

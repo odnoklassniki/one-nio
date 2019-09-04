@@ -110,10 +110,13 @@ class NativeSslContext extends SslContext {
                 case "tlsv1.2":
                     enabled |= 0x08000000;
                     break;
+                case "tlsv1.3":
+                    enabled |= 0x20000000;
+                    break;
             }
         }
 
-        int all = 0x00020000 + 0x01000000 + 0x02000000 + 0x04000000 + 0x08000000 + 0x10000000;
+        int all = 0x00020000 + 0x01000000 + 0x02000000 + 0x04000000 + 0x08000000 + 0x10000000 + 0x20000000;
         clearOptions(enabled);
         setOptions(all - enabled);
     }

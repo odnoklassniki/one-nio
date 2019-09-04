@@ -354,6 +354,11 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public <T> T getSslOption(SslOption<T> option) {
+        return null;
+    }
+
+    @Override
     public SelectableChannel getSelectableChannel() {
         return ch;
     }

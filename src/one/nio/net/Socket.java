@@ -33,16 +33,6 @@ public abstract class Socket implements ByteChannel {
     public static final int SOL_IPV6      = 41;
     public static final int SOL_TCP       = 6;
     public static final int SOL_UDP       = 17;
-    public static final int SOL_SSL       = 1024;
-
-    // Options to use with SOL_SSL
-
-    // Session ID as a byte array
-    public static final int SSL_SESSION        = 1;
-    // 0 = new SSL session; 1 = reused SSL session
-    public static final int SSL_SESSION_REUSED = 2;
-    // 0 = no ticket; 1 = reused ticket; 2 = reused older ticket; 3 = newly issued ticket
-    public static final int SSL_SESSION_TICKET = 3;
 
     // Flags for readRaw / writeRaw
     public static final int MSG_OOB       = 0x01;
@@ -54,7 +44,6 @@ public abstract class Socket implements ByteChannel {
     public static final int MSG_MORE      = 0x8000;
 
     // Options for setTos
-
     public static final int IPTOS_MINCOST     = 0x02;
     public static final int IPTOS_RELIABILITY = 0x04;
     public static final int IPTOS_THROUGHPUT  = 0x08;
@@ -103,6 +92,7 @@ public abstract class Socket implements ByteChannel {
     public abstract Socket sslWrap(SslContext context) throws IOException;
     public abstract Socket sslUnwrap();
     public abstract SslContext getSslContext();
+    public abstract <T> T getSslOption(SslOption<T> option);
 
     public Socket acceptNonBlocking() throws IOException {
         Socket s = accept();

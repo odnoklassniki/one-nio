@@ -17,6 +17,7 @@
 package one.nio.http;
 
 import one.nio.net.Socket;
+import one.nio.net.SslOption;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
@@ -60,22 +61,36 @@ public class HttpServerTest extends HttpServer {
         return response;
     }
 
+    @Path("/cert")
+    public Response handleCert(HttpSession session) {
+        System.out.println("handleCert");
+
+        Socket socket = session.socket();
+        byte[] cert = socket.getSslOption(SslOption.PEER_CERTIFICATE);
+        String subject = socket.getSslOption(SslOption.PEER_SUBJECT);
+        String issuer = socket.getSslOption(SslOption.PEER_ISSUER);
+
+        return Response.ok("Client certificate: " + (cert == null ? "none" : cert.length + " bytes") + "\n"
+                + "Subject: " + subject + "\n"
+                + "Issuer: " + issuer + "\n");
+    }
+
     @Path("/session")
     public Response handleSession(HttpSession session) {
         Socket socket = session.socket();
-        byte[] reused = socket.getOption(Socket.SOL_SSL, Socket.SSL_SESSION_REUSED);
-        byte[] ticket = socket.getOption(Socket.SOL_SSL, Socket.SSL_SESSION_TICKET);
+        Boolean reused = socket.getSslOption(SslOption.SESSION_REUSED);
+        Integer ticket = socket.getSslOption(SslOption.SESSION_TICKET);
 
         StringBuilder result = new StringBuilder("SSL session flags:");
-        if (reused != null && reused.length > 0 && reused[0] == 1) {
+        if (reused != null && reused) {
             result.append(" SESSION_REUSED");
         }
-        if (ticket != null && ticket.length > 0) {
-            if (ticket[0] == 1) {
+        if (ticket != null) {
+            if (ticket == 1) {
                 result.append(" TICKET_REUSED");
-            } else if (ticket[0] == 2) {
+            } else if (ticket == 2) {
                 result.append(" OLD_TICKET_REUSED");
-            } else if (ticket[0] == 3) {
+            } else if (ticket == 3) {
                 result.append(" NEW_TICKET");
             }
         }
