@@ -16,6 +16,7 @@
 
 package one.nio.serial;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -80,5 +81,24 @@ public class DeserializeStream extends DataStream {
     @Override
     public void register(Object obj) {
         context[contextSize] = obj;
+    }
+
+    @Override
+    public Closeable newScope() {
+        return new Closeable() {
+            private final Object[] prevContext = context;
+            private final int prevContextSize = contextSize;
+
+            {
+                context = new Object[INITIAL_CAPACITY];
+                contextSize = 0;
+            }
+
+            @Override
+            public void close() {
+                context = prevContext;
+                contextSize = prevContextSize;
+            }
+        };
     }
 }

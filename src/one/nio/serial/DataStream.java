@@ -19,6 +19,7 @@ package one.nio.serial;
 import one.nio.mem.DirectMemory;
 import one.nio.util.Utf8;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -330,6 +331,10 @@ public class DataStream implements ObjectInput, ObjectOutput {
 
     public void register(Object obj) {
         // Nothing to do
+    }
+
+    public Closeable newScope() {
+        return null;
     }
 
     protected long alloc(int size) throws IOException {

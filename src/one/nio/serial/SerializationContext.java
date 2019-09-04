@@ -18,7 +18,7 @@ package one.nio.serial;
 
 import java.util.Arrays;
 
-class SerializationContext {
+public class SerializationContext {
     private static final int INITIAL_CAPACITY = 64;
 
     private Object first;

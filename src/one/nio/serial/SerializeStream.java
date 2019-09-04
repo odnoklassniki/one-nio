@@ -16,6 +16,7 @@
 
 package one.nio.serial;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 public class SerializeStream extends DataStream {
@@ -59,5 +60,21 @@ public class SerializeStream extends DataStream {
     @Override
     public void close() {
         context = null;
+    }
+
+    @Override
+    public Closeable newScope() {
+        return new Closeable() {
+            private final SerializationContext prevContext = context;
+
+            {
+                context = new SerializationContext();
+            }
+
+            @Override
+            public void close() {
+                context = prevContext;
+            }
+        };
     }
 }

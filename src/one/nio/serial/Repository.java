@@ -130,6 +130,7 @@ public class Repository {
         addBootstrap(new RemoteCallSerializer());
         addBootstrap(new SerializerSerializer(MethodSerializer.class));
         addBootstrap(new HttpRequestSerializer());
+        addBootstrap(new SerializedWrapperSerializer());
 
         classMap.put(int.class, classMap.get(Integer.class));
         classMap.put(long.class, classMap.get(Long.class));
@@ -356,6 +357,10 @@ public class Repository {
                 } else {
                     serializer = new ExternalizableSerializer(cls);
                 }
+            } else if (SerializedWrapper.class.isAssignableFrom(cls)) {
+                serializer = classMap.get(SerializedWrapper.class);
+                classMap.put(cls, serializer);
+                return serializer;
             } else if (Collection.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
                 serializer = new CollectionSerializer(cls);
             } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {

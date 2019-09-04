@@ -32,7 +32,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class SerializationTest {
@@ -433,5 +436,41 @@ public class SerializationTest {
     @Test
     public void testChatSample() throws IOException, ClassNotFoundException {
         checkSerialize(Sample.createChat());
+    }
+
+    static class MySerializedWrapper extends SerializedWrapper {
+
+        public MySerializedWrapper(byte[] serialized) {
+            super(serialized);
+        }
+
+        public static MySerializedWrapper wrap(Object obj) throws IOException {
+            return new MySerializedWrapper(Serializer.serialize(obj));
+        }
+    }
+
+    @Test
+    public void testSerializedWrapper() throws IOException, ClassNotFoundException {
+        Object original = Sample.createChat();
+
+        SerializedWrapper wrapper1 = SerializedWrapper.wrap(original);
+        MySerializedWrapper wrapper2 = MySerializedWrapper.wrap(original);
+        assertEquals(wrapper1, wrapper2);
+        assertEquals(wrapper1.hashCode(), wrapper2.hashCode());
+
+        byte[] serializedOriginal = Serializer.serialize(original);
+        byte[] serializedWrapper = Serializer.serialize(wrapper2);
+        assertEquals(serializedOriginal.length + 1, serializedWrapper.length);
+        assertArrayEquals(serializedOriginal, Arrays.copyOfRange(serializedWrapper, 1, serializedWrapper.length));
+
+        Object deserialized = clone(wrapper1);
+        assertEquals(original, deserialized);
+
+        Object[] array = {original, wrapper1, original, wrapper2};
+        Object[] deserializedArray = (Object[]) clone(array);
+        assertSame(deserializedArray[0], deserializedArray[2]);
+        assertNotSame(deserializedArray[1], deserializedArray[3]);
+        assertEquals(deserializedArray[0], deserializedArray[1]);
+        assertEquals(deserializedArray[0], deserializedArray[3]);
     }
 }
