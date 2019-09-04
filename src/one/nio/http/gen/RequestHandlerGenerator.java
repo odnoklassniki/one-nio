@@ -81,7 +81,7 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
 
         mv.visitVarInsn(ALOAD, 0);
         mv.visitFieldInsn(GETFIELD, className, "router", routerType);
-        setupArguments(mv, m);
+        Label invalidArgumentHandler = setupArguments(mv, m);
         emitInvoke(mv, m);
 
         if (m.getReturnType() == Response.class) {
@@ -89,6 +89,21 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
         }
 
         mv.visitInsn(RETURN);
+
+        // catch (Exception e) {
+        //     throw new HttpException("Invalid parameters", e);
+        // }
+        if (invalidArgumentHandler != null) {
+            mv.visitLabel(invalidArgumentHandler);
+            mv.visitVarInsn(ASTORE, 3);
+            mv.visitTypeInsn(NEW, "one/nio/http/HttpException");
+            mv.visitInsn(DUP);
+            mv.visitLdcInsn("Invalid parameters");
+            mv.visitVarInsn(ALOAD, 3);
+            mv.visitMethodInsn(INVOKESPECIAL, "one/nio/http/HttpException", "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V");
+            mv.visitInsn(ATHROW);
+        }
+
         mv.visitMaxs(0, 0);
         mv.visitEnd();
 
@@ -96,9 +111,15 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
         return instantiate(cv.toByteArray(), m, router);
     }
 
-    private void setupArguments(MethodVisitor mv, Method m) {
+    private Label setupArguments(MethodVisitor mv, Method m) {
         Class[] types = m.getParameterTypes();
+        if (types.length == 0) {
+            return null;
+        }
         Annotation[][] annotations = m.getParameterAnnotations();
+
+        Label start = new Label();
+        mv.visitLabel(start);
 
         nextArgument:
         for (int i = 0; i < types.length; i++) {
@@ -120,6 +141,13 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
                 throw new IllegalArgumentException("Missing @Param or @Header for argument " + i + " of " + m);
             }
         }
+
+        Label end = new Label();
+        mv.visitLabel(end);
+
+        Label invalidArgumentHandler = new Label();
+        mv.visitTryCatchBlock(start, end, invalidArgumentHandler, "java/lang/Exception");
+        return invalidArgumentHandler;
     }
 
     private void setupParam(MethodVisitor mv, Class type, Param param) {
