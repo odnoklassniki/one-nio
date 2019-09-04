@@ -1,3 +1,18 @@
+1.2.0
+  * Updated SSL API. Client certificate inspection support
+  * `SerializedWrapper` for transfering pre-serialized objects
+  * Http server returns "400 Bad Request" if fails to parse parameters
+  * Getters for all socket options
+  * Synchronous `Server.start`
+  * Java wrappers for `setpriority`/`getpriority` (thread niceness)
+  * `HttpClient` invoke with timeout
+  * Support for connected UDP Java socket
+  * Java API for perf events on Linux
+  * Serialization bugfixes
+  * `ConnectionString` recognizes well-known ports
+  * `ConfigParser` enhancements
+  * Fixed compatibility issues with JDK 11. Get rid of `tools.jar` dependency
+
 1.1.0
   * `ConfigParser` better handles scalars, collections and generics
   * `Malloc` compatibility with older format
