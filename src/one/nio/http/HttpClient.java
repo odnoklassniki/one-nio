@@ -29,7 +29,7 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 
 public class HttpClient extends SocketPool {
-    private static final int BUFFER_SIZE = 8000;
+    private int bufferSize = 8000;
 
     protected String[] permanentHeaders;
 
@@ -82,7 +82,7 @@ public class HttpClient extends SocketPool {
             try {
                 socket.setTimeout(timeout == 0 ? readTimeout : timeout);
                 socket.writeFully(rawRequest, 0, rawRequest.length);
-                responseReader = new ResponseReader(socket, BUFFER_SIZE);
+                responseReader = new ResponseReader(socket, bufferSize);
             } catch (SocketTimeoutException e) {
                 throw e;
             } catch (IOException e) {
@@ -90,7 +90,7 @@ public class HttpClient extends SocketPool {
                 destroyObject(socket);
                 socket = createObject();
                 socket.writeFully(rawRequest, 0, rawRequest.length);
-                responseReader = new ResponseReader(socket, BUFFER_SIZE);
+                responseReader = new ResponseReader(socket, bufferSize);
             }
 
             Response response = responseReader.readResponse(method);
@@ -191,6 +191,14 @@ public class HttpClient extends SocketPool {
         return request;
     }
 
+    public int getBufferSize() {
+        return bufferSize;
+    }
+
+    public void setBufferSize(int bufferSize) {
+        this.bufferSize = bufferSize;
+    }
+
     static class ResponseReader {
         Socket socket;
         byte[] buf;
@@ -204,12 +212,9 @@ public class HttpClient extends SocketPool {
         }
 
         Response readResponse(int method) throws IOException, HttpException {
-            String responseHeader = readLine();
-            if (responseHeader.length() <= 9) {
-                throw new HttpException("Invalid response header: " + responseHeader);
-            }
+            String responseHeader = readResponseHeader();
 
-            Response response = new Response(responseHeader.substring(9));
+            Response response = new Response(responseHeader);
             for (String header; !(header = readLine()).isEmpty(); ) {
                 response.addHeader(header);
             }
@@ -232,6 +237,20 @@ public class HttpClient extends SocketPool {
             }
 
             return response;
+        }
+
+        String readResponseHeader() throws HttpException {
+            byte[] buf = this.buf;
+            int pos = 11;
+
+            do {
+                if (pos >= length) {
+                    throw new HttpException("Response header absent");
+                }
+            } while (buf[pos++] != '\n');
+
+            this.pos = pos;
+            return Utf8.read(buf, 9, pos - 2);
         }
 
         String readLine() throws IOException, HttpException {
