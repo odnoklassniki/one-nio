@@ -1,3 +1,8 @@
+1.2.1
+  * Enable SO_KEEPALIVE on a ServerSocket by default
+  * Fixed server graceful shutdown
+  * Fixed Socket tests failing on older kernels
+
 1.2.0
   * Updated SSL API. Client certificate inspection support
   * `SerializedWrapper` for transfering pre-serialized objects
