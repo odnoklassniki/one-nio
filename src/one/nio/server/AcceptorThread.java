@@ -57,6 +57,7 @@ final class AcceptorThread extends Thread {
         if (config.tos != 0) serverSocket.setTos(config.tos);
         if (config.deferAccept) serverSocket.setDeferAccept(true);
 
+        serverSocket.setKeepAlive(config.keepAlive);
         serverSocket.setNoDelay(config.noDelay);
         serverSocket.setTcpFastOpen(config.tcpFastOpen);
         serverSocket.setReuseAddr(true, config.reusePort);
@@ -74,6 +75,7 @@ final class AcceptorThread extends Thread {
             serverSocket.setTos(config.tos);
         }
         serverSocket.setDeferAccept(config.deferAccept);
+        serverSocket.setKeepAlive(config.keepAlive);
         serverSocket.setNoDelay(config.noDelay);
         serverSocket.setTcpFastOpen(config.tcpFastOpen);
         serverSocket.setReuseAddr(true, config.reusePort);

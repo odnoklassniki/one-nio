@@ -42,14 +42,20 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
         ((WaitingSynchronousQueue) getQueue()).setQueueTime(queueTime);
     }
 
-    void gracefulShutdown(long timeout) {
+    void gracefulShutdown() {
         shutdown();
         try {
-            awaitTermination(timeout, TimeUnit.MILLISECONDS);
+            awaitTermination(20, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+
         shutdownNow();
+        try {
+            awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override

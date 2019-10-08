@@ -30,6 +30,7 @@ public class AcceptorConfig {
     public int sendBuf;
     public int tos;
     public int backlog = 128;
+    public boolean keepAlive = true;
     public boolean noDelay = true;
     public boolean tcpFastOpen = true;
     public boolean deferAccept;

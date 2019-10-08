@@ -144,7 +144,7 @@ public class Server implements ServerMXBean {
             selector.shutdown();
         }
 
-        workers.gracefulShutdown(30000L);
+        workers.gracefulShutdown();
     }
 
     public void registerShutdownHook() {
