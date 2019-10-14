@@ -32,7 +32,7 @@ import static org.junit.Assert.assertNull;
 /**
  * Unit tests for client and server support for standard HTTP methods
  *
- * @author Vadim Tsesko <mail@incubos.org>
+ * @author Vadim Tsesko <incubos@yandex.com>
  */
 public class HttpMethodTest {
     private static final String ENDPOINT = "/echoMethod";
