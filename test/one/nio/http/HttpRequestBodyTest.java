@@ -146,7 +146,7 @@ public class HttpRequestBodyTest {
     }
 
     public static class TestServer extends HttpServer {
-        TestServer(HttpServerConfig config) throws IOException {
+        private TestServer(HttpServerConfig config) throws IOException {
             super(config);
         }
 
