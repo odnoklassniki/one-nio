@@ -214,7 +214,7 @@ public class HttpClient extends SocketPool {
                 response.addHeader(header);
             }
 
-            if (method != Request.METHOD_HEAD && response.getStatus() != 204) {
+            if (method != Request.METHOD_HEAD && mayHaveBody(response.getStatus())) {
                 if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding: "))) {
                     response.setBody(readChunkedBody());
                 } else {
@@ -294,6 +294,10 @@ public class HttpClient extends SocketPool {
                 position += chunk.length;
             }
             return result;
+        }
+
+        private static boolean mayHaveBody(int status) {
+            return status >= 200 && status != 204 && status != 304;
         }
     }
 }
