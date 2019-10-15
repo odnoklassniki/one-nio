@@ -32,7 +32,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * Unit tests for client and server support for HTTP request body
  *
- * @author Vadim Tsesko <mail@incubos.org>
+ * @author Vadim Tsesko <incubos@yandex.com>
  */
 public class HttpRequestBodyTest {
     private static final String ENDPOINT = "/echoBody";
@@ -146,7 +146,7 @@ public class HttpRequestBodyTest {
     }
 
     public static class TestServer extends HttpServer {
-        TestServer(HttpServerConfig config) throws IOException {
+        private TestServer(HttpServerConfig config) throws IOException {
             super(config);
         }
 

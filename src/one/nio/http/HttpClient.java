@@ -215,8 +215,14 @@ public class HttpClient extends SocketPool {
             }
 
             if (method != Request.METHOD_HEAD && response.getStatus() != 204) {
-                String contentLength = response.getHeader("Content-Length: ");
-                if (contentLength != null) {
+                if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding: "))) {
+                    response.setBody(readChunkedBody());
+                } else {
+                    String contentLength = response.getHeader("Content-Length: ");
+                    if (contentLength == null) {
+                        throw new HttpException("Content-Length unspecified");
+                    }
+
                     byte[] body = new byte[Integer.parseInt(contentLength)];
                     int contentBytes = length - pos;
                     System.arraycopy(buf, pos, body, 0, contentBytes);
@@ -224,10 +230,6 @@ public class HttpClient extends SocketPool {
                         socket.readFully(body, contentBytes, body.length - contentBytes);
                     }
                     response.setBody(body);
-                } else if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding: "))) {
-                    response.setBody(readChunkedBody());
-                } else {
-                    throw new HttpException("Content-Length unspecified");
                 }
             }
 
