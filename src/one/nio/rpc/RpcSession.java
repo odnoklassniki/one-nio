@@ -193,7 +193,10 @@ public class RpcSession<S, M> extends Session {
 
     @SuppressWarnings("unchecked")
     protected void streamCommunicate(StreamProxy streamProxy) throws IOException {
-        selector.disable(this);
+        if (selector != null) {
+            selector.disable(this);
+        }
+
         socket.setBlocking(true);
         socket.setTos(Socket.IPTOS_THROUGHPUT);
         socket.writeFully(RpcPacket.STREAM_HEADER_ARRAY, 0, 4);
@@ -212,7 +215,10 @@ public class RpcSession<S, M> extends Session {
 
         socket.setTos(0);
         socket.setBlocking(false);
-        selector.enable(this);
+
+        if (selector != null) {
+            selector.enable(this);
+        }
     }
 
     protected void invoke(Object request, M meta) throws Exception {

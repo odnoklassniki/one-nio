@@ -58,6 +58,11 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         return out.getBytesWritten();
     }
 
+    @Override
+    public void invalidate() {
+        error = true;
+    }
+
     // ObjectInput
 
     @Override
@@ -65,7 +70,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             in.read(buf);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -77,7 +82,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
             in.reset();
             return result;
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -87,7 +92,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.read();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -97,7 +102,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.read(b);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -107,7 +112,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.read(b, off, len);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -117,7 +122,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.skip(n);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -132,7 +137,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             in.readFully(b);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -142,7 +147,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             in.read(b, off, len);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -152,7 +157,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.skipBytes(n);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -162,7 +167,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readBoolean();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -172,7 +177,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readByte();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -182,7 +187,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readUnsignedByte();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -192,7 +197,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readShort();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -202,7 +207,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readUnsignedShort();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -212,7 +217,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readChar();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -222,7 +227,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readInt();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -232,7 +237,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readLong();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -242,7 +247,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readFloat();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -252,7 +257,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readDouble();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -262,7 +267,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readLine();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -272,7 +277,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             return in.readUTF();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -284,7 +289,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.write(buf);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -295,7 +300,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
             out.writeObject(obj);
             out.reset();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -305,7 +310,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.write(b);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -315,7 +320,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.write(b);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -325,7 +330,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.write(b, off, len);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -335,7 +340,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeBoolean(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -345,7 +350,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeByte(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -355,7 +360,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeShort(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -365,7 +370,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeChar(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -375,7 +380,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeInt(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -385,7 +390,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeLong(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -395,7 +400,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeFloat(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -405,7 +410,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeDouble(v);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -415,7 +420,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeBytes(s);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -425,7 +430,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeChars(s);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -435,7 +440,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.writeUTF(s);
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -445,7 +450,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
         try {
             out.flush();
         } catch (Throwable e) {
-            error = true;
+            invalidate();
             throw e;
         }
     }
@@ -456,7 +461,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
             in.close();
             out.close();
         } catch (IOException e) {
-            error = true;
+            invalidate();
         }
     }
 

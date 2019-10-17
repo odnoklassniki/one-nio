@@ -48,6 +48,10 @@ public final class StreamProxy<S, R> implements RpcStream, BidiStream<S, R> {
         return bytesWritten;
     }
 
+    public final void invalidate() {
+        // Nothing to do
+    }
+
     // ObjectInput
 
     public final void read(ByteBuffer buf) throws IOException {

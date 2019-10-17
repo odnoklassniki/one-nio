@@ -25,5 +25,6 @@ public interface BaseStream extends AutoCloseable {
     long getBytesRead();
     long getBytesWritten();
 
+    void invalidate();
     void close();
 }
