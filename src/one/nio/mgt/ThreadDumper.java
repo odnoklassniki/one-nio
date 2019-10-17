@@ -20,10 +20,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import javax.management.JMException;
-import javax.management.ObjectName;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.management.ManagementFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ThreadDumper {
@@ -31,14 +29,9 @@ public class ThreadDumper {
     private static final AtomicLong dumpTime = new AtomicLong();
 
     public static void dump(OutputStream out) {
-        Object threadDump;
+        String threadDump;
         try {
-            threadDump = ManagementFactory.getPlatformMBeanServer().invoke(
-                    new ObjectName("com.sun.management:type=DiagnosticCommand"),
-                    "threadPrint",
-                    new Object[]{null},
-                    new String[]{"[Ljava.lang.String;"}
-            );
+            threadDump = DiagnosticCommand.execute("threadPrint");
         } catch (JMException e) {
             log.warn("Failed to get threads dump: " + e);
             return;

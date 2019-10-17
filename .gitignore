@@ -4,6 +4,7 @@
 *.ear
 
 /build
+/out
 /lib
 /target
 
