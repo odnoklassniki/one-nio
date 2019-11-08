@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <project name="one-nio" default="build" basedir=".">
     <property name="build.dir"      value="build"/>
-    <property name="src.dir"        value="src"/>
-    <property name="test.dir"       value="test"/>
+    <property name="src.dir"        value="src/main/java"/>
+    <property name="test.dir"       value="src/test/java"/>
     <property name="lib.dir"        value="lib"/>
     <property name="target.jar"     value="${build.dir}/${ant.project.name}.jar"/>
     <property name="download.repo"  value="http://repo1.maven.org/maven2"/>

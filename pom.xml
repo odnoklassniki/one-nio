@@ -78,8 +78,8 @@
 
     <build>
         <defaultGoal>install</defaultGoal>
-        <sourceDirectory>src</sourceDirectory>
-        <testSourceDirectory>test</testSourceDirectory>
+        <sourceDirectory>src/main/java</sourceDirectory>
+        <testSourceDirectory>src/test/java</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -92,7 +92,7 @@
                         <configuration>
                             <target name="compile-native">
                                 <property name="build.dir"      value="target"/>
-                                <property name="src.dir"        value="src"/>
+                                <property name="src.dir"        value="src/main/java"/>
                                 <property name="gcc.extra.args" value=""/>
 
                                 <echo message="Compiling native library..."/>
