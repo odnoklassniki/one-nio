@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.function.Consumer;
 
 public class Request {
     public static final int METHOD_GET     = 1;
@@ -39,28 +40,29 @@ public class Request {
     public static final int METHOD_PATCH   = 9;
     public static final int NUMBER_OF_METHODS = 10;
 
-    public static final byte[] VERB_GET     = Utf8.toBytes("GET ");
-    public static final byte[] VERB_POST    = Utf8.toBytes("POST ");
-    public static final byte[] VERB_HEAD    = Utf8.toBytes("HEAD ");
-    public static final byte[] VERB_OPTIONS = Utf8.toBytes("OPTIONS ");
-    public static final byte[] VERB_PUT     = Utf8.toBytes("PUT ");
-    public static final byte[] VERB_DELETE  = Utf8.toBytes("DELETE ");
-    public static final byte[] VERB_TRACE   = Utf8.toBytes("TRACE ");
-    public static final byte[] VERB_CONNECT = Utf8.toBytes("CONNECT ");
-    public static final byte[] VERB_PATCH   = Utf8.toBytes("PATCH ");
-
-    static final byte[][] VERBS = {
-            new byte[0],
-            VERB_GET,
-            VERB_POST,
-            VERB_HEAD,
-            VERB_OPTIONS,
-            VERB_PUT,
-            VERB_DELETE,
-            VERB_TRACE,
-            VERB_CONNECT,
-            VERB_PATCH
+    static final String[] METHODS = {
+            "",
+            "GET",
+            "POST",
+            "HEAD",
+            "OPTIONS",
+            "PUT",
+            "DELETE",
+            "TRACE",
+            "CONNECT",
+            "PATCH"
     };
+
+    // Methods followed by a single space character
+    static final byte[][] VERBS;
+
+    static {
+        VERBS = new byte[METHODS.length][];
+        VERBS[0] = new byte[0];
+        for (int i = 1; i < VERBS.length; i++) {
+            VERBS[i] = Utf8.toBytes(METHODS[i] + ' ');
+        }
+    }
 
     private static final byte[] HTTP10_HEADER = Utf8.toBytes(" HTTP/1.0\r\n");
     private static final byte[] HTTP11_HEADER = Utf8.toBytes(" HTTP/1.1\r\n");
@@ -75,6 +77,7 @@ public class Request {
     private byte[] body;
 
     public Request(int method, String uri, boolean http11) {
+        assert 0 <= method && method < METHODS.length;
         this.method = method;
         this.uri = uri;
         this.http11 = http11;
@@ -95,6 +98,10 @@ public class Request {
 
     public int getMethod() {
         return method;
+    }
+
+    public String getMethodName() {
+        return METHODS[method];
     }
 
     public String getURI() {
@@ -128,35 +135,35 @@ public class Request {
     }
 
     public Iterator<String> getParameters(final String key) {
-         return new Iterator<String>() {
-             int cur = findNext(params + 1);
+        return new Iterator<String>() {
+            int cur = findNext(params + 1);
 
-             @Override
-             public boolean hasNext() {
-                 return cur > 0;
-             }
+            @Override
+            public boolean hasNext() {
+                return cur > 0;
+            }
 
-             @Override
-             public String next() {
-                 int next = uri.indexOf('&', cur);
-                 cur += key.length();
-                 String rawValue = next > 0 ? uri.substring(cur, next) : uri.substring(cur);
-                 cur = findNext(next + 1);
-                 return URLEncoder.decode(rawValue);
-             }
+            @Override
+            public String next() {
+                int next = uri.indexOf('&', cur);
+                cur += key.length();
+                String rawValue = next > 0 ? uri.substring(cur, next) : uri.substring(cur);
+                cur = findNext(next + 1);
+                return URLEncoder.decode(rawValue);
+            }
 
-             @Override
-             public void remove() {
-                  throw new UnsupportedOperationException();
-             }
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
 
-             private int findNext(int cur) {
-                 while (cur > 0 && !uri.startsWith(key, cur)) {
-                     cur = uri.indexOf('&', cur) + 1;
-                 }
-                 return cur;
-             }
-         };
+            private int findNext(int cur) {
+                while (cur > 0 && !uri.startsWith(key, cur)) {
+                    cur = uri.indexOf('&', cur) + 1;
+                }
+                return cur;
+            }
+        };
     }
 
     public String getParameter(String key, String defaultValue) {
@@ -174,7 +181,7 @@ public class Request {
 
     /**
      * @return {@link Iterable} over {@code String} {@code key[=[value]]} parameters
-     *         skipping empty parameters
+     * skipping empty parameters
      */
     public Iterable<Map.Entry<String, String>> getParameters() {
         if (params < 0) {
@@ -205,6 +212,15 @@ public class Request {
             }
         }
         return null;
+    }
+
+    public void consumeHeaders(String prefix, Consumer<String> suffixConsumer) {
+        int keyLength = prefix.length();
+        for (int i = 0; i < headerCount; i++) {
+            if (headers[i].regionMatches(true, 0, prefix, 0, keyLength)) {
+                suffixConsumer.accept(headers[i].substring(keyLength));
+            }
+        }
     }
 
     public String getHeader(String key, String defaultValue) {

@@ -35,7 +35,8 @@ import static org.junit.Assert.assertNull;
  * @author Vadim Tsesko <incubos@yandex.com>
  */
 public class HttpMethodTest {
-    private static final String ENDPOINT = "/echoMethod";
+    private static final String ECHO_METHOD_ENDPOINT = "/echoMethod";
+    private static final String ECHO_PUT_ENDPOINT = "/echoMethodOnPut";
 
     private static HttpServer server;
     private static HttpClient client;
@@ -57,62 +58,69 @@ public class HttpMethodTest {
     @Test
     public void get() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_GET),
-                client.get(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_GET],
+                client.get(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void head() throws Exception {
-        assertNull(client.head(ENDPOINT).getBodyUtf8());
+        assertNull(client.head(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void post() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_POST),
-                client.post(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_POST],
+                client.post(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void put() throws Exception {
         assertEquals(
+                Request.METHODS[Request.METHOD_PUT],
+                client.put(ECHO_METHOD_ENDPOINT).getBodyUtf8());
+    }
+
+    @Test
+    public void putMatcher() throws Exception {
+        assertEquals(
                 "echoMethodOnPut",
-                client.put(ENDPOINT).getBodyUtf8());
+                client.put(ECHO_PUT_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void options() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_OPTIONS),
-                client.options(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_OPTIONS],
+                client.options(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void delete() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_DELETE),
-                client.delete(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_DELETE],
+                client.delete(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void trace() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_TRACE),
-                client.trace(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_TRACE],
+                client.trace(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void connect() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_CONNECT),
-                client.connect(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_CONNECT],
+                client.connect(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
     public void patch() throws Exception {
         assertEquals(
-                Integer.toString(Request.METHOD_PATCH),
-                client.patch(ENDPOINT).getBodyUtf8());
+                Request.METHODS[Request.METHOD_PATCH],
+                client.patch(ECHO_METHOD_ENDPOINT).getBodyUtf8());
     }
 
     @Test
@@ -155,12 +163,12 @@ public class HttpMethodTest {
             super(config);
         }
 
-        @Path(ENDPOINT)
-        public Response echoMethod(Request request) throws IOException {
-            return Response.ok(Integer.toString(request.getMethod()));
+        @Path(ECHO_METHOD_ENDPOINT)
+        public Response echoMethod(Request request) {
+            return Response.ok(request.getMethodName());
         }
 
-        @Path(ENDPOINT)
+        @Path(ECHO_PUT_ENDPOINT)
         @RequestMethod(Request.METHOD_PUT)
         public Response echoMethodOnPut(Request request) {
             return Response.ok("echoMethodOnPut");

@@ -23,12 +23,16 @@ import one.nio.net.SslContext;
 import one.nio.pool.PoolException;
 import one.nio.pool.SocketPool;
 import one.nio.util.Utf8;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 
 public class HttpClient extends SocketPool {
+    protected static final Log log = LogFactory.getLog(HttpClient.class);
+
     private static final int BUFFER_SIZE = 8000;
 
     protected String[] permanentHeaders;
@@ -220,6 +224,9 @@ public class HttpClient extends SocketPool {
                 } else {
                     String contentLength = response.getHeader("Content-Length: ");
                     if (contentLength == null) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Content-Length unspecified: " + response.toString());
+                        }
                         throw new HttpException("Content-Length unspecified");
                     }
 
