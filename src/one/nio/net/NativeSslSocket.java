@@ -45,7 +45,7 @@ class NativeSslSocket extends NativeSocket {
     }
 
     @Override
-    public Socket acceptNonBlocking() throws IOException {
+    public NativeSocket acceptNonBlocking() throws IOException {
         return new NativeSslSocket(accept0(true), context, true);
     }
 
@@ -85,6 +85,9 @@ class NativeSslSocket extends NativeSocket {
     public long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
         throw new IOException("Cannot use sendFile with SSL");
     }
+
+    @Override
+    public synchronized native void handshake() throws IOException;
 
     @Override
     public synchronized native int writeRaw(long buf, int count, int flags) throws IOException;

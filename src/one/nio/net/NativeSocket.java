@@ -51,7 +51,7 @@ class NativeSocket extends Socket {
     }
 
     @Override
-    public Socket acceptNonBlocking() throws IOException {
+    public NativeSocket acceptNonBlocking() throws IOException {
         return new NativeSocket(accept0(true));
     }
 
@@ -109,17 +109,17 @@ class NativeSocket extends Socket {
     }
 
     @Override
-    public final void connect(InetAddress address, int port) throws IOException {
+    public void connect(InetAddress address, int port) throws IOException {
         connect0(address.getAddress(), port);
     }
 
     @Override
-    public final void bind(InetAddress address, int port, int backlog) throws IOException {
+    public void bind(InetAddress address, int port, int backlog) throws IOException {
         bind0(address.getAddress(), port);
     }
 
     @Override
-    public final native void listen(int backlog) throws IOException;
+    public native void listen(int backlog) throws IOException;
 
     @Override
     public native void close();
@@ -272,18 +272,18 @@ class NativeSocket extends Socket {
 
     // PF_INET
     static native int socket0(boolean datagram) throws IOException;
-    native void connect0(byte[] address, int port) throws IOException;
-    native void bind0(byte[] address, int port) throws IOException;
+    final native void connect0(byte[] address, int port) throws IOException;
+    final native void bind0(byte[] address, int port) throws IOException;
 
     // PF_UNIX
     static native int socket1() throws IOException;
-    native void connect1(String path) throws IOException;
-    native void bind1(String path) throws IOException;
+    final native void connect1(String path) throws IOException;
+    final native void bind1(String path) throws IOException;
 
-    native int accept0(boolean nonblock) throws IOException;
-    native long sendFile0(int sourceFD, long offset, long count) throws IOException;
-    native void getsockname(byte[] buffer);
-    native void getpeername(byte[] buffer);
-    native int sendTo(long buf, int size, int flags, byte[] address, int port) throws IOException;
-    native int recvFrom(long buf, int maxSize, int flags, byte[] addrBuffer) throws IOException;
+    final native int accept0(boolean nonblock) throws IOException;
+    final native long sendFile0(int sourceFD, long offset, long count) throws IOException;
+    final native void getsockname(byte[] buffer);
+    final native void getpeername(byte[] buffer);
+    final native int sendTo(long buf, int size, int flags, byte[] address, int port) throws IOException;
+    final native int recvFrom(long buf, int maxSize, int flags, byte[] addrBuffer) throws IOException;
 }

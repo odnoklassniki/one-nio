@@ -174,7 +174,7 @@ public abstract class SslContext {
     void updateTicketKeys(String ticketDir, boolean force) throws IOException {
         File[] files = new File(ticketDir).listFiles();
         if (files == null || files.length == 0) {
-            setTicketKeys(null);
+            log.warn("No ticket keys found in " + ticketDir);
             return;
         }
 

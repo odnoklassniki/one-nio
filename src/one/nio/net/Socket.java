@@ -108,6 +108,10 @@ public abstract class Socket implements ByteChannel {
         bind(InetAddress.getByName(host), port, backlog);
     }
 
+    public void handshake() throws IOException {
+        // Only for SSL sockets
+    }
+
     public int write(byte[] data, int offset, int count) throws IOException {
         return write(data, offset, count, 0);
     }

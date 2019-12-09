@@ -840,6 +840,19 @@ Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) 
     SSL_free(ssl);
 }
 
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        throw_socket_closed(env);
+    } else {
+        int result = SSL_do_handshake(ssl);
+        if (result <= 0) {
+            check_ssl_error(env, ssl, result);
+        }
+    }
+}
+
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
     SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
