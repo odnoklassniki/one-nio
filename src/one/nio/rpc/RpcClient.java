@@ -144,7 +144,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
                 };
             }
 
-            RpcPacket.checkSize(responseSize, socket);
+            RpcPacket.checkReadSize(responseSize, socket);
             if (responseSize > 4) buffer = new byte[responseSize];
             socket.readFully(buffer, 0, responseSize);
 
@@ -160,6 +160,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(request);
         int requestSize = css.count();
+        RpcPacket.checkWriteSize(requestSize);
 
         byte[] buffer = new byte[requestSize + 4];
         DataStream ds = css.hasCycles() ? new SerializeStream(buffer) : new DataStream(buffer);

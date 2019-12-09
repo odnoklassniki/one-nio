@@ -216,7 +216,8 @@ public class Repository {
     public static void provideSerializer(Serializer serializer) {
         Serializer oldSerializer = uidMap.put(serializer.uid, serializer);
         if (oldSerializer != null && oldSerializer.cls != serializer.cls) {
-            throw new IllegalStateException("UID collision: " + serializer.descriptor + " overwrites " + oldSerializer.descriptor);
+            throw new IllegalStateException("UID collision (" + Long.toHexString(serializer.uid) + "): " +
+                    serializer.descriptor + " overwrites " + oldSerializer.descriptor);
         }
 
         if (serializer.uid < 0) {

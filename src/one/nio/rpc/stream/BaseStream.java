@@ -16,11 +16,20 @@
 
 package one.nio.rpc.stream;
 
+import one.nio.net.Socket;
+
 import java.net.InetSocketAddress;
 
 public interface BaseStream extends AutoCloseable {
-    InetSocketAddress getLocalAddress();
-    InetSocketAddress getRemoteAddress();
+    Socket socket();
+
+    default InetSocketAddress getLocalAddress() {
+        return socket().getLocalAddress();
+    }
+
+    default InetSocketAddress getRemoteAddress() {
+        return socket().getRemoteAddress();
+    }
 
     long getBytesRead();
     long getBytesWritten();

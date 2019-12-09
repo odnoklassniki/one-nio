@@ -16,6 +16,8 @@
 
 package one.nio.rpc.stream;
 
+import one.nio.net.Socket;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -31,6 +33,10 @@ public final class StreamProxy<S, R> implements RpcStream, BidiStream<S, R> {
     }
 
     // BaseStream
+
+    public final Socket socket() {
+        return null;
+    }
 
     public final InetSocketAddress getLocalAddress() {
         return null;

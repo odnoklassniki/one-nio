@@ -35,7 +35,8 @@ class SerializerSerializer extends ExternalizableSerializer {
         Serializer serializer = Repository.uidMap.get(uid);
         if (serializer != null) {
             if (!descriptor.equals(serializer.descriptor)) {
-                throw new IllegalStateException("UID collision: " + descriptor + " overwrites " + serializer.descriptor);
+                throw new IllegalStateException("UID collision (" + Long.toHexString(uid) + "): " +
+                        descriptor + " overwrites " + serializer.descriptor);
             }
             in.register(serializer);
             serializer.skipExternal(in);

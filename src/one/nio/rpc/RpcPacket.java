@@ -49,7 +49,13 @@ class RpcPacket {
         return buffer[0] << 24 | (buffer[1] & 0xff) << 16 | (buffer[2] & 0xff) << 8 | (buffer[3] & 0xff);
     }
 
-    static void checkSize(int size, Socket socket) throws IOException {
+    static void checkWriteSize(int size) throws IOException {
+        if (size >= ERROR_PACKET_SIZE) {
+            throw new IOException("RPC packet is too large: " + size);
+        }
+    }
+
+    static void checkReadSize(int size, Socket socket) throws IOException {
         if (size <= 0 || size >= ERROR_PACKET_SIZE) {
             throw new IOException("Invalid RPC packet from " + socket.getRemoteAddress());
         } else if (size >= WARN_PACKET_SIZE) {

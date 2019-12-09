@@ -32,14 +32,15 @@ public class ObjectOutputChannel extends DataStream {
     private long bytesWritten;
 
     public ObjectOutputChannel(WritableByteChannel ch) {
-        this(ch, 32768);
+        super(0, 0);
+        this.ch = ch;
+        this.context = new SerializationContext();
     }
 
     public ObjectOutputChannel(WritableByteChannel ch, int bufSize) {
         super(unsafe.allocateMemory(bufSize), bufSize);
         this.ch = ch;
         this.context = new SerializationContext();
-        this.serializerSet = new long[16];
     }
 
     public long getBytesWritten() {
@@ -57,7 +58,7 @@ public class ObjectOutputChannel extends DataStream {
                 Serializer serializer = Repository.get(obj.getClass());
                 if (serializer.uid < 0) {
                     writeByte((byte) serializer.uid);
-                } else if (addSerializer(serializer.uid)) {
+                } else if (serializer.uid > 0 && addSerializer(serializer.uid)) {
                     writeByte(REF_EMBEDDED);
                     writeObject(serializer);
                 } else {
@@ -117,7 +118,7 @@ public class ObjectOutputChannel extends DataStream {
 
         if (size > available()) {
             unsafe.freeMemory(address);
-            int newBufSize = Math.max(size + 32768, available() * 3 / 2);
+            int newBufSize = Math.max(size + 32000, available() * 3 / 2);
             long newAddress = unsafe.allocateMemory(newBufSize);
 
             this.address = newAddress;
@@ -129,8 +130,14 @@ public class ObjectOutputChannel extends DataStream {
     // Embed serializer set for performance reasons
     private boolean addSerializer(long uid) {
         long[] set = this.serializerSet;
-        int mask = set.length - 1;
+        if (set == null) {
+            serializerSet = new long[16];
+            serializerSet[(int) uid & 15] = uid;
+            serializerSetSize = 1;
+            return true;
+        }
 
+        int mask = set.length - 1;
         int i = (int) uid & mask;
         while (set[i] != 0) {
             if (set[i] == uid) {
@@ -140,7 +147,7 @@ public class ObjectOutputChannel extends DataStream {
         }
 
         set[i] = uid;
-        if (uid != 0 && ++serializerSetSize * 2 > serializerSet.length) {
+        if (++serializerSetSize * 2 > serializerSet.length) {
             resizeSerializerSet();
         }
         return true;

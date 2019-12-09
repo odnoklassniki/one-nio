@@ -27,6 +27,7 @@ import java.util.Arrays;
 import static one.nio.util.JavaInternals.unsafe;
 
 public class ObjectInputChannel extends DataStream {
+    private static final Object[] EMPTY_CONTEXT = {};
     private static final int INITIAL_CAPACITY = 16;
 
     private final ReadableByteChannel ch;
@@ -36,14 +37,17 @@ public class ObjectInputChannel extends DataStream {
     private long bytesRead;
 
     public ObjectInputChannel(ReadableByteChannel ch) {
-        this(ch, 32768);
+        super(0, 0);
+        this.ch = ch;
+        this.capacity = 0;
+        this.context = EMPTY_CONTEXT;
     }
 
     public ObjectInputChannel(ReadableByteChannel ch, int bufSize) {
         super(unsafe.allocateMemory(bufSize), 0);
         this.ch = ch;
         this.capacity = bufSize;
-        this.context = new Object[INITIAL_CAPACITY];
+        this.context = EMPTY_CONTEXT;
     }
 
     public long getBytesRead() {
@@ -75,7 +79,7 @@ public class ObjectInputChannel extends DataStream {
         }
 
         if (++contextSize >= context.length) {
-            context = Arrays.copyOf(context, context.length * 2);
+            context = context.length == 0 ? new Object[INITIAL_CAPACITY] : Arrays.copyOf(context, context.length * 2);
         }
 
         return serializer.read(this);
@@ -115,7 +119,7 @@ public class ObjectInputChannel extends DataStream {
     private void fetch(int size) throws IOException {
         int available = (int) (limit - offset);
         if (available + size > capacity) {
-            int newBufSize = Math.max(available + size + 32768, capacity * 3 / 2);
+            int newBufSize = Math.max(available + size + 32000, capacity * 3 / 2);
             long newAddress = unsafe.allocateMemory(newBufSize);
             if (available > 0) {
                 unsafe.copyMemory(null, offset, null, newAddress, available);

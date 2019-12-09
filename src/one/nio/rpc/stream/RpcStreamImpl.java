@@ -21,7 +21,6 @@ import one.nio.serial.ObjectInputChannel;
 import one.nio.serial.ObjectOutputChannel;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
@@ -39,13 +38,8 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
     // BaseStream
 
     @Override
-    public InetSocketAddress getLocalAddress() {
-        return socket.getLocalAddress();
-    }
-
-    @Override
-    public InetSocketAddress getRemoteAddress() {
-        return socket.getRemoteAddress();
+    public Socket socket() {
+        return socket;
     }
 
     @Override

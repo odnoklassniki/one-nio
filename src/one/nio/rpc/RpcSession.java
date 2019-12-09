@@ -73,7 +73,7 @@ public class RpcSession<S, M> extends Session {
                 bytesRead = 0;
             }
 
-            RpcPacket.checkSize(requestSize, socket);
+            RpcPacket.checkReadSize(requestSize, socket);
             if (requestSize > buffer.length) {
                 this.buffer = buffer = expandBuffer(requestSize);
             }
@@ -181,6 +181,7 @@ public class RpcSession<S, M> extends Session {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(response);
         int responseSize = css.count();
+        RpcPacket.checkWriteSize(responseSize);
         byte[] buffer = new byte[responseSize + 4];
 
         DataStream ds = css.hasCycles() ? new SerializeStream(buffer) : new DataStream(buffer);
