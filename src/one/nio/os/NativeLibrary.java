@@ -107,12 +107,12 @@ public final class NativeLibrary implements NativeLibraryMXBean {
     }
 
     @Override
-    public int sched_setaffinity(int pid, long mask) {
-        return Proc.sched_setaffinity(pid, mask);
+    public int setAffinity(int pid, long[] mask) {
+        return Proc.setAffinity(pid, mask);
     }
 
     @Override
-    public long sched_getaffinity(int pid) {
-        return Proc.sched_getaffinity(pid);
+    public long[] getAffinity(int pid) {
+        return Proc.getAffinity(pid);
     }
 }

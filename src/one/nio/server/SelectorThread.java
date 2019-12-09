@@ -27,16 +27,16 @@ public final class SelectorThread extends PayloadThread {
     private static final int BUFFER_SIZE = 64000;
 
     public final Selector selector;
-    public final long affinity;
+    public final int dedicatedCpu;
 
     long operations;
     long sessions;
     int maxReady;
 
-    public SelectorThread(int num, long affinity) throws IOException {
+    public SelectorThread(int num, int dedicatedCpu) throws IOException {
         super("NIO Selector #" + num);
         this.selector = Selector.create();
-        this.affinity = affinity;
+        this.dedicatedCpu = dedicatedCpu;
     }
 
     public void shutdown() {
@@ -50,8 +50,8 @@ public final class SelectorThread extends PayloadThread {
 
     @Override
     public void run() {
-        if (affinity != 0 && Proc.IS_SUPPORTED) {
-            Proc.sched_setaffinity(0, affinity);
+        if (dedicatedCpu >= 0 && Proc.IS_SUPPORTED) {
+            Proc.setDedicatedCpu(0, dedicatedCpu);
         }
 
         final byte[] buffer = new byte[BUFFER_SIZE];

@@ -75,6 +75,44 @@ Java_one_nio_os_Proc_sched_1getaffinity(JNIEnv* env, jclass cls, jint pid) {
 }
 
 JNIEXPORT jint JNICALL
+Java_one_nio_os_Proc_setAffinity(JNIEnv* env, jclass cls, jint pid, jlongArray mask) {
+    cpu_set_t set;
+    CPU_ZERO(&set);
+
+    jsize mask_len = (*env)->GetArrayLength(env, mask);
+    if (mask_len > sizeof(set) / sizeof(jlong)) {
+        mask_len = sizeof(set) / sizeof(jlong);
+    }
+
+    (*env)->GetLongArrayRegion(env, mask, 0, mask_len, (jlong*)&set);
+
+    return sched_setaffinity((pid_t)pid, sizeof(set), &set) == 0 ? 0 : errno;
+}
+
+JNIEXPORT jlongArray JNICALL
+Java_one_nio_os_Proc_getAffinity(JNIEnv* env, jclass cls, jint pid) {
+    int max_cpu = 0;
+    cpu_set_t set;
+    CPU_ZERO(&set);
+
+    if (sched_getaffinity((pid_t)pid, sizeof(set), &set) == 0) {
+        int cpu;
+        for (cpu = 0; cpu < CPU_SETSIZE; cpu++) {
+            if (CPU_ISSET(cpu, &set)) {
+                max_cpu = cpu;
+            }
+        }
+    }
+
+    jsize mask_len = max_cpu / 64 + 1;
+    jlongArray result = (*env)->NewLongArray(env, mask_len);
+    if (result != NULL) {
+        (*env)->SetLongArrayRegion(env, result, 0, mask_len, (jlong*)&set);
+    }
+    return result;
+}
+
+JNIEXPORT jint JNICALL
 Java_one_nio_os_Proc_ioprio_1set(JNIEnv* env, jclass cls, jint pid, jint ioprio) {
     return syscall(SYS_ioprio_set, 1, pid, ioprio);
 }

@@ -42,6 +42,22 @@ public final class Proc {
     public static native int sched_setaffinity(int pid, long mask);
     public static native long sched_getaffinity(int pid);
 
+    /**
+     * The same as above, but allows an arbitrary long mask
+     */
+    public static native int setAffinity(int pid, long[] mask);
+    public static native long[] getAffinity(int pid);
+
+    public static void setDedicatedCpu(int pid, int cpu) {
+        if (cpu < 0) {
+            throw new IllegalArgumentException("Negative CPU number");
+        }
+
+        long[] mask = new long[cpu / 64 + 1];
+        mask[cpu / 64] = 1L << cpu;
+        setAffinity(pid, mask);
+    }
+
     public static native int ioprio_set(int pid, int ioprio);
     public static native int ioprio_get(int pid);
 

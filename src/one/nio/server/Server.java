@@ -62,7 +62,7 @@ public class Server implements ServerMXBean {
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = new SelectorThread[config.selectors != 0 ? config.selectors : processors];
         for (int i = 0; i < selectors.length; i++) {
-            selectors[i] = new SelectorThread(i, config.affinity ? 1L << (i % processors) : 0);
+            selectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1);
             selectors[i].setPriority(config.threadPriority);
         }
         this.selectors = selectors;
@@ -98,7 +98,7 @@ public class Server implements ServerMXBean {
         if (config.selectors > selectors.length) {
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, config.selectors);
             for (int i = selectors.length; i < config.selectors; i++) {
-                newSelectors[i] = new SelectorThread(i, config.affinity ? 1L << (i % processors) : 0);
+                newSelectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1);
                 newSelectors[i].setPriority(config.threadPriority);
                 newSelectors[i].start();
             }
