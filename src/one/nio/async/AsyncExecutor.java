@@ -25,7 +25,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class AsyncExecutor {
     public static final ThreadPoolExecutor POOL = new ThreadPoolExecutor(1, 32, 60, TimeUnit.SECONDS,
-            new SynchronousQueue<Runnable>(), new ThreadPoolExecutor.CallerRunsPolicy());
+            new SynchronousQueue<>(),
+            new CustomThreadFactory("one-nio AsyncExecutor", true),
+            new ThreadPoolExecutor.CallerRunsPolicy());
 
     public static <T> Future<T> submit(Callable<T> task) {
         return POOL.submit(task);
