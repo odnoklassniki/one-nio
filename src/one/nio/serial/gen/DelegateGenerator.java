@@ -93,7 +93,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         generateWrite(cv, cls, fds);
         generateRead(cv, cls, fds, defaultFields);
         generateSkip(cv, fds);
-        generateToJson(cv, fds);
+        generateToJson(cv, cls, fds);
         generateFromJson(cv, cls, fds, defaultFields);
 
         cv.visitEnd();
@@ -116,6 +116,9 @@ public class DelegateGenerator extends BytecodeGenerator {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
+        mv.visitVarInsn(ALOAD, 1);
+        emitTypeCast(mv, Object.class, cls);
+        mv.visitVarInsn(ASTORE, 1);
 
         Method writeObjectMethod = JavaInternals.findMethodRecursively(cls, "writeObject", ObjectOutputStream.class);
         if (writeObjectMethod != null && !Repository.hasOptions(writeObjectMethod.getDeclaringClass(), Repository.SKIP_WRITE_OBJECT)) {
@@ -163,6 +166,9 @@ public class DelegateGenerator extends BytecodeGenerator {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
+        mv.visitVarInsn(ALOAD, 1);
+        emitTypeCast(mv, Object.class, cls);
+        mv.visitVarInsn(ASTORE, 1);
 
         Method writeObjectMethod = JavaInternals.findMethodRecursively(cls, "writeObject", ObjectOutputStream.class);
         if (writeObjectMethod != null && !Repository.hasOptions(writeObjectMethod.getDeclaringClass(), Repository.SKIP_WRITE_OBJECT)) {
@@ -308,10 +314,13 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
-    private static void generateToJson(ClassVisitor cv, FieldDescriptor[] fds) {
+    private static void generateToJson(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "toJson", "(Ljava/lang/Object;Ljava/lang/StringBuilder;)V",
                 null, new String[] { "java/io/IOException" });
         mv.visitCode();
+        mv.visitVarInsn(ALOAD, 1);
+        emitTypeCast(mv, Object.class, cls);
+        mv.visitVarInsn(ASTORE, 1);
 
         boolean firstWritten = false;
         mv.visitVarInsn(ALOAD, 2);
