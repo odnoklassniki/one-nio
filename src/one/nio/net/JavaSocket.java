@@ -90,7 +90,7 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
+    public final int send(ByteBuffer src, int flags, InetAddress address, int port) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -113,7 +113,7 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
-    public final InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
+    public final InetSocketAddress recv(ByteBuffer dst, int flags) throws IOException {
         throw new UnsupportedOperationException();
     }
 

@@ -27,12 +27,20 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 
 public abstract class Socket implements ByteChannel {
+    // Protocol family
+    public static final int AF_UNIX  = 1;
+    public static final int AF_INET  = 2;
+    public static final int AF_INET6 = 10;
+
+    // Use when the address has no port (i.e. for AF_UNIX address)
+    public static final int NO_PORT = -1;
+
     // Levels for getOption()
-    public static final int SOL_SOCKET    = 1;
-    public static final int SOL_IP        = 0;
-    public static final int SOL_IPV6      = 41;
-    public static final int SOL_TCP       = 6;
-    public static final int SOL_UDP       = 17;
+    public static final int SOL_SOCKET = 1;
+    public static final int SOL_IP     = 0;
+    public static final int SOL_IPV6   = 41;
+    public static final int SOL_TCP    = 6;
+    public static final int SOL_UDP    = 17;
 
     // Flags for readRaw / writeRaw
     public static final int MSG_OOB       = 0x01;
@@ -58,11 +66,11 @@ public abstract class Socket implements ByteChannel {
     public abstract int writeRaw(long buf, int count, int flags) throws IOException;
     public abstract int write(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void writeFully(byte[] data, int offset, int count) throws IOException;
-    public abstract int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException;
+    public abstract int send(ByteBuffer src, int flags, InetAddress address, int port) throws IOException;
     public abstract int readRaw(long buf, int count, int flags) throws IOException;
     public abstract int read(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void readFully(byte[] data, int offset, int count) throws IOException;
-    public abstract InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException;
+    public abstract InetSocketAddress recv(ByteBuffer dst, int flags) throws IOException;
     public abstract long sendFile(RandomAccessFile file, long offset, long count) throws IOException;
     public abstract void setBlocking(boolean blocking);
     public abstract boolean isBlocking();
@@ -108,6 +116,10 @@ public abstract class Socket implements ByteChannel {
         bind(InetAddress.getByName(host), port, backlog);
     }
 
+    public int send(ByteBuffer data, int flags, String host, int port) throws IOException {
+        return send(data, flags, InetAddress.getByName(host), port);
+    }
+
     public void handshake() throws IOException {
         // Only for SSL sockets
     }
@@ -132,6 +144,14 @@ public abstract class Socket implements ByteChannel {
         return NativeLibrary.IS_SUPPORTED ? new NativeSocket(true) : new JavaDatagramSocket();
     }
 
+    public static Socket createUnixSocket() throws IOException {
+        if (!NativeLibrary.IS_SUPPORTED) {
+            throw new IOException("Unix sockets are supported in native mode only");
+        }
+
+        return new NativeSocket(AF_UNIX, true);
+    }
+
     public static Socket connectInet(InetAddress address, int port) throws IOException {
         Socket sock = create();
         sock.connect(address, port);
@@ -150,8 +170,8 @@ public abstract class Socket implements ByteChannel {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
-        NativeSocket sock = new NativeSocket(NativeSocket.socket1());
-        sock.connect1(unixPath.getAbsolutePath());
+        NativeSocket sock = new NativeSocket(AF_UNIX, false);
+        sock.connect(unixPath.getAbsolutePath(), NO_PORT);
         return sock;
     }
 
@@ -160,8 +180,8 @@ public abstract class Socket implements ByteChannel {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
-        NativeSocket sock = new NativeSocket(NativeSocket.socket1());
-        sock.bind1(unixPath.getAbsolutePath());
+        NativeSocket sock = new NativeSocket(AF_UNIX, false);
+        sock.bind(unixPath.getAbsolutePath(), NO_PORT, backlog);
         sock.listen(backlog);
         return sock;
     }

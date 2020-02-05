@@ -33,9 +33,14 @@
 #include "jni_util.h"
 
 
+static int use_IPv6 = 0;
 static jfieldID f_fd;
+static jclass c_AddressHolder;
+static jfieldID f_address;
+static jmethodID m_createIPv4Address;
+static jmethodID m_createIPv6Address;
+static jmethodID m_createUnixAddress;
 static pthread_t* fd_table;
-static int use_IPv6;
 
 // sys/un.h does not have it by either reason
 #define UNIX_PATH_MAX 108
@@ -49,41 +54,74 @@ static int use_IPv6;
 #endif
 
 
-static int check_IPv6(JNIEnv* env) {
-    int s = socket(PF_INET6, SOCK_STREAM, 0);
-    if (s != -1) {
-        jclass cls = (*env)->FindClass(env, "java/lang/Boolean");
-        jmethodID method = (*env)->GetStaticMethodID(env, cls, "getBoolean", "(Ljava/lang/String;)Z");
-        jstring str = (*env)->NewStringUTF(env, "java.net.preferIPv4Stack");
-        close(s);
-        return (*env)->CallStaticBooleanMethod(env, cls, method, str) ? 0 : 1;
+static socklen_t sockaddr_from_java(JNIEnv* env, jobject address, jint port, struct sockaddr_storage* sa) {
+    // AF_UNIX
+    if (port < 0) {
+        struct sockaddr_un* sun = (struct sockaddr_un*)sa;
+        sun->sun_family = AF_UNIX;
+        const char* path = (*env)->GetStringUTFChars(env, (jstring)address, NULL);
+        if (path != NULL) {
+            strncpy(sun->sun_path, path, UNIX_PATH_MAX);
+            (*env)->ReleaseStringUTFChars(env, (jstring)address, path);
+        }
+        return sizeof(struct sockaddr_un);
     }
-    return 0;
-}
 
-static int sockaddr_from_java(JNIEnv* env, jbyteArray address, jint port, struct sockaddr_storage* sa) {
+    // AF_INET / AF_INET6
+    jbyteArray array = (jbyteArray)address;
     if (use_IPv6) {
         struct sockaddr_in6* sin = (struct sockaddr_in6*)sa;
         sin->sin6_family = AF_INET6;
         sin->sin6_port = htons(port);
         sin->sin6_flowinfo = 0;
         sin->sin6_scope_id = 0;
-        if ((*env)->GetArrayLength(env, address) == 4) {
+        if ((*env)->GetArrayLength(env, array) == 4) {
             ((int*)&sin->sin6_addr)[0] = 0;
             ((int*)&sin->sin6_addr)[1] = 0;
-            ((int*)&sin->sin6_addr)[2] = 0xffff0000;
-            (*env)->GetByteArrayRegion(env, address, 0, 4, (jbyte*)&sin->sin6_addr + 12);
+            ((int*)&sin->sin6_addr)[2] = htonl(0xffff);
+            (*env)->GetByteArrayRegion(env, array, 0, 4, (jbyte*)&sin->sin6_addr + 12);
         } else {
-            (*env)->GetByteArrayRegion(env, address, 0, 16, (jbyte*)&sin->sin6_addr);
+            (*env)->GetByteArrayRegion(env, array, 0, 16, (jbyte*)&sin->sin6_addr);
         }
         return sizeof(struct sockaddr_in6);
     } else {
         struct sockaddr_in* sin = (struct sockaddr_in*)sa;
         sin->sin_family = AF_INET;
         sin->sin_port = htons(port);
-        (*env)->GetByteArrayRegion(env, address, 0, 4, (jbyte*)&sin->sin_addr);
+        (*env)->GetByteArrayRegion(env, array, 0, 4, (jbyte*)&sin->sin_addr);
         return sizeof(struct sockaddr_in);
     }
+}
+
+static jobject sockaddr_to_java(JNIEnv* env, struct sockaddr_storage* sa, socklen_t len) {
+    if (sa->ss_family == AF_INET) {
+        struct sockaddr_in* sin = (struct sockaddr_in*)sa;
+        int ip = ntohl(sin->sin_addr.s_addr);
+        int port = ntohs(sin->sin_port);
+        return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createIPv4Address, ip, port);
+    }
+
+    if (sa->ss_family == AF_INET6) {
+        struct sockaddr_in6* sin = (struct sockaddr_in6*)sa;
+        const int* a = (const int*)&sin->sin6_addr;
+        int port = ntohs(sin->sin6_port);
+        if (a[0] == 0 && a[1] == 0 && a[2] == htonl(0xffff)) {
+            // IPv4-mapped address
+            return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createIPv4Address, ntohl(a[3]), port);
+        }
+        return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createIPv6Address,
+                                              ntohl(a[0]), ntohl(a[1]), ntohl(a[2]), ntohl(a[3]), port);
+    }
+
+    if (sa->ss_family == AF_UNIX && len > sizeof(sa_family_t)) {
+        struct sockaddr_un* sun = (struct sockaddr_un*)sa;
+        sun->sun_path[UNIX_PATH_MAX - 1] = 0;
+        jstring path = (*env)->NewStringUTF(env, sun->sun_path);
+        return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createUnixAddress, path);
+    }
+
+    // Unknown address family
+    return NULL;
 }
 
 static int is_udp_socket(int fd) {
@@ -103,14 +141,6 @@ static jint get_int_socket_opt(int fd, int level, int optname) {
 
 static jboolean get_bool_socket_opt(int fd, int level, int optname) {
     return get_int_socket_opt(fd, level, optname) ? JNI_TRUE : JNI_FALSE;
-}
-
-static void sockaddr_to_java(JNIEnv* env, jbyteArray buffer, struct sockaddr_storage* sa, int err) {
-    jbyte tmpBuf[25];
-    int len = err == 0 ? (sa->ss_family == AF_INET6 ? 24 : 8) : 0;
-    tmpBuf[0] = (jbyte)len;
-    memcpy(tmpBuf + 1, sa, len);
-    (*env)->SetByteArrayRegion(env, buffer, 0, len + 1, tmpBuf);
 }
 
 static int accept_with_flags(int fd, jboolean nonblock) {
@@ -148,20 +178,28 @@ static inline void wakeup_blocking_call(int fd) {
 
 
 JNIEXPORT jint JNICALL
-JNI_OnLoad(JavaVM* vm, void* reserved) {
-    JNIEnv* env;
+Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean preferIPv4) {
     struct rlimit max_files;
     struct sigaction sa;
 
-    if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_2) != JNI_OK) {
-        return JNI_ERR;
-    }
-
     // Check IPv6 support
-    use_IPv6 = check_IPv6(env);
+    if (!preferIPv4) {
+        int s = socket(AF_INET6, SOCK_STREAM, 0);
+        if (s != -1) {
+            use_IPv6 = 1;
+            close(s);
+        }
+    }
 
     // Cache field ID to access NativeSocket.fd
     f_fd = cache_field(env, "one/nio/net/NativeSocket", "fd", "I");
+
+    // Cache method IDs to produce InetSocketAddress
+    c_AddressHolder = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/AddressHolder"));
+    f_address = (*env)->GetFieldID(env, c_AddressHolder, "address", "Ljava/net/InetSocketAddress;");
+    m_createIPv4Address = (*env)->GetStaticMethodID(env, c_AddressHolder, "createIPv4Address", "(II)Ljava/net/InetSocketAddress;");
+    m_createIPv6Address = (*env)->GetStaticMethodID(env, c_AddressHolder, "createIPv6Address", "(IIIII)Ljava/net/InetSocketAddress;");
+    m_createUnixAddress = (*env)->GetStaticMethodID(env, c_AddressHolder, "createUnixAddress", "(Ljava/lang/String;)Ljava/net/InetSocketAddress;");
 
     // Allocate table for thread pointer per file descriptor
     getrlimit(RLIMIT_NOFILE, &max_files);
@@ -173,21 +211,12 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIG_WAKEUP, &sa, NULL);
 
-    return JNI_VERSION_1_2;
+    return use_IPv6 ? AF_INET6 : AF_INET;
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls, jboolean datagram) {
-    int result = socket(use_IPv6 ? PF_INET6 : PF_INET, datagram ? SOCK_DGRAM : SOCK_STREAM, 0);
-    if (result == -1) {
-        throw_io_exception(env);
-    }
-    return result;
-}
-
-JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_socket1(JNIEnv* env, jclass cls) {
-    int result = socket(PF_UNIX, SOCK_STREAM, 0);
+Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls, jint domain, jboolean datagram) {
+    int result = socket(domain, datagram ? SOCK_DGRAM : SOCK_STREAM, 0);
     if (result == -1) {
         throw_io_exception(env);
     }
@@ -224,13 +253,13 @@ Java_one_nio_net_NativeSocket_close(JNIEnv* env, jobject self) {
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_connect0(JNIEnv* env, jobject self, jbyteArray address, jint port) {
+Java_one_nio_net_NativeSocket_connect0(JNIEnv* env, jobject self, jobject address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
     } else {
         struct sockaddr_storage sa;
-        int len = sockaddr_from_java(env, address, port, &sa);
+        socklen_t len = sockaddr_from_java(env, address, port, &sa);
 
         while (connect(fd, (struct sockaddr*)&sa, len) != 0) {
             if (errno != EINTR) {
@@ -242,53 +271,14 @@ Java_one_nio_net_NativeSocket_connect0(JNIEnv* env, jobject self, jbyteArray add
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_connect1(JNIEnv* env, jobject self, jstring path) {
-    int fd = (*env)->GetIntField(env, self, f_fd);
-    if (fd == -1) {
-        throw_socket_closed(env);
-    } else {
-        const char* npath = (*env)->GetStringUTFChars(env, path, NULL);
-        struct sockaddr_un sun;
-        sun.sun_family = AF_UNIX;
-        strncpy(sun.sun_path, npath, UNIX_PATH_MAX);
-        (*env)->ReleaseStringUTFChars(env, path, npath);
-
-        while (connect(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
-            if (errno != EINTR) {
-                throw_io_exception(env);
-                break;
-            }
-        }
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_bind0(JNIEnv* env, jobject self, jbyteArray address, jint port) {
+Java_one_nio_net_NativeSocket_bind0(JNIEnv* env, jobject self, jobject address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
     } else {
         struct sockaddr_storage sa;
-        int len = sockaddr_from_java(env, address, port, &sa);
+        socklen_t len = sockaddr_from_java(env, address, port, &sa);
         if (bind(fd, (struct sockaddr*)&sa, len) != 0) {
-            throw_io_exception(env);
-        }
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_bind1(JNIEnv* env, jobject self, jstring path) {
-    int fd = (*env)->GetIntField(env, self, f_fd);
-    if (fd == -1) {
-        throw_socket_closed(env);
-    } else {
-        struct sockaddr_un sun;
-        const char* npath = (*env)->GetStringUTFChars(env, path, NULL);
-        sun.sun_family = AF_UNIX;
-        strncpy(sun.sun_path, npath, UNIX_PATH_MAX);
-        (*env)->ReleaseStringUTFChars(env, path, npath);
-
-        if (bind(fd, (struct sockaddr*)&sun, sizeof(sun)) != 0) {
             throw_io_exception(env);
         }
     }
@@ -454,15 +444,21 @@ Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_sendTo(JNIEnv* env, jobject self, jlong buffer, jint count,
-                                      jint flags, jbyteArray address, jint port) {
+Java_one_nio_net_NativeSocket_sendTo0(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count,
+                                      jint flags, jobject address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
+    jbyte buf[MAX_STACK_BUF];
+
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
+        int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
+        (*env)->GetByteArrayRegion(env, data, offset, result, buf);
+
         struct sockaddr_storage sa;
-        int len = sockaddr_from_java(env, address, port, &sa);
-        int result = sendto(fd, (void*)buffer, count, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
+        socklen_t len = sockaddr_from_java(env, address, port, &sa);
+        result = sendto(fd, (void*)(intptr_t)buf, result, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
+
         if (result > 0) {
             return result;
         } else if (result == 0) {
@@ -470,25 +466,22 @@ Java_one_nio_net_NativeSocket_sendTo(JNIEnv* env, jobject self, jlong buffer, ji
         } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }
-        return result;
     }
     return 0;
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_recvFrom(JNIEnv* env, jobject self, jlong buffer, jint count,
-                                       jint flags, jbyteArray address) {
+Java_one_nio_net_NativeSocket_sendTo1(JNIEnv* env, jobject self, jlong buffer, jint count,
+                                      jint flags, jobject address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
         struct sockaddr_storage sa;
-        socklen_t len = sizeof(sa);
+        socklen_t len = sockaddr_from_java(env, address, port, &sa);
+        int result = sendto(fd, (void*)(intptr_t)buffer, count, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
 
-        int result = recvfrom(fd, (void*)buffer, count, flags, (struct sockaddr*)&sa, &len);
-
-        if (result > 0 || (result == 0 && is_udp_socket(fd))) {
-            sockaddr_to_java(env, address, &sa, 0);
+        if (result > 0) {
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
@@ -499,22 +492,80 @@ Java_one_nio_net_NativeSocket_recvFrom(JNIEnv* env, jobject self, jlong buffer, 
     return 0;
 }
 
-JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_getsockname(JNIEnv* env, jobject self, jbyteArray buffer) {
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_recvFrom0(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count,
+                                        jint flags, jobject holder) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    struct sockaddr_storage sa;
-    socklen_t len = sizeof(sa);
-    int err = getsockname(fd, (struct sockaddr*)&sa, &len);
-    sockaddr_to_java(env, buffer, &sa, err);
+    jbyte buf[MAX_STACK_BUF];
+
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else if (count != 0) {
+        struct sockaddr_storage sa;
+        socklen_t len = sizeof(sa);
+        int result = recvfrom(fd, (void*)(intptr_t)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF,
+                              flags, (struct sockaddr*)&sa, &len);
+
+        if (result > 0 || (result == 0 && is_udp_socket(fd))) {
+            (*env)->SetByteArrayRegion(env, data, offset, result, buf);
+            (*env)->SetObjectField(env, holder, f_address, sockaddr_to_java(env, &sa, len));
+            return result;
+        } else if (result == 0) {
+            throw_socket_closed(env);
+        } else if (is_io_exception(fd)) {
+            throw_io_exception(env);
+        }
+    }
+    return 0;
 }
 
-JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSocket_getpeername(JNIEnv* env, jobject self, jbyteArray buffer) {
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer, jint count,
+                                        jint flags, jobject holder) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else if (count != 0) {
+        struct sockaddr_storage sa;
+        socklen_t len = sizeof(sa);
+        int result = recvfrom(fd, (void*)(intptr_t)buffer, count, flags, (struct sockaddr*)&sa, &len);
+
+        if (result > 0 || (result == 0 && is_udp_socket(fd))) {
+            (*env)->SetObjectField(env, holder, f_address, sockaddr_to_java(env, &sa, len));
+            return result;
+        } else if (result == 0) {
+            throw_socket_closed(env);
+        } else if (is_io_exception(fd)) {
+            throw_io_exception(env);
+        }
+    }
+    return 0;
+}
+
+JNIEXPORT jobject JNICALL
+Java_one_nio_net_NativeSocket_getLocalAddress(JNIEnv* env, jobject self) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     struct sockaddr_storage sa;
     socklen_t len = sizeof(sa);
-    int err = getpeername(fd, (struct sockaddr*)&sa, &len);
-    sockaddr_to_java(env, buffer, &sa, err);
+
+    if (getsockname(fd, (struct sockaddr*)&sa, &len) != 0) {
+        return NULL;
+    }
+
+    return sockaddr_to_java(env, &sa, len);
+}
+
+JNIEXPORT jobject JNICALL
+Java_one_nio_net_NativeSocket_getRemoteAddress(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    struct sockaddr_storage sa;
+    socklen_t len = sizeof(sa);
+
+    if (getpeername(fd, (struct sockaddr*)&sa, &len) != 0) {
+        return NULL;
+    }
+
+    return sockaddr_to_java(env, &sa, len);
 }
 
 JNIEXPORT void JNICALL

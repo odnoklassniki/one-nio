@@ -25,15 +25,18 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 class NativeSocket extends Socket {
-    private static final int SOCKADDR_SIZE = 1 + 24;  // 1 byte size + 24 bytes max for IPv6 address
+    private static final int INET_FAMILY = initNatives(Boolean.getBoolean("java.net.preferIPv4Stack"));
 
     int fd;
 
+    NativeSocket(int domain, boolean datagram) throws IOException {
+        this.fd = socket0(domain, datagram);
+    }
+
     NativeSocket(boolean datagram) throws IOException {
-        this.fd = socket0(datagram);
+        this.fd = socket0(INET_FAMILY, datagram);
     }
 
     NativeSocket(int fd) {
@@ -56,37 +59,10 @@ class NativeSocket extends Socket {
     }
 
     @Override
-    public final InetSocketAddress getLocalAddress() {
-        byte[] sockaddr = new byte[SOCKADDR_SIZE];
-        getsockname(sockaddr);
-        return makeAddress(sockaddr);
-    }
+    public final native InetSocketAddress getLocalAddress();
 
     @Override
-    public final InetSocketAddress getRemoteAddress() {
-        byte[] sockaddr = new byte[SOCKADDR_SIZE];
-        getpeername(sockaddr);
-        return makeAddress(sockaddr);
-    }
-
-    private InetSocketAddress makeAddress(byte[] buffer) {
-        byte[] address;
-        if (buffer[0] == 8) {
-            address = Arrays.copyOfRange(buffer, 5, 9);  // IPv4
-        } else if (buffer[0] == 24) {
-            address = Arrays.copyOfRange(buffer, 9, 25); // IPv6
-        } else {
-            return null;
-        }
-
-        int port = (buffer[3] & 0xff) << 8 | (buffer[4] & 0xff);
-
-        try {
-            return new InetSocketAddress(InetAddress.getByAddress(address), port);
-        } catch (UnknownHostException e) {
-            return null;
-        }
-    }
+    public final native InetSocketAddress getRemoteAddress();
 
     @Override
     public Socket sslWrap(SslContext context) throws IOException {
@@ -114,8 +90,18 @@ class NativeSocket extends Socket {
     }
 
     @Override
+    public void connect(String host, int port) throws IOException {
+        connect0(toNativeAddr(host, port), port);
+    }
+
+    @Override
     public void bind(InetAddress address, int port, int backlog) throws IOException {
         bind0(address.getAddress(), port);
+    }
+
+    @Override
+    public void bind(String host, int port, int backlog) throws IOException {
+        bind0(toNativeAddr(host, port), port);
     }
 
     @Override
@@ -128,16 +114,27 @@ class NativeSocket extends Socket {
     public native int writeRaw(long buf, int count, int flags) throws IOException;
 
     @Override
-    public int send(ByteBuffer data, int flags, InetAddress address, int port) throws IOException {
-        if (!data.isDirect()) {
-            throw new UnsupportedOperationException();
+    public int send(ByteBuffer src, int flags, InetAddress address, int port) throws IOException {
+        return sendTo(src, flags, address.getAddress(), port);
+    }
+
+    @Override
+    public int send(ByteBuffer data, int flags, String host, int port) throws IOException {
+        return sendTo(data, flags, toNativeAddr(host, port), port);
+    }
+
+    private int sendTo(ByteBuffer src, int flags, Object address, int port) throws IOException {
+        int result;
+        if (src.hasArray()) {
+            result = sendTo0(src.array(), src.arrayOffset() + src.position(), src.remaining(), flags, address, port);
+        } else {
+            result = sendTo1(DirectMemory.getAddress(src) + src.position(), src.remaining(), flags, address, port);
         }
 
-        long bufAddress = DirectMemory.getAddress(data) + data.position();
-        int result = sendTo(bufAddress, data.remaining(), flags, address.getAddress(), port);
         if (result > 0) {
-            data.position(data.position() + result);
+            src.position(src.position() + result);
         }
+
         return result;
     }
 
@@ -154,19 +151,21 @@ class NativeSocket extends Socket {
     public native int read(byte[] data, int offset, int count, int flags) throws IOException;
 
     @Override
-    public InetSocketAddress recv(ByteBuffer buffer, int flags) throws IOException {
-        if (!buffer.isDirect()) {
-            throw new UnsupportedOperationException();
+    public InetSocketAddress recv(ByteBuffer dst, int flags) throws IOException {
+        AddressHolder holder = new AddressHolder();
+
+        int result;
+        if (dst.hasArray()) {
+            result = recvFrom0(dst.array(), dst.arrayOffset() + dst.position(), dst.remaining(), flags, holder);
+        } else {
+            result = recvFrom1(DirectMemory.getAddress(dst) + dst.position(), dst.remaining(), flags, holder);
         }
 
-        byte[] sockaddr = new byte[SOCKADDR_SIZE];
-        long bufAddress = DirectMemory.getAddress(buffer) + buffer.position();
-        int result = recvFrom(bufAddress, buffer.remaining(), flags, sockaddr);
-        if (result <= 0) {
-            return null;
+        if (result > 0) {
+            dst.position(dst.position() + result);
+            return holder.address;
         }
-        buffer.position(buffer.position() + result);
-        return makeAddress(sockaddr);
+        return null;
     }
 
     @Override
@@ -270,20 +269,20 @@ class NativeSocket extends Socket {
     @Override
     public native boolean setOption(int level, int option, byte[] value);
 
-    // PF_INET
-    static native int socket0(boolean datagram) throws IOException;
-    final native void connect0(byte[] address, int port) throws IOException;
-    final native void bind0(byte[] address, int port) throws IOException;
+    static Object toNativeAddr(String host, int port) throws UnknownHostException {
+        return port == NO_PORT ? host : InetAddress.getByName(host).getAddress();
+    }
 
-    // PF_UNIX
-    static native int socket1() throws IOException;
-    final native void connect1(String path) throws IOException;
-    final native void bind1(String path) throws IOException;
+    private static native int initNatives(boolean preferIPv4);
 
+    private static native int socket0(int domain, boolean datagram) throws IOException;
+
+    final native void connect0(Object address, int port) throws IOException;
+    final native void bind0(Object address, int port) throws IOException;
     final native int accept0(boolean nonblock) throws IOException;
     final native long sendFile0(int sourceFD, long offset, long count) throws IOException;
-    final native void getsockname(byte[] buffer);
-    final native void getpeername(byte[] buffer);
-    final native int sendTo(long buf, int size, int flags, byte[] address, int port) throws IOException;
-    final native int recvFrom(long buf, int maxSize, int flags, byte[] addrBuffer) throws IOException;
+    final native int sendTo0(byte[] data, int offset, int size, int flags, Object address, int port) throws IOException;
+    final native int sendTo1(long buf, int size, int flags, Object address, int port) throws IOException;
+    final native int recvFrom0(byte[] data, int offset, int maxSize, int flags, AddressHolder holder) throws IOException;
+    final native int recvFrom1(long buf, int maxSize, int flags, AddressHolder holder) throws IOException;
 }
