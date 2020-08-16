@@ -7,6 +7,13 @@
  * Configurable `DigestStream`
  * `Thread.onSpinWait` bridge
  * Custom collection converters for `ConfigParser`
+ * HttpClient fixes
+ * Utility class to invoke HotSpot diagnostic commands
+ * `CustomThreadFactory` for creating named/daemon/batch threads
+ * `RpcStream` memory optimizations
+ * `setAffinity`/`getAffinity` for machines with more than 64 CPUs
+ * AF_UNIX socket support. Refactored InetAddress handling
+ * systemd-notify API
 
 1.2.1
   * Enable SO_KEEPALIVE on a ServerSocket by default
