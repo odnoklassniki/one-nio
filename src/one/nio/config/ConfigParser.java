@@ -18,6 +18,9 @@ package one.nio.config;
 
 import one.nio.util.JavaInternals;
 
+import java.lang.reflect.AnnotatedArrayType;
+import java.lang.reflect.AnnotatedParameterizedType;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
@@ -78,20 +81,20 @@ public class ConfigParser {
         }
 
         try {
-            return (T) parser.parseValue(type, 0);
+            return (T) parser.parseValue(type, null, 0);
         } catch (ReflectiveOperationException e) {
             throw new IllegalArgumentException(e);
         }
     }
 
-    private Object parseValue(Type type, int level) throws ReflectiveOperationException {
+    private Object parseValue(Type type, AnnotatedType aType, int level) throws ReflectiveOperationException {
         if (type instanceof Class) {
             Class<?> cls = (Class) type;
-            if (isScalar(cls)) {
-                return parseScalar(cls, tail());
-            } else if (cls.isArray()) {
+            if (cls.isArray()) {
                 Object ref = parseReference();
-                return ref != null ? ref : parseArray(cls.getComponentType(), level);
+                return ref != null ? ref : parseArray(cls.getComponentType(), aType, level);
+            } else if (hasScalarConverter(cls, aType)) {
+                return parseScalar(cls, aType, tail());
             } else if (cls.isAnnotationPresent(Config.class)) {
                 Object ref = parseReference();
                 return ref != null ? ref : parseBean(cls, level);
@@ -106,15 +109,15 @@ public class ConfigParser {
             Class<?> rawType = (Class<?>) ptype.getRawType();
             if (Collection.class.isAssignableFrom(rawType) && ptype.getActualTypeArguments().length >= 1) {
                 Object ref = parseReference();
-                return ref != null ? ref : parseCollection(rawType, ptype.getActualTypeArguments()[0], level);
+                return ref != null ? ref : parseCollection(rawType, ptype.getActualTypeArguments()[0], aType, level);
             } else if (Map.class.isAssignableFrom(rawType) && ptype.getActualTypeArguments().length >= 2) {
                 Object ref = parseReference();
                 Type[] mapArgs = ptype.getActualTypeArguments();
-                return ref != null ? ref : parseMap(rawType, mapArgs[0], mapArgs[1], level);
+                return ref != null ? ref : parseMap(rawType, aType, mapArgs[0], mapArgs[1], level);
             }
         } else if (type instanceof GenericArrayType) {
             Object ref = parseReference();
-            return ref != null ? ref : parseArray(((GenericArrayType) type).getGenericComponentType(), level);
+            return ref != null ? ref : parseArray(((GenericArrayType) type).getGenericComponentType(), aType, level);
         }
 
         throw new IllegalArgumentException("Invalid type: " + type);
@@ -137,21 +140,23 @@ public class ConfigParser {
                 if (colon < 0) throw new IllegalArgumentException("Field expected: " + line);
 
                 String key = line.substring(level, colon).trim();
-                Field f = fields.get(key);
-                if (f == null) {
+                Field field = fields.get(key);
+                if (field == null) {
                     throw new IllegalArgumentException("Unknown field: " + line);
                 }
 
                 skipSpaces(colon + 1);
 
                 Object value;
-                Converter converter = f.getAnnotation(Converter.class);
-                if (converter != null) {
+                Converter converter = field.getAnnotation(Converter.class);;
+                // Declaration annotation and array type annotation are at the same location
+                // https://docs.oracle.com/javase/specs/jls/se8/html/jls-9.html#jls-9.7.4
+                if (!field.getType().isArray() && converter != null) {
                     value = convert(tail(), converter);
                 } else {
-                    value = parseValue(f.getGenericType(), level + 1);
+                    value = parseValue(field.getGenericType(), field.getAnnotatedType(), level + 1);
                 }
-                f.set(obj, value);
+                field.set(obj, value);
             } while (isSameLevel(nextLine(), level, minLevel));
         }
     }
@@ -167,8 +172,11 @@ public class ConfigParser {
         return method.invoke(sender, value);
     }
 
-    private Object parseArray(Type elementType, int minLevel) throws ReflectiveOperationException {
-        List<Object> list = parseCollection(new ArrayList<>(), elementType, minLevel);
+    private Object parseArray(Type elementType, AnnotatedType aType, int minLevel) throws ReflectiveOperationException {
+        if (aType instanceof AnnotatedArrayType) {
+            aType = ((AnnotatedArrayType) aType).getAnnotatedGenericComponentType();
+        }
+        List<Object> list = parseCollection(new ArrayList<>(), elementType, aType, minLevel);
 
         Class<?> cls = resolveArrayElementType(elementType);
         Object array = Array.newInstance(cls, list.size());
@@ -204,30 +212,33 @@ public class ConfigParser {
     }
 
     @SuppressWarnings("unchecked")
-    private Collection<Object> parseCollection(Class<?> rawType, Type elementType, int minLevel) throws ReflectiveOperationException {
-        if (rawType == List.class || rawType == Collection.class) {
-            return parseCollection(new ArrayList<>(), elementType, minLevel);
-        } else if (rawType == Set.class) {
-            return parseCollection(new HashSet<>(), elementType, minLevel);
+    private Collection<Object> parseCollection(Class<?> rawType, Type elementType, AnnotatedType aType, int minLevel) throws ReflectiveOperationException {
+        if (aType instanceof AnnotatedParameterizedType) {
+            aType = ((AnnotatedParameterizedType) aType).getAnnotatedActualTypeArguments()[0];
         }
-        return parseCollection((Collection<Object>) rawType.getDeclaredConstructor().newInstance(), elementType, minLevel);
+        if (rawType == List.class || rawType == Collection.class) {
+            return parseCollection(new ArrayList<>(), elementType, aType, minLevel);
+        } else if (rawType == Set.class) {
+            return parseCollection(new HashSet<>(), elementType, aType, minLevel);
+        }
+        return parseCollection((Collection<Object>) rawType.getDeclaredConstructor().newInstance(), elementType, aType, minLevel);
     }
 
-    private <T extends Collection<Object>> T parseCollection(T list, Type elementType, int minLevel) throws ReflectiveOperationException {
+    private <T extends Collection<Object>> T parseCollection(T list, Type elementType, AnnotatedType aType, int minLevel) throws ReflectiveOperationException {
         registerReference(list);
 
         if (hasTail()) {
+            String tail = tail();
+            if (tail.charAt(0) == '[' && tail.charAt(tail.length() - 1) == ']') {
+                tail = tail.substring(1, tail.length() - 1);
+            }
+
             // Support inlined scalar array value
             if (elementType instanceof Class) {
                 Class<?> cls = (Class) elementType;
-                if (isScalar(cls)) {
-                    String tail = tail();
-                    if (tail.charAt(0) == '[' && tail.charAt(tail.length() - 1) == ']') {
-                        tail = tail.substring(1, tail.length() - 1);
-                    }
-
+                if (hasScalarConverter(cls, aType)) {
                     for (String element : tail.split(",")) {
-                        list.add(parseScalar(cls, element.trim()));
+                        list.add(parseScalar(cls, aType, element.trim()));
                     }
                     return list;
                 }
@@ -238,7 +249,7 @@ public class ConfigParser {
             if (level >= minLevel - 1 && line.charAt(level) == '-') { // arrays allowed at the same position as parent
                 do {
                     skipSpaces(level + 1);
-                    Object value = parseValue(elementType, level + 1);
+                    Object value = parseValue(elementType, aType, level + 1);
                     list.add(value);
                 } while (nextLine() == level && line.charAt(level) == '-');
             }
@@ -248,17 +259,24 @@ public class ConfigParser {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<Object, Object> parseMap(Class<?> rawType, Type keyType, Type valueType, int minLevel) throws ReflectiveOperationException {
+    private Map<Object, Object> parseMap(Class<?> rawType, AnnotatedType aType, Type keyType, Type valueType, int minLevel) throws ReflectiveOperationException {
         if (rawType == Map.class) {
-            return parseMap(new HashMap<>(), keyType, valueType, minLevel);
+            return parseMap(new HashMap<>(), aType, keyType, valueType, minLevel);
         }
-        return parseMap((Map<Object, Object>) rawType.getDeclaredConstructor().newInstance(), keyType, valueType, minLevel);
+        return parseMap((Map<Object, Object>) rawType.getDeclaredConstructor().newInstance(), aType, keyType, valueType, minLevel);
     }
 
-    private <T extends Map<Object, Object>> T parseMap(T map, Type keyType, Type valueType, int minLevel) throws ReflectiveOperationException {
+    private <T extends Map<Object, Object>> T parseMap(T map, AnnotatedType aType, Type keyType, Type valueType, int minLevel) throws ReflectiveOperationException {
         registerReference(map);
 
-        Class<?> keyClass = keyType instanceof Class && isScalar((Class) keyType)
+        AnnotatedType keyAType = null;
+        AnnotatedType valueAType = null;
+        if (aType instanceof AnnotatedParameterizedType) {
+            keyAType = ((AnnotatedParameterizedType) aType).getAnnotatedActualTypeArguments()[0];
+            valueAType = ((AnnotatedParameterizedType) aType).getAnnotatedActualTypeArguments()[1];
+        }
+
+        Class<?> keyClass = keyType instanceof Class && hasScalarConverter((Class) keyType, aType)
                 ? (Class) keyType
                 : String.class;
 
@@ -268,9 +286,9 @@ public class ConfigParser {
                 int colon = line.indexOf(':', level);
                 if (colon < 0) throw new IllegalArgumentException("Key expected: " + line);
 
-                Object key = parseScalar(keyClass, line.substring(level, colon).trim());
+                Object key = parseScalar(keyClass, keyAType, line.substring(level, colon).trim());
                 skipSpaces(colon + 1);
-                Object value = parseValue(valueType, level + 1);
+                Object value = parseValue(valueType, valueAType, level + 1);
                 map.put(key, value);
             } while (isSameLevel(nextLine(), level, minLevel));
         }
@@ -287,8 +305,9 @@ public class ConfigParser {
         throw new IllegalArgumentException("Level differs: " + newLevel + " != " + prevLevel + " at " + line);
     }
 
-    private boolean isScalar(Class<?> type) {
-        return type.isPrimitive()
+    private boolean hasScalarConverter(Class<?> type, AnnotatedType aType) {
+        return (aType != null && aType.isAnnotationPresent(Converter.class))
+                || type.isPrimitive()
                 || type == String.class
                 || type == Boolean.class
                 || type == Byte.class
@@ -302,8 +321,11 @@ public class ConfigParser {
     }
 
     @SuppressWarnings("unchecked")
-    private Object parseScalar(Class<?> type, String value) {
-        if (type == String.class) {
+    private Object parseScalar(Class<?> type, AnnotatedType aType, String value) throws ReflectiveOperationException {
+        Converter converter;
+        if (aType != null && (converter = aType.getAnnotation(Converter.class)) != null) {
+            return convert(value, converter);
+        } else if (type == String.class) {
             return value;
         } else if (type == boolean.class || type == Boolean.class) {
             return "true".equalsIgnoreCase(value);
