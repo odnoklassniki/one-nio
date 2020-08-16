@@ -24,7 +24,6 @@ import one.nio.serial.Repository;
 import one.nio.serial.SerializeWith;
 import one.nio.util.Hex;
 import one.nio.util.JavaInternals;
-
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -40,6 +39,7 @@ import java.lang.reflect.ParameterizedType;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -86,7 +86,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL, className, null, MAGIC_CLASS,
-                new String[] { "one/nio/serial/gen/Delegate" });
+                new String[]{"one/nio/serial/gen/Delegate"});
 
         generateConstructor(cv);
         generateCalcSize(cv, cls, fds);
@@ -114,8 +114,9 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void generateCalcSize(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V",
-                null, new String[] { "java/io/IOException" });
+                null, new String[]{"java/io/IOException"});
         mv.visitCode();
+
         mv.visitVarInsn(ALOAD, 1);
         emitTypeCast(mv, Object.class, cls);
         mv.visitVarInsn(ASTORE, 1);
@@ -164,8 +165,9 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void generateWrite(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V",
-                null, new String[] { "java/io/IOException" });
+                null, new String[]{"java/io/IOException"});
         mv.visitCode();
+
         mv.visitVarInsn(ALOAD, 1);
         emitTypeCast(mv, Object.class, cls);
         mv.visitVarInsn(ASTORE, 1);
@@ -203,7 +205,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void generateRead(ClassVisitor cv, Class cls, FieldDescriptor[] fds, List<Field> defaultFields) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "read", "(Lone/nio/serial/DataStream;)Ljava/lang/Object;",
-                null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
+                null, new String[]{"java/io/IOException", "java/lang/ClassNotFoundException"});
         mv.visitCode();
 
         mv.visitVarInsn(ALOAD, 1);
@@ -277,7 +279,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void generateSkip(ClassVisitor cv, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "skip", "(Lone/nio/serial/DataStream;)V",
-                null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
+                null, new String[]{"java/io/IOException", "java/lang/ClassNotFoundException"});
         mv.visitCode();
 
         int skipSize = 0;
@@ -316,8 +318,9 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void generateToJson(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "toJson", "(Ljava/lang/Object;Ljava/lang/StringBuilder;)V",
-                null, new String[] { "java/io/IOException" });
+                null, new String[]{"java/io/IOException"});
         mv.visitCode();
+
         mv.visitVarInsn(ALOAD, 1);
         emitTypeCast(mv, Object.class, cls);
         mv.visitVarInsn(ASTORE, 1);
@@ -374,7 +377,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void generateFromJson(ClassVisitor cv, Class cls, FieldDescriptor[] fds, List<Field> defaultFields) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "fromJson", "(Lone/nio/serial/JsonReader;)Ljava/lang/Object;",
-                null, new String[] { "java/io/IOException", "java/lang/ClassNotFoundException" });
+                null, new String[]{"java/io/IOException", "java/lang/ClassNotFoundException"});
         mv.visitCode();
 
         // Find opening '{'
@@ -530,13 +533,11 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitVarInsn(ALOAD, 2);
             if (parentField != null) emitGetField(mv, parentField);
             mv.visitLdcInsn(unsafe.objectFieldOffset(ownField));
-            mv.visitVarInsn(ALOAD, 1);
             generateReadJsonFieldInternal(mv, ownField);
             mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", dstType.putMethod(), dstType.putSignature());
         } else {
             mv.visitVarInsn(ALOAD, 2);
             if (parentField != null) emitGetField(mv, parentField);
-            mv.visitVarInsn(ALOAD, 1);
             generateReadJsonFieldInternal(mv, ownField);
             emitPutField(mv, ownField, fd.useSetter());
         }
@@ -546,8 +547,25 @@ public class DelegateGenerator extends BytecodeGenerator {
         Class fieldClass = ownField.getType();
         if (fieldClass.isPrimitive()) {
             FieldType fieldType = FieldType.valueOf(fieldClass);
+            mv.visitVarInsn(ALOAD, 1);
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", fieldType.readMethod(), fieldType.readSignature());
-        } else if (fieldClass == String.class) {
+            return;
+        }
+
+        // Check if the next literal is "null"
+        Label done = new Label();
+        Label notNull = new Label();
+        mv.visitVarInsn(ALOAD, 1);
+        mv.visitInsn(DUP);
+        mv.visitFieldInsn(GETFIELD, "one/nio/serial/JsonReader", "next", "I");
+        emitInt(mv, 'n');
+        mv.visitJumpInsn(IF_ICMPNE, notNull);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readNull", "()Ljava/lang/Object;");
+        mv.visitJumpInsn(GOTO, done);
+        mv.visitLabel(notNull);
+
+        readObject:
+        if (fieldClass == String.class) {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readString", "()Ljava/lang/String;");
         } else if (fieldClass.isArray() && !fieldClass.getComponentType().isPrimitive()) {
             Class componentType = fieldClass.getComponentType();
@@ -571,7 +589,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                     mv.visitLdcInsn(Type.getType((Class) args[0]));
                     mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readArray", "(Ljava/lang/reflect/Type;)Ljava/util/ArrayList;");
                     emitTypeCast(mv, ArrayList.class, fieldClass);
-                    return;
+                    break readObject;
                 }
             }
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readArray", "()Ljava/util/ArrayList;");
@@ -585,7 +603,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                     mv.visitLdcInsn(Type.getType((Class) args[1]));
                     mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readMap", "(Ljava/lang/Class;Ljava/lang/reflect/Type;)Ljava/util/Map;");
                     emitTypeCast(mv, Map.class, fieldClass);
-                    return;
+                    break readObject;
                 }
             }
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readMap", "()Ljava/util/Map;");
@@ -598,6 +616,8 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readObject", "()Ljava/lang/Object;");
             emitTypeCast(mv, Object.class, fieldClass);
         }
+
+        mv.visitLabel(done);
     }
 
     private static boolean isConcreteClass(Class cls) {
@@ -753,6 +773,21 @@ public class DelegateGenerator extends BytecodeGenerator {
                         return;
                     }
                 }
+            }
+        }
+
+        // Collection -> List, Set
+        if (Collection.class.isAssignableFrom(src)) {
+            Class target = dst.isAssignableFrom(ArrayList.class) ? ArrayList.class :
+                    dst.isAssignableFrom(HashSet.class) ? HashSet.class : null;
+            if (target != null) {
+                Label isNull = emitNullGuard(mv, dst);
+                mv.visitTypeInsn(NEW, Type.getInternalName(target));
+                mv.visitInsn(DUP_X1);
+                mv.visitInsn(SWAP);
+                mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(target), "<init>", "(Ljava/util/Collection;)V");
+                mv.visitLabel(isNull);
+                return;
             }
         }
 

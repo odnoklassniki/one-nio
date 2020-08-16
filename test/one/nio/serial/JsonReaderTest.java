@@ -21,8 +21,10 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class JsonReaderTest {
     private static final String sample = "[{\n" +
@@ -97,11 +99,21 @@ public class JsonReaderTest {
         Custom x = reader.readObject(Custom.class);
     }
 
+    @Test
+    public void nullableFields() throws IOException, ClassNotFoundException {
+        String s = "{\"FB\": null, \"set\": []}";
+        JsonReader reader = new JsonReader(s.getBytes());
+        Custom x = reader.readObject(Custom.class);
+        Assert.assertNull(x.FB);
+        Assert.assertTrue(x.set instanceof Set && x.set.isEmpty());
+    }
+
     static class Custom implements Serializable {
         int intValue;
         Long longValue = -77L;
         final String string = "zzz";
         Object[] FB = {"A", true};
+        Set<String> set = Collections.emptySet();
         final Map<String, Integer> Ea = new HashMap<String, Integer>() {{
             put("one", 1);
             put("two", 2);

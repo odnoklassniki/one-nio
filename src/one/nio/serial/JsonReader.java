@@ -185,6 +185,13 @@ public class JsonReader {
         }
     }
 
+    public Object readNull() throws IOException {
+        if (read() != 'n' || read() != 'u' || read() != 'l' || read() != 'l') {
+            throw exception("Expected null");
+        }
+        return null;
+    }
+
     public String readString() throws IOException {
         StringBuilder sb = new StringBuilder();
         expect('\"', "Expected string");
@@ -286,10 +293,7 @@ public class JsonReader {
     public Object readObject() throws IOException, ClassNotFoundException {
         switch (next) {
             case 'n':
-                if (read() != 'n' || read() != 'u' || read() != 'l' || read() != 'l') {
-                    throw exception("Expected null");
-                }
-                return null;
+                return readNull();
             case 'f':
             case 't':
                 return readBoolean();

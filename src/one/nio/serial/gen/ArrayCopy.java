@@ -16,7 +16,7 @@
 
 package one.nio.serial.gen;
 
-// Used in DelegateGenerator for convertion of one primitive array to another
+// Used in DelegateGenerator for conversion of one primitive array to another
 public class ArrayCopy {
 
     public static void copy(boolean[] src, char[] dst)   { for (int i = 0; i < src.length; i++) dst[i] = src[i] ? (char) 1 : (char) 0; }
