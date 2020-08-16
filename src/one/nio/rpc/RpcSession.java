@@ -17,6 +17,7 @@
 package one.nio.rpc;
 
 import one.nio.http.Request;
+import one.nio.net.ProxyProtocol;
 import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.rpc.stream.RpcStreamImpl;
@@ -38,7 +39,8 @@ public class RpcSession<S, M> extends Session {
     protected static final byte HTTP_REQUEST_UID = (byte) Repository.get(Request.class).uid();
 
     protected final RpcServer<S> server;
-    protected final InetSocketAddress peer;
+    protected InetSocketAddress peer;
+    protected boolean proxyProtocol;
     protected byte[] buffer;
     protected int bytesRead;
     protected int requestSize;
@@ -58,6 +60,10 @@ public class RpcSession<S, M> extends Session {
 
         // Read 4-bytes header
         if (requestSize == 0) {
+            if (proxyProtocol) {
+                parseProxyProtocol();
+            }
+
             if (bytesRead < 4 && (bytesRead += super.read(buffer, bytesRead, 4 - bytesRead)) < 4) {
                 return;
             }
@@ -121,6 +127,14 @@ public class RpcSession<S, M> extends Session {
             invoke(request, meta);
             server.incRequestsProcessed();
         }
+    }
+
+    private void parseProxyProtocol() throws IOException {
+        InetSocketAddress originalAddress = ProxyProtocol.parse(socket, buffer);
+        if (originalAddress != null) {
+            peer = originalAddress;
+        }
+        proxyProtocol = false;
     }
 
     private byte[] expandBuffer(int requestSize) {
