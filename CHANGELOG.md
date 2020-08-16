@@ -1,3 +1,13 @@
+1.3.0
+ * SSL improvements: RDRAND, PEER_CERTIFICATE_CHAIN, autoupdate certificates
+ * Extended Perf Events API, including PEBS
+ * Garbage free thread safe date utilities; high performance date formatter
+ * Serialization: collection type evolution; better JSON support
+ * PROXY protocol support for RPC server
+ * Configurable `DigestStream`
+ * `Thread.onSpinWait` bridge
+ * Custom collection converters for `ConfigParser`
+
 1.2.1
   * Enable SO_KEEPALIVE on a ServerSocket by default
   * Fixed server graceful shutdown
