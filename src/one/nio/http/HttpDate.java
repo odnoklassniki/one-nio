@@ -25,7 +25,7 @@ public final class HttpDate extends GregorianCalendar {
     private static final String[] DAYS = { null, "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
     private static final String[] MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-    private char[] chars = "Thu, 01 Jan 1970 00:00:00 GMT".toCharArray();
+    private final char[] chars = "Thu, 01 Jan 1970 00:00:00 GMT".toCharArray();
 
     public HttpDate() {
         super(GMT, Locale.US);

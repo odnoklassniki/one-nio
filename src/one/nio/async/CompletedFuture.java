@@ -21,7 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public class CompletedFuture<V> implements Future<V>, Serializable {
-    private V value;
+    private final V value;
 
     public CompletedFuture(V value) {
         this.value = value;
