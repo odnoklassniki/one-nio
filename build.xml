@@ -5,7 +5,7 @@
     <property name="test.dir"       value="test"/>
     <property name="lib.dir"        value="lib"/>
     <property name="target.jar"     value="${build.dir}/${ant.project.name}.jar"/>
-    <property name="download.repo"  value="http://repo1.maven.org/maven2"/>
+    <property name="download.repo"  value="https://repo1.maven.org/maven2"/>
     <property name="gcc.extra.args" value=""/>
 
     <target name="init">
