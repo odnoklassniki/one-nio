@@ -37,8 +37,8 @@ final class AcceptorThread extends Thread {
     volatile long acceptedSessions;
     volatile long rejectedSessions;
 
-    AcceptorThread(Server server, AcceptorConfig config) throws IOException {
-        super("NIO Acceptor " + config.address + ":" + config.port);
+    AcceptorThread(Server server, AcceptorConfig config, int num) throws IOException {
+        super("NIO Acceptor " + config.address + ":" + config.port + " #" + num);
         this.address = config.address;
         this.port = config.port;
         this.backlog = config.backlog;

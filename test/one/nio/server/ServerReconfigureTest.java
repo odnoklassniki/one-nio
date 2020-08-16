@@ -27,22 +27,24 @@ public class ServerReconfigureTest {
 
     public static void main(String[] args) throws Exception {
         String fileName = args[0];
-        ServerConfig config = readServerConfig(fileName);
+        String config = readServerConfig(fileName);
 
-        Server server = new Server(config);
+        Server server = new Server(ConfigParser.parse(config, ServerConfig.class));
         server.start();
 
         for (;;) {
             Thread.sleep(1000);
 
-            ServerConfig newConfig = readServerConfig(fileName);
-            server.reconfigure(newConfig);
+            String newConfig = readServerConfig(fileName);
+            if (!newConfig.equals(config)) {
+                config = newConfig;
+                server.reconfigure(ConfigParser.parse(config, ServerConfig.class));
+            }
         }
     }
 
-    private static ServerConfig readServerConfig(String fileName) throws IOException {
+    private static String readServerConfig(String fileName) throws IOException {
         byte[] fileData = Files.readAllBytes(Paths.get(fileName));
-        String configStr = new String(fileData, StandardCharsets.UTF_8);
-        return ConfigParser.parse(configStr, ServerConfig.class);
+        return new String(fileData, StandardCharsets.UTF_8);
     }
 }

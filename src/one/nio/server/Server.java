@@ -25,7 +25,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
@@ -40,24 +42,28 @@ public class Server implements ServerMXBean {
     private volatile QueueStats queueStats;
 
     protected final int port;
-    protected final AcceptorThread[] acceptors;
     protected final CountDownLatch startSync;
+    protected volatile AcceptorThread[] acceptors;
     protected volatile SelectorThread[] selectors;
-    protected final WorkerPool workers;
     protected boolean useWorkers;
+    protected final WorkerPool workers;
     protected final CleanupThread cleanup;
 
     public Server(ServerConfig config) throws IOException {
-        if (config.acceptors == null || config.acceptors.length == 0) {
+        List<AcceptorThread> acceptors = new ArrayList<>();
+        for (AcceptorConfig ac : config.acceptors) {
+            for (int i = 0; i < ac.threads; i++) {
+                acceptors.add(new AcceptorThread(this, ac, i));
+            }
+        }
+
+        if (acceptors.isEmpty()) {
             throw new IllegalArgumentException("No configured acceptors");
         }
 
-        this.port = config.acceptors[0].port;
-        this.acceptors = new AcceptorThread[config.acceptors.length];
-        for (int i = 0; i < acceptors.length; i++) {
-            acceptors[i] = new AcceptorThread(this, config.acceptors[i]);
-        }
-        this.startSync = new CountDownLatch(acceptors.length);
+        this.acceptors = acceptors.toArray(new AcceptorThread[0]);
+        this.startSync = new CountDownLatch(this.acceptors.length);
+        this.port = this.acceptors[0].port;
 
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = new SelectorThread[config.selectors != 0 ? config.selectors : processors];
@@ -77,21 +83,50 @@ public class Server implements ServerMXBean {
     }
 
     public synchronized void reconfigure(ServerConfig config) throws IOException {
-        workers.setCorePoolSize(config.minWorkers);
-
         useWorkers = config.maxWorkers > 0;
-        workers.setMaximumPoolSize(useWorkers ? config.maxWorkers : 2);
-
+        if (config.minWorkers > workers.getMaximumPoolSize())  {
+            workers.setMaximumPoolSize(useWorkers ? config.maxWorkers : 2);
+            workers.setCorePoolSize(config.minWorkers);
+        } else {
+            workers.setCorePoolSize(config.minWorkers);
+            workers.setMaximumPoolSize(useWorkers ? config.maxWorkers : 2);
+        }
         workers.setQueueTime(config.queueTime);
 
+        // Create a copy of the array, since the elements will be nulled out
+        // to allow reconfiguring multiple acceptors with the same address:port
+        AcceptorThread[] oldAcceptors = acceptors.clone();
+        List<AcceptorThread> newAcceptors = new ArrayList<>();
         for (AcceptorConfig ac : config.acceptors) {
-            for (AcceptorThread acceptor : acceptors) {
-                if (acceptor.port == ac.port && acceptor.address.equals(ac.address)) {
-                    acceptor.reconfigure(ac);
-                    break;
+            int threads = 0;
+            for (int i = 0; i < oldAcceptors.length; i++) {
+                AcceptorThread oldAcceptor = oldAcceptors[i];
+                if (oldAcceptor != null && oldAcceptor.port == ac.port && oldAcceptor.address.equals(ac.address)) {
+                    if (++threads <= ac.threads) {
+                        log.info("Reconfiguring acceptor: " + oldAcceptor.getName());
+                        oldAcceptor.reconfigure(ac);
+                        oldAcceptors[i] = null;
+                        newAcceptors.add(oldAcceptor);
+                    }
                 }
             }
+
+            for (; threads < ac.threads; threads++) {
+                AcceptorThread newAcceptor = new AcceptorThread(this, ac, threads);
+                log.info("New acceptor: " + newAcceptor.getName());
+                newAcceptor.start();
+                newAcceptors.add(newAcceptor);
+            }
         }
+
+        for (AcceptorThread oldAcceptor : oldAcceptors) {
+            if (oldAcceptor != null) {
+                log.info("Stopping acceptor: " + oldAcceptor.getName());
+                oldAcceptor.shutdown();
+            }
+        }
+
+        acceptors = newAcceptors.toArray(new AcceptorThread[0]);
 
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = this.selectors;
@@ -109,12 +144,11 @@ public class Server implements ServerMXBean {
     }
 
     public synchronized void start() {
-        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selector.start();
         }
 
-        for (AcceptorThread acceptor : this.acceptors) {
+        for (AcceptorThread acceptor : acceptors) {
             acceptor.start();
         }
 
@@ -135,11 +169,10 @@ public class Server implements ServerMXBean {
 
         cleanup.shutdown();
 
-        for (AcceptorThread acceptor : this.acceptors) {
+        for (AcceptorThread acceptor : acceptors) {
             acceptor.shutdown();
         }
 
-        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selector.shutdown();
         }
@@ -186,7 +219,6 @@ public class Server implements ServerMXBean {
     @Override
     public int getConnections() {
         int result = 0;
-        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             result += selector.selector.size();
         }
@@ -296,7 +328,6 @@ public class Server implements ServerMXBean {
             acceptor.rejectedSessions = 0;
         }
 
-        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selector.operations = 0;
             selector.sessions = 0;
@@ -329,7 +360,6 @@ public class Server implements ServerMXBean {
         selectorStats = new SelectorStats();
         selectorStats.expireTime = currentTime + 1000;
 
-        SelectorThread[] selectors = this.selectors;
         for (SelectorThread selector : selectors) {
             selectorStats.operations += selector.operations;
             selectorStats.sessions += selector.sessions;

@@ -22,6 +22,7 @@ import one.nio.net.SslConfig;
 
 @Config
 public class AcceptorConfig {
+    public int threads = 1;
     public String address = "0.0.0.0";
     public int port;
     @Converter(method = "size")
