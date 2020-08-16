@@ -122,6 +122,9 @@ class NativeSslContext extends SslContext {
     }
 
     @Override
+    public native void setRdrand(boolean rdrand) throws SSLException;
+
+    @Override
     public native void setCiphers(String ciphers) throws SSLException;
 
     @Override
@@ -136,9 +139,9 @@ class NativeSslContext extends SslContext {
     @Override
     public native void setCA(String caFile) throws SSLException;
 
-    @Override 
+    @Override
     public native void setVerify(int verifyMode) throws SSLException;
-    
+
     @Override
     public native void setTicketKeys(byte[] keys) throws SSLException;
 

@@ -18,14 +18,15 @@ package one.nio.net;
 
 public class SslOption<T> {
     public static final SslOption<byte[]> PEER_CERTIFICATE = new SslOption<>(1, byte[].class);
-    public static final SslOption<String> PEER_SUBJECT = new SslOption<>(2, String.class);
-    public static final SslOption<String> PEER_ISSUER = new SslOption<>(3, String.class);
-    public static final SslOption<String> VERIFY_RESULT = new SslOption<>(4, String.class);
+    public static final SslOption<Object[]> PEER_CERTIFICATE_CHAIN = new SslOption<>(2, Object[].class);
+    public static final SslOption<String> PEER_SUBJECT = new SslOption<>(3, String.class);
+    public static final SslOption<String> PEER_ISSUER = new SslOption<>(4, String.class);
+    public static final SslOption<String> VERIFY_RESULT = new SslOption<>(5, String.class);
 
-    public static final SslOption<Boolean> SESSION_REUSED = new SslOption<>(5, Boolean.class);
-    public static final SslOption<Integer> SESSION_TICKET = new SslOption<>(6, Integer.class);
+    public static final SslOption<Boolean> SESSION_REUSED = new SslOption<>(6, Boolean.class);
+    public static final SslOption<Integer> SESSION_TICKET = new SslOption<>(7, Integer.class);
 
-    public static final SslOption<String> CURRENT_CIPHER = new SslOption<>(7, String.class);
+    public static final SslOption<String> CURRENT_CIPHER = new SslOption<>(8, String.class);
 
     final int id;
     final Class<T> type;

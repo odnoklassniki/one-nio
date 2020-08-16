@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <openssl/crypto.h>
+#include <openssl/engine.h>
 #include <openssl/ssl.h>
 #include "sslcompat.h"
 
@@ -94,6 +95,13 @@ int OPENSSL_init_ssl(unsigned long long opts, const void* settings) {
     return 1;
 }
 
+// ENGINE_load_rdrand was replaced with OPENSSL_init_crypto in OpenSSL 1.1.0
+
+int OPENSSL_init_crypto(unsigned long long opts, const void* settings) {
+    ENGINE_load_rdrand();
+    return 1;
+}
+
 
 // SSLv23_method() was renamed to TLS_method() in OpenSSL 1.1.0
 
@@ -135,6 +143,16 @@ void SSL_CTX_set_alpn_select_cb(SSL_CTX* ctx,
     int (*cb)(SSL* ssl, const unsigned char** out, unsigned char* outlen,
               const unsigned char* in, unsigned int inlen, void* arg), void* arg) {
     fprintf(stderr, "[WARNING] symbol not found: SSL_CTX_set_alpn_select_cb. ALPN disabled\n");
+}
+
+// The following symbols was renamed in OpenSSL 1.1.0, see openssl/stack.h for details
+
+int OPENSSL_sk_num(const OPENSSL_STACK* st) {
+    return sk_num(st);
+}
+
+void* OPENSSL_sk_value(const OPENSSL_STACK* st, int i) {
+    return sk_value(st, i);
 }
 
 #endif // OPENSSL_VERSION_NUMBER < 0x10100000L

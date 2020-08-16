@@ -16,8 +16,10 @@
 
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
+#include <openssl/crypto.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
+#include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -427,6 +429,22 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
     }
 }
 
+static jbyteArray X509_cert_to_jbyteArray(JNIEnv* env, X509* cert) {
+    jbyteArray result = NULL;
+
+    unsigned char* buf = NULL;
+    int len = i2d_X509(cert, &buf);
+    if (buf != NULL) {
+        result = (*env)->NewByteArray(env, len);
+        if (result != NULL) {
+            (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte*)buf);
+        }
+        OPENSSL_free(buf);
+    }
+
+    return result;
+}
+
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
     if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
@@ -511,6 +529,24 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_clearOptions(JNIEnv* env, jobject self, jint options) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     SSL_CTX_clear_options(ctx, options);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setRdrand(JNIEnv* env, jobject self, jboolean rdrand) {
+    if (rdrand) {
+        OPENSSL_init_crypto(/* OPENSSL_INIT_ENGINE_RDRAND */ 0x200L, NULL);
+        ENGINE* e = ENGINE_by_id("rdrand");
+        if (e == NULL || !ENGINE_init(e) || !ENGINE_set_default_RAND(e)) {
+            throw_ssl_exception(env);
+        }
+        RAND_set_rand_method(ENGINE_get_RAND(e));
+    } else {
+        ENGINE* e = ENGINE_by_id("rdrand");
+        if (e != NULL) {
+            ENGINE_unregister_RAND(e);
+        }
+        ERR_clear_error();
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -976,19 +1012,41 @@ Java_one_nio_net_NativeSslSocket_sslPeerCertificate(JNIEnv* env, jobject self) {
         return NULL;
     }
 
-    jbyteArray result = NULL;
-
-    unsigned char* buf = NULL;
-    int len = i2d_X509(cert, &buf);
-    if (buf != NULL) {
-        result = (*env)->NewByteArray(env, len);
-        if (result != NULL) {
-            (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte*)buf);
-        }
-        OPENSSL_free(buf);
-    }
+    jbyteArray result = X509_cert_to_jbyteArray(env, cert);
 
     X509_free(cert);
+    return result;
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_one_nio_net_NativeSslSocket_sslPeerCertificateChain(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) {
+        return NULL;
+    }
+
+    STACK_OF(X509)* chain = SSL_get_peer_cert_chain(ssl);
+    if (chain == NULL) {
+        return NULL;
+    }
+
+    int len = OPENSSL_sk_num((OPENSSL_STACK*)chain);
+    jclass jbyteArrayClass = (*env)->FindClass(env, "[B");
+
+    jobjectArray result = (*env)->NewObjectArray(env, len, jbyteArrayClass, NULL);
+    if (result != NULL) {
+        int i;
+        for (i = 0; i < len; i++) {
+            X509* cert = (X509*)OPENSSL_sk_value((OPENSSL_STACK*)chain, i);
+            if (cert != NULL) {
+                jbyteArray element = X509_cert_to_jbyteArray(env, cert);
+                if (element != NULL) {
+                    (*env)->SetObjectArrayElement(env, result, i, element);
+                }
+            }
+        }
+    }
+
     return result;
 }
 

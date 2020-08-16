@@ -66,16 +66,18 @@ class NativeSslSocket extends NativeSocket {
             case 1:
                 return sslPeerCertificate();
             case 2:
-                return sslCertName(0);
+                return sslPeerCertificateChain();
             case 3:
-                return sslCertName(1);
+                return sslCertName(0);
             case 4:
-                return sslVerifyResult();
+                return sslCertName(1);
             case 5:
-                return sslSessionReused();
+                return sslVerifyResult();
             case 6:
-                return sslSessionTicket();
+                return sslSessionReused();
             case 7:
+                return sslSessionTicket();
+            case 8:
                 return sslCurrentCipher();
         }
         return null;
@@ -108,6 +110,7 @@ class NativeSslSocket extends NativeSocket {
     public synchronized native void readFully(byte[] data, int offset, int count) throws IOException;
 
     private synchronized native byte[] sslPeerCertificate();
+    private synchronized native Object[] sslPeerCertificateChain();
     private synchronized native String sslCertName(int which);
     private synchronized native String sslVerifyResult();
 

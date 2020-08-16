@@ -42,6 +42,7 @@ public abstract class SslContext {
     public static final int VERIFY_ONCE = 4;               // do not verify certs on renegotiations
 
     private final AtomicLong nextRefresh = new AtomicLong();
+    private long lastCertUpdate;
     private long lastTicketsUpdate;
     private long lastOCSPUpdate;
 
@@ -72,6 +73,10 @@ public abstract class SslContext {
 
         setDebug(config.debug);
 
+        if (config.rdrand != currentConfig.rdrand) {
+            setRdrand(config.rdrand);
+        }
+
         if (changed(config.protocols, currentConfig.protocols)) {
             setProtocols(config.protocols);
         }
@@ -83,9 +88,12 @@ public abstract class SslContext {
         }
 
         if (changed(config.certFile, currentConfig.certFile)) {
+            long lastCertUpdate = 0;
             for (String certFile : config.certFile) {
                 setCertificate(certFile);
+                lastCertUpdate = Math.max(lastCertUpdate, new File(certFile).lastModified());
             }
+            this.lastCertUpdate = lastCertUpdate;
         }
 
         if (changed(config.privateKeyFile, currentConfig.privateKeyFile)) {
@@ -171,6 +179,28 @@ public abstract class SslContext {
         }
     }
 
+    void updateCertificates(String[] certFiles, String[] privateKeyFiles) throws IOException {
+        long maxLastModified = 0;
+        for (String certFile : certFiles) {
+            long lastModified = new File(certFile).lastModified();
+            if (lastModified > lastCertUpdate) {
+                setCertificate(certFile);
+                maxLastModified = Math.max(maxLastModified, lastModified);
+            }
+        }
+
+        if (maxLastModified == 0) {
+            return;
+        }
+
+        for (String privateKeyFile : privateKeyFiles) {
+            setPrivateKey(privateKeyFile);
+        }
+
+        log.info("Certificates updated: " + new Date(maxLastModified));
+        lastCertUpdate = maxLastModified;
+    }
+
     void updateTicketKeys(String ticketDir, boolean force) throws IOException {
         File[] files = new File(ticketDir).listFiles();
         if (files == null || files.length == 0) {
@@ -223,6 +253,14 @@ public abstract class SslContext {
             return;
         }
 
+        if (currentConfig.certFile != null && currentConfig.privateKeyFile != null) {
+            try {
+                updateCertificates(currentConfig.certFile, currentConfig.privateKeyFile);
+            } catch (IOException e) {
+                log.error("Failed to update certificates", e);
+            }
+        }
+
         if (currentConfig.ticketDir != null) {
             try {
                 updateTicketKeys(currentConfig.ticketDir, false);
@@ -243,6 +281,7 @@ public abstract class SslContext {
     public abstract void setDebug(boolean debug);
     public abstract boolean getDebug();
 
+    public abstract void setRdrand(boolean rdrand) throws SSLException;
     public abstract void setProtocols(String protocols) throws SSLException;
     public abstract void setCiphers(String ciphers) throws SSLException;
     public abstract void setCertificate(String certFile) throws SSLException;
