@@ -57,6 +57,22 @@ public abstract class Socket implements ByteChannel {
     public static final int IPTOS_THROUGHPUT  = 0x08;
     public static final int IPTOS_LOWDELAY    = 0x10;
 
+    // TCP socket options
+    public static final int TCP_NODELAY      = 1;
+    public static final int TCP_MAXSEG       = 2;
+    public static final int TCP_CORK         = 3;
+    public static final int TCP_KEEPIDLE     = 4;
+    public static final int TCP_KEEPINTVL    = 5;
+    public static final int TCP_KEEPCNT      = 6;
+    public static final int TCP_SYNCNT       = 7;
+    public static final int TCP_LINGER2      = 8;
+    public static final int TCP_DEFER_ACCEPT = 9;
+    public static final int TCP_WINDOW_CLAMP = 10;
+    public static final int TCP_INFO         = 11;
+    public static final int TCP_QUICKACK     = 12;
+    public static final int TCP_CONGESTION   = 13;
+    public static final int TCP_USER_TIMEOUT = 18;
+
     public abstract boolean isOpen();
     public abstract void close();
     public abstract Socket accept() throws IOException;
