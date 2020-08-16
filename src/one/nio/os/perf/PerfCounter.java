@@ -22,13 +22,15 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 public class PerfCounter implements Closeable {
     private final PerfEvent event;
-    private volatile int fd;
+    private final RingBuffer ringBuffer;
+    volatile int fd;
 
     static final AtomicIntegerFieldUpdater<PerfCounter> fdUpdater =
             AtomicIntegerFieldUpdater.newUpdater(PerfCounter.class, "fd");
 
-    PerfCounter(PerfEvent event, int fd) {
+    PerfCounter(PerfEvent event, RingBuffer ringBuffer, int fd) {
         this.event = event;
+        this.ringBuffer = ringBuffer;
         this.fd = fd;
     }
 
@@ -41,11 +43,21 @@ public class PerfCounter implements Closeable {
         int fd = this.fd;
         if (fdUpdater.compareAndSet(this, fd, -1)) {
             Perf.close(fd);
+            if (ringBuffer != null) {
+                ringBuffer.close();
+            }
         }
     }
 
     public long get() throws IOException {
         return Perf.get(fd);
+    }
+
+    public PerfSample nextSample() {
+        if (ringBuffer == null) {
+            throw new IllegalStateException("Not a sampling counter");
+        }
+        return ringBuffer.nextSample();
     }
 
     public void reset() {

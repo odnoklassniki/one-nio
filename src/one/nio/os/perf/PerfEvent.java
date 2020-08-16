@@ -30,28 +30,30 @@ public class PerfEvent implements Serializable {
     private static final int PERF_TYPE_RAW = 4;
     private static final int PERF_TYPE_BREAKPOINT = 5;
 
-    public static final PerfEvent HW_CPU_CYCLES = new PerfEvent("HW_CPU_CYCLES", PERF_TYPE_HARDWARE, 0);
-    public static final PerfEvent HW_INSTRUCTIONS = new PerfEvent("HW_INSTRUCTIONS", PERF_TYPE_HARDWARE, 1);
-    public static final PerfEvent HW_CACHE_REFERENCES = new PerfEvent("HW_CACHE_REFERENCES", PERF_TYPE_HARDWARE, 2);
-    public static final PerfEvent HW_CACHE_MISSES = new PerfEvent("HW_CACHE_MISSES", PERF_TYPE_HARDWARE, 3);
-    public static final PerfEvent HW_BRANCH_INSTRUCTIONS = new PerfEvent("HW_BRANCH_INSTRUCTIONS", PERF_TYPE_HARDWARE, 4);
-    public static final PerfEvent HW_BRANCH_MISSES = new PerfEvent("HW_BRANCH_MISSES", PERF_TYPE_HARDWARE, 5);
-    public static final PerfEvent HW_BUS_CYCLES = new PerfEvent("HW_BUS_CYCLES", PERF_TYPE_HARDWARE, 6);
-    public static final PerfEvent HW_STALLED_CYCLES_FRONTEND = new PerfEvent("HW_STALLED_CYCLES_FRONTEND", PERF_TYPE_HARDWARE, 7);
-    public static final PerfEvent HW_STALLED_CYCLES_BACKEND = new PerfEvent("HW_STALLED_CYCLES_BACKEND", PERF_TYPE_HARDWARE, 8);
-    public static final PerfEvent HW_REF_CPU_CYCLES = new PerfEvent("HW_REF_CPU_CYCLES", PERF_TYPE_HARDWARE, 9);
+    public static final PerfEvent
+            HW_CPU_CYCLES = new PerfEvent("HW_CPU_CYCLES", PERF_TYPE_HARDWARE, 0),
+            HW_INSTRUCTIONS = new PerfEvent("HW_INSTRUCTIONS", PERF_TYPE_HARDWARE, 1),
+            HW_CACHE_REFERENCES = new PerfEvent("HW_CACHE_REFERENCES", PERF_TYPE_HARDWARE, 2),
+            HW_CACHE_MISSES = new PerfEvent("HW_CACHE_MISSES", PERF_TYPE_HARDWARE, 3),
+            HW_BRANCH_INSTRUCTIONS = new PerfEvent("HW_BRANCH_INSTRUCTIONS", PERF_TYPE_HARDWARE, 4),
+            HW_BRANCH_MISSES = new PerfEvent("HW_BRANCH_MISSES", PERF_TYPE_HARDWARE, 5),
+            HW_BUS_CYCLES = new PerfEvent("HW_BUS_CYCLES", PERF_TYPE_HARDWARE, 6),
+            HW_STALLED_CYCLES_FRONTEND = new PerfEvent("HW_STALLED_CYCLES_FRONTEND", PERF_TYPE_HARDWARE, 7),
+            HW_STALLED_CYCLES_BACKEND = new PerfEvent("HW_STALLED_CYCLES_BACKEND", PERF_TYPE_HARDWARE, 8),
+            HW_REF_CPU_CYCLES = new PerfEvent("HW_REF_CPU_CYCLES", PERF_TYPE_HARDWARE, 9);
 
-    public static final PerfEvent SW_CPU_CLOCK = new PerfEvent("SW_CPU_CLOCK", PERF_TYPE_SOFTWARE, 0);
-    public static final PerfEvent SW_TASK_CLOCK = new PerfEvent("SW_TASK_CLOCK", PERF_TYPE_SOFTWARE, 1);
-    public static final PerfEvent SW_PAGE_FAULTS = new PerfEvent("SW_PAGE_FAULTS", PERF_TYPE_SOFTWARE, 2);
-    public static final PerfEvent SW_CONTEXT_SWITCHES = new PerfEvent("SW_CONTEXT_SWITCHES", PERF_TYPE_SOFTWARE, 3);
-    public static final PerfEvent SW_CPU_MIGRATIONS = new PerfEvent("SW_CPU_MIGRATIONS", PERF_TYPE_SOFTWARE, 4);
-    public static final PerfEvent SW_PAGE_FAULTS_MIN = new PerfEvent("SW_PAGE_FAULTS_MIN", PERF_TYPE_SOFTWARE, 5);
-    public static final PerfEvent SW_PAGE_FAULTS_MAJ = new PerfEvent("SW_PAGE_FAULTS_MAJ", PERF_TYPE_SOFTWARE, 6);
-    public static final PerfEvent SW_ALIGNMENT_FAULTS = new PerfEvent("SW_ALIGNMENT_FAULTS", PERF_TYPE_SOFTWARE, 7);
-    public static final PerfEvent SW_EMULATION_FAULTS = new PerfEvent("SW_EMULATION_FAULTS", PERF_TYPE_SOFTWARE, 8);
-    public static final PerfEvent SW_DUMMY = new PerfEvent("SW_DUMMY", PERF_TYPE_SOFTWARE, 9);
-    public static final PerfEvent SW_BPF_OUTPUT = new PerfEvent("SW_BPF_OUTPUT", PERF_TYPE_SOFTWARE, 10);
+    public static final PerfEvent
+            SW_CPU_CLOCK = new PerfEvent("SW_CPU_CLOCK", PERF_TYPE_SOFTWARE, 0),
+            SW_TASK_CLOCK = new PerfEvent("SW_TASK_CLOCK", PERF_TYPE_SOFTWARE, 1),
+            SW_PAGE_FAULTS = new PerfEvent("SW_PAGE_FAULTS", PERF_TYPE_SOFTWARE, 2),
+            SW_CONTEXT_SWITCHES = new PerfEvent("SW_CONTEXT_SWITCHES", PERF_TYPE_SOFTWARE, 3),
+            SW_CPU_MIGRATIONS = new PerfEvent("SW_CPU_MIGRATIONS", PERF_TYPE_SOFTWARE, 4),
+            SW_PAGE_FAULTS_MIN = new PerfEvent("SW_PAGE_FAULTS_MIN", PERF_TYPE_SOFTWARE, 5),
+            SW_PAGE_FAULTS_MAJ = new PerfEvent("SW_PAGE_FAULTS_MAJ", PERF_TYPE_SOFTWARE, 6),
+            SW_ALIGNMENT_FAULTS = new PerfEvent("SW_ALIGNMENT_FAULTS", PERF_TYPE_SOFTWARE, 7),
+            SW_EMULATION_FAULTS = new PerfEvent("SW_EMULATION_FAULTS", PERF_TYPE_SOFTWARE, 8),
+            SW_DUMMY = new PerfEvent("SW_DUMMY", PERF_TYPE_SOFTWARE, 9),
+            SW_BPF_OUTPUT = new PerfEvent("SW_BPF_OUTPUT", PERF_TYPE_SOFTWARE, 10);
 
     final String name;
     final int type;

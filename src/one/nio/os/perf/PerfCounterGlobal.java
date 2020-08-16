@@ -22,7 +22,7 @@ public class PerfCounterGlobal extends PerfCounter {
     private final int[] fds;
 
     PerfCounterGlobal(PerfEvent event, int[] fds) {
-        super(event, 0);
+        super(event, null, 0);
         this.fds = fds;
     }
 

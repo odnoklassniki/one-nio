@@ -40,8 +40,10 @@ public class Perf {
             return openGlobal(event, pid, options);
         }
 
-        int fd = openEvent(pid, cpu, event.type, event.config, event.breakpoint, -1, optionString(options));
-        return new PerfCounter(event, fd);
+        int group = (int) optionValue(options, "GROUP");
+        int fd = openEvent(pid, cpu, event.type, event.config, event.breakpoint, group, optionString(options));
+        RingBuffer ringBuffer = createRingBuffer(fd, options);
+        return new PerfCounter(event, ringBuffer, fd);
     }
 
     public static PerfCounter open(PerfEvent event, String cgroup, int cpu, PerfOption... options) throws IOException {
@@ -76,12 +78,52 @@ public class Perf {
         return new PerfCounterGlobal(event, fds);
     }
 
-    private static String optionString(PerfOption... options) {
+    private static RingBuffer createRingBuffer(int fd, PerfOption... options) throws IOException {
+        boolean useRingBuffer = false;
+        int sampleType = 0;
+        int pages = 1;
+
+        for (PerfOption o : options) {
+            // All option names are interned strings
+            String name = o.name;
+            if (name == "PERIOD" || name == "FREQ") {
+                useRingBuffer = true;
+            } else if (name == "SAMPLE") {
+                sampleType |= o.value;
+            } else if (name == "FORMAT") {
+                sampleType |= o.value << 24;
+            } else if (name == "PAGES") {
+                pages = (int) o.value;
+            }
+        }
+
+        if (!useRingBuffer) {
+            return null;
+        }
+
+        try {
+            return new RingBuffer(fd, pages, sampleType);
+        } catch (Throwable e) {
+            close(fd);
+            throw e;
+        }
+    }
+
+    private static String optionString(PerfOption[] options) {
         StringBuilder sb = new StringBuilder();
         for (PerfOption option : options) {
             sb.append(option).append(',');
         }
         return sb.toString();
+    }
+
+    private static long optionValue(PerfOption[] options, String name) {
+        for (PerfOption o : options) {
+            if (o.name == name) {
+                return o.value;
+            }
+        }
+        return -1;
     }
 
     private static boolean hasOption(PerfOption[] options, PerfOption option) {

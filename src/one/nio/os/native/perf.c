@@ -63,6 +63,10 @@ static unsigned long parse_perf_options(JNIEnv* env, jstring options, struct per
             attr->exclude_user = 1;
         } else if (STARTS_WITH(op, "EXCLUDE_KERNEL")) {
             attr->exclude_kernel = 1;
+        } else if (STARTS_WITH(op, "SAMPLE=")) {
+            attr->sample_type |= get_uint_param(op);
+        } else if (STARTS_WITH(op, "FORMAT=")) {
+            attr->read_format |= get_uint_param(op);
         } else if (STARTS_WITH(op, "PERIOD=")) {
             attr->freq = 0;
             attr->sample_period = get_ulong_param(op);
