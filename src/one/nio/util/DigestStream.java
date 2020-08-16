@@ -24,25 +24,37 @@ public class DigestStream implements ObjectOutput {
     protected MessageDigest md;
     protected byte[] buf;
 
-    public DigestStream(String algorithm) {
+    private static MessageDigest getDigest(String algorithm) {
         try {
-            this.md = MessageDigest.getInstance(algorithm);
+            return MessageDigest.getInstance(algorithm);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalArgumentException(e);
         }
-        this.buf = new byte[8];
     }
 
-    public long digest() {
-        byte[] tmp = md.digest();
+    public DigestStream(String algorithm) {
+        this(getDigest(algorithm), 64);
+    }
+
+    public DigestStream(MessageDigest md, int bufferSize) {
+        this.md = md;
+        this.buf = new byte[bufferSize];
+    }
+
+    public byte[] digest() {
+        return md.digest();
+    }
+
+    public long digest64() {
+        byte[] tmp = digest();
         return (tmp[0] & 0x7fL) << 56 |
-               (tmp[1] & 0xffL) << 48 |
-               (tmp[2] & 0xffL) << 40 |
-               (tmp[3] & 0xffL) << 32 |
-               (tmp[4] & 0xffL) << 24 |
-               (tmp[5] & 0xffL) << 16 |
-               (tmp[6] & 0xffL) <<  8 |
-               (tmp[7] & 0xffL);
+                (tmp[1] & 0xffL) << 48 |
+                (tmp[2] & 0xffL) << 40 |
+                (tmp[3] & 0xffL) << 32 |
+                (tmp[4] & 0xffL) << 24 |
+                (tmp[5] & 0xffL) << 16 |
+                (tmp[6] & 0xffL) <<  8 |
+                (tmp[7] & 0xffL);
     }
 
     public void write(int b) {
@@ -108,31 +120,45 @@ public class DigestStream implements ObjectOutput {
     @SuppressWarnings("deprecation")
     public void writeBytes(String s) {
         int length = s.length();
-        byte[] tmp = new byte[length];
-        s.getBytes(0, length, tmp, length);
-        md.update(tmp);
+        byte[] buf = this.buf;
+        int bufLength = buf.length;
+
+        while (length > 0) {
+            int lengthToCopy = Math.min(bufLength, length);
+            s.getBytes(0, lengthToCopy, buf, 0);
+            md.update(buf, 0, lengthToCopy);
+            length -= bufLength;
+        }
     }
 
     public void writeChars(String s) {
+        int charPos = 0;
         int length = s.length();
-        byte[] tmp = new byte[length << 1];
-        int pos = 0;
-        for (int i = 0; i < length; i++) {
-            int v = s.charAt(i);
-            tmp[pos]     = (byte) (v >>> 8);
-            tmp[pos + 1] = (byte) v;
-            pos += 2;
+
+        byte[] buf = this.buf;
+        int bufLength = buf.length;
+
+        while (charPos < length) {
+            int bytesToCopy = Math.min(bufLength, (length - charPos) * 2);
+            for (int pos = 0; pos < bytesToCopy; pos += 2) {
+                int v = s.charAt(charPos++);
+                buf[pos]     = (byte) (v >>> 8);
+                buf[pos + 1] = (byte) v;
+            }
+            md.update(buf, 0, bytesToCopy);
         }
-        md.update(tmp);
     }
 
     public void writeUTF(String s) {
-        int utfLength = Utf8.length(s);
-        byte[] tmp = new byte[utfLength + 2];
-        tmp[0] = (byte) (utfLength >>> 8);
-        tmp[1] = (byte) utfLength;
-        Utf8.write(s, tmp, 2);
-        md.update(tmp);
+        byte[] buf = this.buf;
+        int bufLength = buf.length;
+
+        int step = bufLength / 3;
+
+        for (int pos = 0; pos < s.length(); pos += step) {
+            int written = Utf8.write(s, pos, step, buf, 0);
+            md.update(buf, 0, written);
+        }
     }
 
     public void writeObject(Object obj) {

@@ -55,6 +55,10 @@ public final class Utf8 {
         return write(s, buf, byteArrayOffset + start);
     }
 
+    public static int write(String s, int stringStart, int maxChars, byte[] buf, int bufferStart) {
+        return write(s, stringStart, maxChars, buf, byteArrayOffset + bufferStart);
+    }
+
     public static int write(char[] c, int length, byte[] buf, int start) {
         return write(c, length, buf, byteArrayOffset + start);
     }
@@ -64,9 +68,14 @@ public final class Utf8 {
     }
 
     public static int write(String s, Object obj, long start) {
-        int length = s.length();
-        long pos = start;
-        for (int i = 0; i < length; i++) {
+        return write(s, 0, s.length(), obj, start);
+    }
+
+    public static int write(String s, int inStart, int inCount, Object obj, long outStart) {
+        int length = Math.min(s.length(), inStart + inCount);
+        long pos = outStart;
+
+        for (int i = inStart; i < length; i++) {
             int v = s.charAt(i);
             if (v <= 0x7f && v != 0) {
                 unsafe.putByte(obj, pos++, (byte) v);
@@ -81,7 +90,7 @@ public final class Utf8 {
                 pos += 2;
             }
         }
-        return (int) (pos - start);
+        return (int) (pos - outStart);
     }
 
     public static int write(char[] c, int length, Object obj, long start) {
