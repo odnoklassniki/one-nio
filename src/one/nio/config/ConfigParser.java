@@ -148,7 +148,7 @@ public class ConfigParser {
                 skipSpaces(colon + 1);
 
                 Object value;
-                Converter converter = field.getAnnotation(Converter.class);;
+                Converter converter = field.getAnnotation(Converter.class);
                 // Declaration annotation and array type annotation are at the same location
                 // https://docs.oracle.com/javase/specs/jls/se8/html/jls-9.html#jls-9.7.4
                 if (!field.getType().isArray() && converter != null) {

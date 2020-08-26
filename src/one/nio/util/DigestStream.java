@@ -123,11 +123,14 @@ public class DigestStream implements ObjectOutput {
         byte[] buf = this.buf;
         int bufLength = buf.length;
 
+        int i = 0;
+
         while (length > 0) {
             int lengthToCopy = Math.min(bufLength, length);
-            s.getBytes(0, lengthToCopy, buf, 0);
+            s.getBytes(i, i + lengthToCopy, buf, 0);
             md.update(buf, 0, lengthToCopy);
-            length -= bufLength;
+            length -= lengthToCopy;
+            i += lengthToCopy;
         }
     }
 
@@ -136,7 +139,7 @@ public class DigestStream implements ObjectOutput {
         int length = s.length();
 
         byte[] buf = this.buf;
-        int bufLength = buf.length;
+        int bufLength = buf.length & 0xfffffffe;    // odd bytes
 
         while (charPos < length) {
             int bytesToCopy = Math.min(bufLength, (length - charPos) * 2);
@@ -151,6 +154,12 @@ public class DigestStream implements ObjectOutput {
 
     public void writeUTF(String s) {
         byte[] buf = this.buf;
+
+        int utfLength = Utf8.length(s);
+        buf[0] = (byte) (utfLength >>> 8);
+        buf[1] = (byte) utfLength;
+        md.update(buf, 0, 2);
+
         int bufLength = buf.length;
 
         int step = bufLength / 3;
