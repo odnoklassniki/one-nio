@@ -1,3 +1,7 @@
+1.3.1
+ * Serialization of Java Records
+ * DigestStream fixes
+
 1.3.0
  * SSL improvements: RDRAND, PEER_CERTIFICATE_CHAIN, autoupdate certificates
  * Extended Perf Events API, including PEBS
