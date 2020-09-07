@@ -26,8 +26,7 @@ public class FieldDescriptor {
     private TypeDescriptor typeDescriptor;
     private Field ownField;
     private Field parentField;
-    private boolean useGetter;
-    private boolean useSetter;
+    private int index;
 
     // Ad-hoc linked list
     public FieldDescriptor next;
@@ -37,11 +36,11 @@ public class FieldDescriptor {
         this.typeDescriptor = typeDescriptor;
     }
 
-    FieldDescriptor(Field ownField, Field parentField) {
+    FieldDescriptor(Field ownField, Field parentField, int index) {
         Renamed renamed = ownField.getAnnotation(Renamed.class);
         this.nameDescriptor = renamed == null ? ownField.getName() : ownField.getName() + '|' + renamed.from();
         this.typeDescriptor = new TypeDescriptor(ownField.getType());
-        assignField(ownField, parentField);
+        assignField(ownField, parentField, index);
     }
 
     @Override
@@ -65,27 +64,18 @@ public class FieldDescriptor {
         return parentField;
     }
 
-    public boolean useGetter() {
-        return useGetter;
-    }
-
-    public boolean useSetter() {
-        return useSetter;
+    public int index() {
+        return index;
     }
 
     public boolean is(String nameDescriptor, String typeDescriptor) {
         return nameDescriptor.equals(this.nameDescriptor) && typeDescriptor.equals(this.typeDescriptor.toString());
     }
 
-    public void assignField(Field ownField, Field parentField) {
+    public void assignField(Field ownField, Field parentField, int index) {
         this.ownField = ownField;
         this.parentField = parentField;
-
-        SerializeWith serializeWith = ownField.getAnnotation(SerializeWith.class);
-        if (serializeWith != null) {
-            this.useGetter = !serializeWith.getter().isEmpty();
-            this.useSetter = !serializeWith.setter().isEmpty();
-        }
+        this.index = index;
     }
 
     public static FieldDescriptor read(ObjectInput in) throws IOException {

@@ -20,35 +20,52 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
-public class SpinWait {
+public class JavaFeatures {
     private static final MethodHandle onSpinWait = getOnSpinWait();
+    private static final MethodHandle isRecord = getIsRecord();
 
     private static MethodHandle getOnSpinWait() {
         try {
             return MethodHandles.publicLookup().findStatic(
                     Thread.class, "onSpinWait", MethodType.methodType(void.class));
         } catch (ReflectiveOperationException e) {
-            // fall through
+            return null;
         }
+    }
 
-        // Older JDK: no Thread.onSpinWait method
+    private static MethodHandle getIsRecord() {
         try {
-            return MethodHandles.lookup().findStatic(
-                    SpinWait.class, "onSpinWait", MethodType.methodType(void.class));
+            return MethodHandles.publicLookup().findVirtual(
+                    Class.class, "isRecord", MethodType.methodType(boolean.class));
         } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Should not happen");
+            return null;
         }
     }
 
-    private static void onSpinWait() {
-        // Fallback implementation
+    /**
+     * Calls Thread.onSpinWait() since Java 9; does nothing otherwise
+     */
+    public static void onSpinWait() {
+        if (onSpinWait != null) {
+            try {
+                onSpinWait.invokeExact();
+            } catch (Throwable e) {
+                // Never happens
+            }
+        }
     }
 
-    public static void pause() {
-        try {
-            onSpinWait.invokeExact();
-        } catch (Throwable e) {
-            // Never happens
+    /**
+     * Calls Class.isRecord() since Java 14 preview; returns false otherwise
+     */
+    public static boolean isRecord(Class<?> cls) {
+        if (isRecord != null) {
+            try {
+                return (boolean) isRecord.invokeExact(cls);
+            } catch (Throwable e) {
+                // Never happens
+            }
         }
+        return false;
     }
 }

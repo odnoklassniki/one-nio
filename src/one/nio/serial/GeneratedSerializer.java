@@ -23,7 +23,6 @@ import one.nio.serial.gen.StubGenerator;
 
 import java.io.Externalizable;
 import java.io.IOException;
-import java.io.NotSerializableException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.Field;
@@ -41,7 +40,7 @@ public class GeneratedSerializer extends Serializer {
     static final AtomicInteger unsupportedFields = new AtomicInteger();
 
     private FieldDescriptor[] fds;
-    private ArrayList<Field> defaultFields;
+    private FieldDescriptor[] defaultFields;
     private Delegate delegate;
 
     GeneratedSerializer(Class cls) {
@@ -50,8 +49,9 @@ public class GeneratedSerializer extends Serializer {
         Field[] ownFields = getSerializableFields();
         this.fds = new FieldDescriptor[ownFields.length / 2];
         for (int i = 0; i < ownFields.length; i += 2) {
-            fds[i / 2] = new FieldDescriptor(ownFields[i], ownFields[i + 1]);
+            fds[i / 2] = new FieldDescriptor(ownFields[i], ownFields[i + 1], i / 2);
         }
+        this.defaultFields = new FieldDescriptor[0];
 
         checkFieldTypes();
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
@@ -89,7 +89,7 @@ public class GeneratedSerializer extends Serializer {
         Field[] ownFields = getSerializableFields();
         assignFields(ownFields, true);
         assignFields(ownFields, false);
-        assignDefaultFields(ownFields);
+        this.defaultFields = assignDefaultFields(ownFields);
 
         checkFieldTypes();
         this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
@@ -181,26 +181,26 @@ public class GeneratedSerializer extends Serializer {
             if (fd.ownField() == null) {
                 int found = findField(fd, ownFields, exactType);
                 if (found >= 0) {
-                    fd.assignField(ownFields[found], ownFields[found + 1]);
+                    fd.assignField(ownFields[found], ownFields[found + 1], found / 2);
                     ownFields[found] = null;
                 }
             }
         }
     }
 
-    private void assignDefaultFields(Field[] ownFields) {
-        defaultFields = new ArrayList<>();
+    private FieldDescriptor[] assignDefaultFields(Field[] ownFields) {
+        ArrayList<FieldDescriptor> defaultFields = new ArrayList<>();
 
         for (int i = 0; i < ownFields.length; i += 2) {
             Field f = ownFields[i];
             if (f != null) {
                 logFieldMismatch("Local field is missed in stream", f.getType(), f.getDeclaringClass(), f.getName());
                 missedLocalFields.incrementAndGet();
-                if (f.getAnnotation(Default.class) != null) {
-                    defaultFields.add(f);
-                }
+                defaultFields.add(new FieldDescriptor(f, null, i / 2));
             }
         }
+
+        return defaultFields.toArray(new FieldDescriptor[0]);
     }
 
     private int findField(FieldDescriptor fd, Field[] ownFields, boolean exactType) {

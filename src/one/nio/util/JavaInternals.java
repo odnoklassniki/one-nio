@@ -173,4 +173,42 @@ public final class JavaInternals {
     public static <E extends Throwable> void uncheckedThrow(Throwable e) throws E {
         throw (E) e;
     }
+
+    // Helpers to be called from generated code
+
+    public static void putObject(Object o, Object value, long offset) {
+        unsafe.putObject(o, offset, value);
+    }
+
+    public static void putInt(Object o, int value, long offset) {
+        unsafe.putInt(o, offset, value);
+    }
+
+    public static void putLong(Object o, long value, long offset) {
+        unsafe.putLong(o, offset, value);
+    }
+
+    public static void putBoolean(Object o, boolean value, long offset) {
+        unsafe.putBoolean(o, offset, value);
+    }
+
+    public static void putByte(Object o, byte value, long offset) {
+        unsafe.putByte(o, offset, value);
+    }
+
+    public static void putShort(Object o, short value, long offset) {
+        unsafe.putShort(o, offset, value);
+    }
+
+    public static void putChar(Object o, char value, long offset) {
+        unsafe.putChar(o, offset, value);
+    }
+
+    public static void putFloat(Object o, float value, long offset) {
+        unsafe.putFloat(o, offset, value);
+    }
+
+    public static void putDouble(Object o, double value, long offset) {
+        unsafe.putDouble(o, offset, value);
+    }
 }

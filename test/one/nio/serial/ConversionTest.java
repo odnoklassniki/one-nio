@@ -37,7 +37,7 @@ public class ConversionTest implements Serializable {
         byte[] code = DelegateGenerator.generate(ConversionTest.class, new FieldDescriptor[]{
                 fd("intField", BigInteger.class),
                 fd("longField", BigInteger.class)
-        }, Collections.<Field>emptyList());
+        }, new FieldDescriptor[0]);
 
         Delegate delegate = BytecodeGenerator.INSTANCE.instantiate(code, Delegate.class);
 
@@ -53,7 +53,7 @@ public class ConversionTest implements Serializable {
 
     private FieldDescriptor fd(String fieldName, Class<?> modifiedType) throws ReflectiveOperationException {
         FieldDescriptor fd = new FieldDescriptor(fieldName, new TypeDescriptor(modifiedType));
-        fd.assignField(getClass().getDeclaredField(fieldName), null);
+        fd.assignField(getClass().getDeclaredField(fieldName), null, 0);
         return fd;
     }
 }
