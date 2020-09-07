@@ -72,7 +72,7 @@ enum FieldType implements Opcodes {
     }
 
     public String putSignature() {
-        return "(Ljava/lang/Object;J" + sig + ")V";
+        return "(Ljava/lang/Object;" + sig + "J)V";
     }
 
     public int convertTo(FieldType target) {

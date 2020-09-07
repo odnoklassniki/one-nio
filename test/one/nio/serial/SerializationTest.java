@@ -32,11 +32,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class SerializationTest {
 
@@ -269,14 +265,14 @@ public class SerializationTest {
 
         checkSerialize(InetSocketAddress.createUnresolved("www.example.com", 80));
         checkSerialize(new InetSocketAddress(21));
-        checkSerialize(new InetSocketAddress(InetAddress.getByAddress(new byte[] {8, 8, 8, 8}), 53));
+        checkSerialize(new InetSocketAddress(InetAddress.getByAddress(new byte[]{8, 8, 8, 8}), 53));
         checkSerialize(new InetSocketAddress("google.com", 443));
     }
 
     @Test
     public void testBigDecimal() throws IOException, ClassNotFoundException {
         checkSerialize(new BigInteger("12345678901234567890"));
-        checkSerialize(new BigInteger(-1, new byte[] { 11, 22, 33, 44, 55, 66, 77, 88, 99 }));
+        checkSerialize(new BigInteger(-1, new byte[]{11, 22, 33, 44, 55, 66, 77, 88, 99}));
         checkSerialize(new BigDecimal(999.999999999));
         checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
     }
@@ -290,7 +286,7 @@ public class SerializationTest {
     }
 
     private static class ReadObject1 implements Serializable {
-        private Object[] array = new String[] {"regular", "array"};
+        private Object[] array = new String[]{"regular", "array"};
 
         private void readObject(ObjectInputStream in) {
             for (Object o : array) {
@@ -309,7 +305,7 @@ public class SerializationTest {
     }
 
     private static class ReadObject2 implements Serializable {
-        private final Object[] array = new String[] {"final", "field"};
+        private final Object[] array = new String[]{"final", "field"};
 
         private void readObject(ObjectInputStream in) {
             for (Object o : array) {
@@ -473,4 +469,114 @@ public class SerializationTest {
         assertEquals(deserializedArray[0], deserializedArray[1]);
         assertEquals(deserializedArray[0], deserializedArray[3]);
     }
+
+    static class GetterSetter implements Serializable {
+        @SerializeWith(getter = "getN")
+        int n;
+
+        @SerializeWith(setter = "setS")
+        String s;
+
+        public int getN() {
+            return 55;
+        }
+
+        public void setS(String s) {
+            this.s = s + s;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            GetterSetter that = (GetterSetter) o;
+            return n == that.n &&
+                    Objects.equals(s, that.s);
+        }
+
+        @Override
+        public String toString() {
+            return "GetterSetter{" +
+                    "n=" + n +
+                    ", s='" + s + '\'' +
+                    '}';
+        }
+    }
+
+    @Test
+    public void testSerializeWith() throws IOException, ClassNotFoundException {
+        GetterSetter gs = new GetterSetter();
+        gs.n = 10;
+        gs.s = "abc";
+
+        try {
+            checkSerialize(gs);
+            fail("Must throw AssertionError");
+        } catch (AssertionError e) {
+            // This is fine
+        }
+
+        assertEquals(10, gs.n);
+
+        GetterSetter gs2 = (GetterSetter) clone(gs);
+        assertEquals(55, gs2.n);
+        assertEquals("abcabc", gs2.s);
+
+        GetterSetter gs3 = (GetterSetter) clone(gs2);
+        assertEquals(55, gs3.n);
+        assertEquals("abcabcabcabc", gs3.s);
+    }
+
+/*
+    record Color(String name, int r, int g, int b) implements Serializable {
+
+        public Color(String name, String rgb) {
+            this(name, hh(rgb, 1, 3), hh(rgb, 3, 5), hh(rgb, 5, 7));
+        }
+
+        private static int hh(String s, int from, int to) {
+            return Integer.parseInt(s.substring(from, to), 16);
+        }
+    }
+
+    @Test
+    public void testRecord() throws IOException, ClassNotFoundException {
+        checkSerialize(new Color("gold", 255, 215, 0));
+        checkSerialize(new Color("skyblue", "#87CEEB"));
+
+        Color pink = (Color) clone(new Color("pink", "#FFC0CB"));
+        Color pink2 = (Color) clone(new Color("pink", 255, 192, 203));
+        assertEquals(pink, pink2);
+    }
+
+    record Node(Object value, Node left, Node right) implements Serializable {
+        Node(Object value) {
+            this(value, null, null);
+        }
+    }
+
+    @Test
+    public void testRecordJson() throws IOException, ClassNotFoundException {
+        Integer n = 1000;
+        Node root = new Node("root",
+                new Node(n,
+                        new Node("leaf_l1"),
+                        new Node("leaf_r1")),
+                new Node(n,
+                        new Node("leaf_l2"),
+                        new Node("node_r2",
+                                new Node(true),
+                                new Node(false))));
+
+        checkSerialize(root);
+        Node root2 = (Node) clone(root);
+        assertSame(root2.left.value, root2.right.value);
+
+        String s = Json.toJson(root);
+        Node root3 = Repository.get(Node.class).fromJson(new JsonReader(s.getBytes()));
+        assertEquals(root, root2);
+        assertEquals(root, root3);
+        assertEquals(s, Json.toJson(root2));
+    }
+*/
 }

@@ -125,9 +125,8 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
 
     public static void emitInvoke(MethodVisitor mv, Constructor c) {
         String holder = Type.getInternalName(c.getDeclaringClass());
-        String name = c.getName();
         String sig = Type.getConstructorDescriptor(c);
-        mv.visitMethodInsn(INVOKESPECIAL, holder, name, sig);
+        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig);
     }
 
     public static void emitThrow(MethodVisitor mv, String exceptionClass, String message) {

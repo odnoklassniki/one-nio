@@ -353,6 +353,6 @@ public class JsonReader {
             }
         }
         long n = Long.parseLong(number);
-        return n == (int) n ? Integer.valueOf((int) n) : Long.valueOf(n);
+        return n == (int) n ? (int) n : (Number) n;
     }
 }

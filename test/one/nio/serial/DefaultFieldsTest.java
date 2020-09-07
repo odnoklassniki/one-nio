@@ -58,7 +58,11 @@ public class DefaultFieldsTest implements Serializable {
 
     @Test
     public void testDefaultFields() throws Exception {
-        List<Field> defaultFields = Arrays.asList(DefaultFieldsTest.class.getDeclaredFields());
+        Field[] ownFields = DefaultFieldsTest.class.getDeclaredFields();
+        FieldDescriptor[] defaultFields = new FieldDescriptor[ownFields.length];
+        for (int i = 0; i < ownFields.length; i++) {
+            defaultFields[i] = new FieldDescriptor(ownFields[i], null, i);
+        }
         byte[] code = DelegateGenerator.generate(DefaultFieldsTest.class, new FieldDescriptor[0], defaultFields);
 
         Delegate delegate = BytecodeGenerator.INSTANCE.instantiate(code, Delegate.class);
