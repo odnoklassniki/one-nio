@@ -509,12 +509,13 @@ public class SerializationTest {
         gs.n = 10;
         gs.s = "abc";
 
+        boolean ok = false;
         try {
             checkSerialize(gs);
-            fail("Must throw AssertionError");
         } catch (AssertionError e) {
-            // This is fine
+            ok = true;
         }
+        assertTrue("Must throw AssertionError", ok);
 
         assertEquals(10, gs.n);
 
