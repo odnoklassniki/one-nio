@@ -282,7 +282,7 @@ public class Repository {
 
         CalcSizeStream css = new CalcSizeStream();
         for (Serializer serializer : serializers) {
-            if (serializer.uid >= 0) {
+            if (serializer.uid >= 0 && !(serializer instanceof MethodSerializer)) {
                 css.writeObject(serializer);
             }
         }
@@ -290,7 +290,7 @@ public class Repository {
         byte[] snapshot = new byte[css.count()];
         SerializeStream ss = new SerializeStream(snapshot);
         for (Serializer serializer : serializers) {
-            if (serializer.uid >= 0) {
+            if (serializer.uid >= 0 && !(serializer instanceof MethodSerializer)) {
                 ss.writeObject(serializer);
             }
         }

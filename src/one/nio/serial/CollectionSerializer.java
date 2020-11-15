@@ -18,19 +18,20 @@ package one.nio.serial;
 
 import one.nio.serial.gen.StubGenerator;
 
-import java.io.ObjectInput;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
+import java.io.ObjectInput;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
 public class CollectionSerializer extends Serializer<Collection> {
-    private Constructor constructor;
+    private MethodHandle constructor;
 
     CollectionSerializer(Class cls) {
         super(cls);
         this.constructor = findConstructor();
-        this.constructor.setAccessible(true);
     }
 
     @Override
@@ -44,7 +45,6 @@ public class CollectionSerializer extends Serializer<Collection> {
         }
 
         this.constructor = findConstructor();
-        this.constructor.setAccessible(true);
     }
 
     @Override
@@ -68,9 +68,9 @@ public class CollectionSerializer extends Serializer<Collection> {
     public Collection read(DataStream in) throws IOException, ClassNotFoundException {
         Collection result;
         try {
-            result = (Collection) constructor.newInstance();
+            result = (Collection) constructor.invokeExact();
             in.register(result);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             throw new IOException(e);
         }
 
@@ -108,31 +108,44 @@ public class CollectionSerializer extends Serializer<Collection> {
         return in.readArray();
     }
 
-    @SuppressWarnings("unchecked")
-    private Constructor findConstructor() {
+    private MethodHandle findConstructor() {
         try {
-            return cls.getConstructor();
-        } catch (NoSuchMethodException e) {
-            Class implementation;
-            if (SortedSet.class.isAssignableFrom(cls)) {
-                implementation = TreeSet.class;
-            } else if (Set.class.isAssignableFrom(cls)) {
-                implementation = HashSet.class;
-            } else if (Queue.class.isAssignableFrom(cls)) {
-                implementation = LinkedList.class;
-            } else {
-                implementation = ArrayList.class;
-            }
+            return MethodHandles.publicLookup()
+                    .findConstructor(cls, MethodType.methodType(void.class))
+                    .asType(MethodType.methodType(Collection.class));
+        } catch (ReflectiveOperationException e) {
+            // Fallback
+        }
 
-            generateUid();
-            Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
-                    ", changed type to " + implementation.getName());
+        if (cls == Collections.EMPTY_LIST.getClass()) {
+            return MethodHandles.constant(Collection.class, Collections.EMPTY_LIST);
+        } else if (cls == Collections.EMPTY_SET.getClass()) {
+            return MethodHandles.constant(Collection.class, Collections.EMPTY_SET);
+        } else if (cls == Collections.emptySortedSet().getClass()) {
+            return MethodHandles.constant(Collection.class, Collections.emptySortedSet());
+        }
 
-            try {
-                return implementation.getConstructor();
-            } catch (NoSuchMethodException e1) {
-                return null;
-            }
+        Class<?> implementation;
+        if (SortedSet.class.isAssignableFrom(cls)) {
+            implementation = TreeSet.class;
+        } else if (Set.class.isAssignableFrom(cls)) {
+            implementation = HashSet.class;
+        } else if (Queue.class.isAssignableFrom(cls)) {
+            implementation = LinkedList.class;
+        } else {
+            implementation = ArrayList.class;
+        }
+
+        generateUid();
+        Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
+                ", changed type to " + implementation.getName());
+
+        try {
+            return MethodHandles.publicLookup()
+                    .findConstructor(implementation, MethodType.methodType(void.class))
+                    .asType(MethodType.methodType(Collection.class));
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
         }
     }
 

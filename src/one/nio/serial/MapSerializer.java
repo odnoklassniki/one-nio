@@ -20,18 +20,19 @@ import one.nio.serial.gen.StubGenerator;
 
 import java.io.ObjectInput;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class MapSerializer extends Serializer<Map> {
-    private Constructor constructor;
+    private MethodHandle constructor;
 
     MapSerializer(Class cls) {
         super(cls);
         this.constructor = findConstructor();
-        this.constructor.setAccessible(true);
     }
 
     @Override
@@ -45,7 +46,6 @@ public class MapSerializer extends Serializer<Map> {
         }
 
         this.constructor = findConstructor();
-        this.constructor.setAccessible(true);
     }
 
     @Override
@@ -71,9 +71,9 @@ public class MapSerializer extends Serializer<Map> {
     public Map read(DataStream in) throws IOException, ClassNotFoundException {
         Map result;
         try {
-            result = (Map) constructor.newInstance();
+            result = (Map) constructor.invokeExact();
             in.register(result);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             throw new IOException(e);
         }
 
@@ -111,31 +111,42 @@ public class MapSerializer extends Serializer<Map> {
         return in.readMap();
     }
 
-    @SuppressWarnings("unchecked")
-    private Constructor findConstructor() {
+    private MethodHandle findConstructor() {
         try {
-            return cls.getConstructor();
-        } catch (NoSuchMethodException e) {
-            Class implementation;
-            if (ConcurrentNavigableMap.class.isAssignableFrom(cls)) {
-                implementation = ConcurrentSkipListMap.class;
-            } else if (ConcurrentMap.class.isAssignableFrom(cls)) {
-                implementation = ConcurrentHashMap.class;
-            } else if (SortedMap.class.isAssignableFrom(cls)) {
-                implementation = TreeMap.class;
-            } else {
-                implementation = HashMap.class;
-            }
+            return MethodHandles.publicLookup()
+                    .findConstructor(cls, MethodType.methodType(void.class))
+                    .asType(MethodType.methodType(Map.class));
+        } catch (ReflectiveOperationException e) {
+            // Fallback
+        }
 
-            generateUid();
-            Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
-                    ", changed type to " + implementation.getName());
+        if (cls == Collections.EMPTY_MAP.getClass()) {
+            return MethodHandles.constant(Map.class, Collections.EMPTY_MAP);
+        } else if (cls == Collections.emptySortedMap().getClass()) {
+            return MethodHandles.constant(Map.class, Collections.emptySortedMap());
+        }
 
-            try {
-                return implementation.getConstructor();
-            } catch (NoSuchMethodException e1) {
-                return null;
-            }
+        Class<?> implementation;
+        if (ConcurrentNavigableMap.class.isAssignableFrom(cls)) {
+            implementation = ConcurrentSkipListMap.class;
+        } else if (ConcurrentMap.class.isAssignableFrom(cls)) {
+            implementation = ConcurrentHashMap.class;
+        } else if (SortedMap.class.isAssignableFrom(cls)) {
+            implementation = TreeMap.class;
+        } else {
+            implementation = HashMap.class;
+        }
+
+        generateUid();
+        Repository.log.warn("[" + Long.toHexString(uid) + "] No default constructor for " + descriptor +
+                ", changed type to " + implementation.getName());
+
+        try {
+            return MethodHandles.publicLookup()
+                    .findConstructor(implementation, MethodType.methodType(void.class))
+                    .asType(MethodType.methodType(Map.class));
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
         }
     }
 
