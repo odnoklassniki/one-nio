@@ -16,11 +16,60 @@
 
 package one.nio.net;
 
+import one.nio.util.JavaInternals;
+import sun.nio.ch.Net;
+import sun.nio.ch.SelChImpl;
+
+import java.io.FileDescriptor;
+import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Method;
+import java.net.SocketTimeoutException;
 import java.nio.channels.SelectableChannel;
 
 /**
  * @author ivan.grigoryev
  */
 public abstract class SelectableJavaSocket extends Socket {
+    private static final MethodHandle poll = getPollMethodHandle();
+
+    private static MethodHandle getPollMethodHandle() {
+        try {
+            Method m = JavaInternals.getMethod(Net.class, "poll", FileDescriptor.class, int.class, long.class);
+            if (m != null) {
+                return MethodHandles.publicLookup().unreflect(m);
+            }
+        } catch (Throwable e) {
+            // ignore
+        }
+        return null;
+    }
+
+    static final int POLL_READ = Net.POLLIN;
+    static final int POLL_WRITE = Net.POLLOUT;
+
+    void checkTimeout(int events, long timeout) throws IOException {
+        if (timeout <= 0 || poll == null) {
+            return;
+        }
+
+        try {
+            long endTime = System.currentTimeMillis() + timeout;
+            do {
+                int result = (int) poll.invokeExact(((SelChImpl) getSelectableChannel()).getFD(), events, timeout);
+                if (result > 0) {
+                    return;
+                }
+            } while ((timeout = endTime - System.currentTimeMillis()) > 0);
+        } catch (IOException e) {
+            throw e;
+        } catch (Throwable e) {
+            return;
+        }
+
+        throw new SocketTimeoutException();
+    }
+
     public abstract SelectableChannel getSelectableChannel();
 }

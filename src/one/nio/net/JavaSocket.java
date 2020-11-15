@@ -31,6 +31,7 @@ import java.nio.channels.SocketChannel;
 
 final class JavaSocket extends SelectableJavaSocket {
     final SocketChannel ch;
+    int timeout;
 
     JavaSocket() throws IOException {
         this.ch = SocketChannel.open();
@@ -76,11 +77,13 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final int writeRaw(long buf, int count, int flags) throws IOException {
+        checkTimeout(POLL_WRITE, timeout);
         return ch.write(DirectMemory.wrap(buf, count));
     }
 
     @Override
     public final int write(byte[] data, int offset, int count, int flags) throws IOException {
+        checkTimeout(POLL_WRITE, timeout);
         return ch.write(ByteBuffer.wrap(data, offset, count));
     }
 
@@ -96,6 +99,7 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final int readRaw(long buf, int count, int flags) throws IOException {
+        checkTimeout(POLL_READ, timeout);
         int result = ch.read(DirectMemory.wrap(buf, count));
         if (result < 0) {
             throw new SocketClosedException();
@@ -105,6 +109,7 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final int read(byte[] data, int offset, int count, int flags) throws IOException {
+        checkTimeout(POLL_READ, timeout);
         int result = ch.read(ByteBuffer.wrap(data, offset, count));
         if (result < 0) {
             throw new SocketClosedException();
@@ -137,11 +142,13 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final int read(ByteBuffer dst) throws IOException {
+        checkTimeout(POLL_READ, timeout);
         return ch.read(dst);
     }
 
     @Override
     public final int write(ByteBuffer src) throws IOException {
+        checkTimeout(POLL_WRITE, timeout);
         return ch.write(src);
     }
 
@@ -166,6 +173,7 @@ final class JavaSocket extends SelectableJavaSocket {
         } catch (SocketException e) {
             // Ignore
         }
+        this.timeout = timeout;
     }
 
     @Override
