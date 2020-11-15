@@ -30,12 +30,14 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
 
     private final AtomicInteger index;
     private final int threadPriority;
+    private final int schedulingPolicy;
 
-    WorkerPool(int minThreads, int maxThreads, long queueTime, int threadPriority) {
+    WorkerPool(int minThreads, int maxThreads, long queueTime, int threadPriority, int schedulingPolicy) {
         super(minThreads, maxThreads, 60L, TimeUnit.SECONDS, new WaitingSynchronousQueue(queueTime));
         setThreadFactory(this);
         this.index = new AtomicInteger();
         this.threadPriority = threadPriority;
+        this.schedulingPolicy = schedulingPolicy;
     }
 
     void setQueueTime(long queueTime) {
@@ -60,9 +62,10 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
 
     @Override
     public Thread newThread(Runnable r) {
-        Thread thread = new PayloadThread(r, "NIO Worker #" + index.incrementAndGet());
+        PayloadThread thread = new PayloadThread(r, "NIO Worker #" + index.incrementAndGet());
         thread.setUncaughtExceptionHandler(this);
         thread.setPriority(threadPriority);
+        thread.setSchedulingPolicy(schedulingPolicy);
         return thread;
     }
 

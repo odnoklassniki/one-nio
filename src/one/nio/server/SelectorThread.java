@@ -33,10 +33,11 @@ public final class SelectorThread extends PayloadThread {
     long sessions;
     int maxReady;
 
-    public SelectorThread(int num, int dedicatedCpu) throws IOException {
+    public SelectorThread(int num, int dedicatedCpu, int schedulingPolicy) throws IOException {
         super("NIO Selector #" + num);
         this.selector = Selector.create();
         this.dedicatedCpu = dedicatedCpu;
+        setSchedulingPolicy(schedulingPolicy);
     }
 
     public void shutdown() {
@@ -50,6 +51,7 @@ public final class SelectorThread extends PayloadThread {
 
     @Override
     public void run() {
+        adjustPriority();
         if (dedicatedCpu >= 0 && Proc.IS_SUPPORTED) {
             Proc.setDedicatedCpu(0, dedicatedCpu);
         }

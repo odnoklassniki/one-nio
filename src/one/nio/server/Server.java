@@ -30,13 +30,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 public class Server implements ServerMXBean {
     private static final Log log = LogFactory.getLog(Server.class);
 
-    private final AtomicLong requestsProcessed = new AtomicLong();
-    private final AtomicLong requestsRejected = new AtomicLong();
+    private final LongAdder requestsProcessed = new LongAdder();
+    private final LongAdder requestsRejected = new LongAdder();
 
     private volatile SelectorStats selectorStats;
     private volatile QueueStats queueStats;
@@ -68,13 +68,14 @@ public class Server implements ServerMXBean {
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = new SelectorThread[config.selectors != 0 ? config.selectors : processors];
         for (int i = 0; i < selectors.length; i++) {
-            selectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1);
+            selectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1, config.schedulingPolicy);
             selectors[i].setPriority(config.threadPriority);
         }
         this.selectors = selectors;
 
         this.useWorkers = config.maxWorkers > 0;
-        this.workers = new WorkerPool(config.minWorkers, useWorkers ? config.maxWorkers : 2, config.queueTime, config.threadPriority);
+        this.workers = new WorkerPool(config.minWorkers, useWorkers ? config.maxWorkers : 2, config.queueTime,
+                config.threadPriority, config.schedulingPolicy);
 
         this.cleanup = new CleanupThread(selectors, config.keepAlive);
 
@@ -133,7 +134,7 @@ public class Server implements ServerMXBean {
         if (config.selectors > selectors.length) {
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, config.selectors);
             for (int i = selectors.length; i < config.selectors; i++) {
-                newSelectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1);
+                newSelectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1, config.schedulingPolicy);
                 newSelectors[i].setPriority(config.threadPriority);
                 newSelectors[i].start();
             }
@@ -208,12 +209,12 @@ public class Server implements ServerMXBean {
         return a.size() < b.size() ? a : b;
     }
 
-    public final long incRequestsProcessed() {
-        return requestsProcessed.incrementAndGet();
+    public final void incRequestsProcessed() {
+        requestsProcessed.increment();
     }
 
-    public final long incRequestsRejected() {
-        return requestsRejected.incrementAndGet();
+    public final void incRequestsRejected() {
+        requestsRejected.increment();
     }
 
     @Override
@@ -313,12 +314,12 @@ public class Server implements ServerMXBean {
 
     @Override
     public long getRequestsProcessed() {
-        return requestsProcessed.get();
+        return requestsProcessed.sum();
     }
 
     @Override
     public long getRequestsRejected() {
-        return requestsRejected.get();
+        return requestsRejected.sum();
     }
 
     @Override
@@ -334,8 +335,8 @@ public class Server implements ServerMXBean {
             selector.maxReady = 0;
         }
 
-        requestsProcessed.set(0);
-        requestsRejected.set(0);
+        requestsProcessed.reset();
+        requestsRejected.reset();
     }
 
     public final void asyncExecute(Runnable command) {

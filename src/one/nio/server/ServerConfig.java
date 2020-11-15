@@ -20,6 +20,7 @@ import one.nio.config.Config;
 import one.nio.config.Converter;
 import one.nio.net.ConnectionString;
 import one.nio.net.SslConfig;
+import one.nio.os.Proc;
 
 @Config
 public class ServerConfig {
@@ -33,6 +34,7 @@ public class ServerConfig {
     @Converter(method = "time")
     public int keepAlive;
     public int threadPriority = Thread.NORM_PRIORITY;
+    public int schedulingPolicy = Proc.SCHED_OTHER;
 
     public ServerConfig() {
     }
@@ -55,6 +57,7 @@ public class ServerConfig {
         this.maxWorkers = conn.getIntParam("maxWorkers", 0);
         this.queueTime = conn.getIntParam("queueTime", 0) / 1000;
         this.threadPriority = conn.getIntParam("threadPriority", Thread.NORM_PRIORITY);
+        this.schedulingPolicy = conn.getIntParam("schedulingPolicy", Proc.SCHED_OTHER);
     }
 
     // Do not use for new servers! Use ConfigParser instead
