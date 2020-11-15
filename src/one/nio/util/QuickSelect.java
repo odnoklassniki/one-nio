@@ -20,7 +20,7 @@ import java.util.Comparator;
 
 public class QuickSelect {
 
-    // Select k-th largest element from the array
+    // Select k-th smallest element from the array
     public static long select(long[] array, int k) {
         return select(array, k, 0, array.length - 1);
     }
