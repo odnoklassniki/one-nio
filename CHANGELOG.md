@@ -1,3 +1,8 @@
+1.3.2
+ * Optimized serialization of empty collections
+ * `schedulingPolicy` option for NIO server threads
+ * Fixed JavaSocket timeouts on Mac and Windows
+
 1.3.1
  * Serialization of Java Records
  * DigestStream fixes
