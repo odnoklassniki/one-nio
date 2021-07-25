@@ -35,7 +35,7 @@ public abstract class SharedMemoryFixedMap<K, V> extends SharedMemoryMap<K, V> {
         this.allocator = createFixedSizeAllocator(getEntrySize(valueSize));
     }
 
-    private static int getEntrySize(int valueSize) {
+    protected static int getEntrySize(int valueSize) {
         return (valueSize + (HEADER_SIZE + 7)) & ~7;  // align to 8-byte boundary
     }
 

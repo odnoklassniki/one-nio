@@ -431,20 +431,24 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     public void iterate(Visitor<K, V> visitor) {
-        iterate(visitor, 0, 1);
+        iterate(visitor, 0, capacity, 1);
     }
 
     public void iterate(final Visitor<K, V> visitor, final int workers) {
         AsyncExecutor.fork(workers, new ParallelTask() {
             @Override
             public void execute(int taskNum, int taskCount) {
-                iterate(visitor, taskNum, taskCount);
+                iterate(visitor, taskNum, capacity, taskCount);
             }
         });
     }
 
-    public void iterate(Visitor<K, V> visitor, int taskNum, int taskCount) {
-        for (int i = taskNum; i < capacity; i += taskCount) {
+    public void iterate(Visitor<K, V> visitor, int start, int end, int step) {
+        if (start < 0 || end > capacity) {
+            throw new IndexOutOfBoundsException();
+        }
+
+        for (int i = start; i < end; i += step) {
             long currentPtr = mapBase + (long) i * 8;
             RWLock lock = locks[i & (CONCURRENCY_LEVEL - 1)].lockRead();
             try {
@@ -458,20 +462,24 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     }
 
     public void iterate(WritableVisitor<K, V> visitor) {
-        iterate(visitor, 0, 1);
+        iterate(visitor, 0, capacity, 1);
     }
 
     public void iterate(final WritableVisitor<K, V> visitor, final int workers) {
         AsyncExecutor.fork(workers, new ParallelTask() {
             @Override
             public void execute(int taskNum, int taskCount) {
-                iterate(visitor, taskNum, taskCount);
+                iterate(visitor, taskNum, capacity, taskCount);
             }
         });
     }
 
-    public void iterate(WritableVisitor<K, V> visitor, int taskNum, int taskCount) {
-        for (int i = taskNum; i < capacity; i += taskCount) {
+    public void iterate(WritableVisitor<K, V> visitor, int start, int end, int step) {
+        if (start < 0 || end > capacity) {
+            throw new IndexOutOfBoundsException();
+        }
+
+        for (int i = start; i < end; i += step) {
             long currentPtr = mapBase + (long) i * 8;
             RWLock lock = locks[i & (CONCURRENCY_LEVEL - 1)].lockWrite();
             try {
@@ -543,7 +551,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         protected final RWLock lock;
         protected long entry;
 
-        protected Record(OffheapMap<K, V> map, RWLock lock, long entry) {
+        public Record(OffheapMap<K, V> map, RWLock lock, long entry) {
             this.map = map;
             this.lock = lock;
             this.entry = entry;
@@ -591,7 +599,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         protected K key;
         protected long currentPtr;
 
-        protected WritableRecord(OffheapMap<K, V> map, RWLock lock, long entry, K key, long currentPtr) {
+        public WritableRecord(OffheapMap<K, V> map, RWLock lock, long entry, K key, long currentPtr) {
             super(map, lock, entry);
             this.key = key;
             this.currentPtr = currentPtr;

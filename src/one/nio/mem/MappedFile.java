@@ -160,9 +160,17 @@ public class MappedFile implements Closeable {
         }
 
         try {
-            Method map0 = Class.forName("sun.nio.ch.FileChannelImpl").getDeclaredMethod("map0", int.class, long.class, long.class);
-            map0.setAccessible(true);
-            return (Long) map0.invoke(f.getChannel(), mode, start, size);
+            Class<?> cls = Class.forName("sun.nio.ch.FileChannelImpl");
+            Method map0 = JavaInternals.getMethod(cls, "map0", int.class, long.class, long.class);
+            if (map0 != null) {
+                return (long) map0.invoke(f.getChannel(), mode, start, size);
+            }
+            // Newer JDK has an extra 'sync' argument
+            map0 = JavaInternals.getMethod(cls, "map0", int.class, long.class, long.class, boolean.class);
+            if (map0 != null) {
+                return (long) map0.invoke(f.getChannel(), mode, start, size, false);
+            }
+            throw new IllegalStateException("map0 method not found");
         } catch (InvocationTargetException e) {
             Throwable target = e.getTargetException();
             throw (target instanceof IOException) ? (IOException) target : new IOException(target);
@@ -179,8 +187,11 @@ public class MappedFile implements Closeable {
         }
 
         try {
-            Method unmap0 = Class.forName("sun.nio.ch.FileChannelImpl").getDeclaredMethod("unmap0", long.class, long.class);
-            unmap0.setAccessible(true);
+            Class<?> cls = Class.forName("sun.nio.ch.FileChannelImpl");
+            Method unmap0 = JavaInternals.getMethod(cls, "unmap0", long.class, long.class);
+            if (unmap0 == null) {
+                throw new IllegalStateException("unmap0 method not found");
+            }
             unmap0.invoke(null, start, size);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
