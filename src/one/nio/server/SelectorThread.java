@@ -19,6 +19,7 @@ package one.nio.server;
 import one.nio.net.Selector;
 import one.nio.net.Session;
 import one.nio.os.Proc;
+import one.nio.os.SchedulingPolicy;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -33,7 +34,7 @@ public final class SelectorThread extends PayloadThread {
     long sessions;
     int maxReady;
 
-    public SelectorThread(int num, int dedicatedCpu, int schedulingPolicy) throws IOException {
+    public SelectorThread(int num, int dedicatedCpu, SchedulingPolicy schedulingPolicy) throws IOException {
         super("NIO Selector #" + num);
         this.selector = Selector.create();
         this.dedicatedCpu = dedicatedCpu;
@@ -51,7 +52,10 @@ public final class SelectorThread extends PayloadThread {
 
     @Override
     public void run() {
-        adjustPriority();
+        if (schedulingPolicy != null) {
+            schedulingPolicy.apply();
+        }
+
         if (dedicatedCpu >= 0 && Proc.IS_SUPPORTED) {
             Proc.setDedicatedCpu(0, dedicatedCpu);
         }

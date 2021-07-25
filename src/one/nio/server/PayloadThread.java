@@ -16,13 +16,11 @@
 
 package one.nio.server;
 
-import one.nio.os.BatchThread;
-import one.nio.os.IdleThread;
-import one.nio.os.Proc;
+import one.nio.os.SchedulingPolicy;
 
 public class PayloadThread extends Thread {
     protected Object payload;
-    private int schedulingPolicy;
+    protected SchedulingPolicy schedulingPolicy;
 
     public PayloadThread(Runnable target) {
         super(target);
@@ -44,25 +42,19 @@ public class PayloadThread extends Thread {
         this.payload = payload;
     }
 
-    public final int schedulingPolicy() {
+    public final SchedulingPolicy schedulingPolicy() {
         return schedulingPolicy;
     }
 
-    public final void setSchedulingPolicy(int schedulingPolicy) {
+    public final void setSchedulingPolicy(SchedulingPolicy schedulingPolicy) {
         this.schedulingPolicy = schedulingPolicy;
-    }
-
-    public void adjustPriority() {
-        if (schedulingPolicy == Proc.SCHED_BATCH) {
-            BatchThread.adjustPriority();
-        } else if (schedulingPolicy == Proc.SCHED_IDLE) {
-            IdleThread.adjustPriority();
-        }
     }
 
     @Override
     public void run() {
-        adjustPriority();
+        if (schedulingPolicy != null) {
+            schedulingPolicy.apply();
+        }
         super.run();
     }
 

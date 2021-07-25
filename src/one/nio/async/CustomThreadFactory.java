@@ -16,7 +16,8 @@
 
 package one.nio.async;
 
-import one.nio.os.BatchThread;
+import one.nio.os.SchedulingPolicy;
+import one.nio.server.PayloadThread;
 
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
@@ -26,28 +27,28 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CustomThreadFactory implements ThreadFactory, ForkJoinPool.ForkJoinWorkerThreadFactory {
     private final String name;
     private final boolean daemon;
-    private final boolean batch;
+    private final SchedulingPolicy schedulingPolicy;
     private final AtomicInteger id = new AtomicInteger();
 
     public CustomThreadFactory(String name) {
-        this(name, false, false);
+        this(name, false, null);
     }
 
     public CustomThreadFactory(String name, boolean daemon) {
-        this(name, daemon, false);
+        this(name, daemon, null);
     }
 
-    public CustomThreadFactory(String name, boolean daemon, boolean batch) {
+    public CustomThreadFactory(String name, boolean daemon, SchedulingPolicy schedulingPolicy) {
         this.name = name;
         this.daemon = daemon;
-        this.batch = batch;
+        this.schedulingPolicy = schedulingPolicy;
     }
 
     @Override
     public Thread newThread(Runnable r) {
-        String nextThreadName = name + "-" + id.incrementAndGet();
-        Thread thread = batch ? new BatchThread(r, nextThreadName) : new Thread(r, nextThreadName);
+        PayloadThread thread = new PayloadThread(r, name + "-" + id.incrementAndGet());
         thread.setDaemon(daemon);
+        thread.setSchedulingPolicy(schedulingPolicy);
         return thread;
     }
 
@@ -57,8 +58,8 @@ public class CustomThreadFactory implements ThreadFactory, ForkJoinPool.ForkJoin
             @Override
             protected void onStart() {
                 super.onStart();
-                if (batch) {
-                    BatchThread.adjustPriority();
+                if (schedulingPolicy != null) {
+                    schedulingPolicy.apply();
                 }
             }
         };

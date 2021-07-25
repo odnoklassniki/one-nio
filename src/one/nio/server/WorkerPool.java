@@ -16,6 +16,7 @@
 
 package one.nio.server;
 
+import one.nio.os.SchedulingPolicy;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -30,9 +31,9 @@ final class WorkerPool extends ThreadPoolExecutor implements ThreadFactory, Thre
 
     private final AtomicInteger index;
     private final int threadPriority;
-    private final int schedulingPolicy;
+    private final SchedulingPolicy schedulingPolicy;
 
-    WorkerPool(int minThreads, int maxThreads, long queueTime, int threadPriority, int schedulingPolicy) {
+    WorkerPool(int minThreads, int maxThreads, long queueTime, int threadPriority, SchedulingPolicy schedulingPolicy) {
         super(minThreads, maxThreads, 60L, TimeUnit.SECONDS, new WaitingSynchronousQueue(queueTime));
         setThreadFactory(this);
         this.index = new AtomicInteger();
