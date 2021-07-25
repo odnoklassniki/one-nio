@@ -26,6 +26,20 @@ public class SerializationContext {
     private int[] values;
     private int size;
     private int threshold;
+    
+    public SerializationContext() {
+    }
+
+    public SerializationContext(int capacity) {
+        this.first = this;
+        this.keys = new Object[capacity];
+        this.values = new int[capacity];
+        this.threshold = capacity * 2 / 3;
+    }
+
+    public int capacity() {
+        return keys.length;
+    }
 
     public int put(Object obj) {
         if (first == null) {

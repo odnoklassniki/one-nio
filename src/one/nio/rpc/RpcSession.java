@@ -198,7 +198,7 @@ public class RpcSession<S, M> extends Session {
         RpcPacket.checkWriteSize(responseSize);
         byte[] buffer = new byte[responseSize + 4];
 
-        DataStream ds = css.hasCycles() ? new SerializeStream(buffer) : new DataStream(buffer);
+        DataStream ds = css.hasCycles() ? new SerializeStream(buffer, css.capacity()) : new DataStream(buffer);
         ds.writeInt(responseSize);
         ds.writeObject(response);
 

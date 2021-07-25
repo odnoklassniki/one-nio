@@ -163,7 +163,7 @@ public class RpcClient extends SocketPool implements InvocationHandler {
         RpcPacket.checkWriteSize(requestSize);
 
         byte[] buffer = new byte[requestSize + 4];
-        DataStream ds = css.hasCycles() ? new SerializeStream(buffer) : new DataStream(buffer);
+        DataStream ds = css.hasCycles() ? new SerializeStream(buffer, css.capacity()) : new DataStream(buffer);
         ds.writeInt(requestSize);
         ds.writeObject(request);
         return buffer;

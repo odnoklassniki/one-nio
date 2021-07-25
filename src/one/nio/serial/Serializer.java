@@ -130,7 +130,7 @@ public abstract class Serializer<T> implements Externalizable {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(obj);
         byte[] data = new byte[css.count];
-        DataStream ds = css.hasCycles ? new SerializeStream(data) : new DataStream(data);
+        DataStream ds = css.hasCycles ? new SerializeStream(data, css.capacity()) : new DataStream(data);
         ds.writeObject(obj);
         return data;
     }
