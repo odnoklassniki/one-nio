@@ -78,7 +78,7 @@ public class Response {
         this.headers = new String[4];
         this.headers[0] = resultCode;
     }
-    
+
     public Response(String resultCode, byte[] body) {
         this.headerCount = 2;
         this.headers = new String[4];
@@ -108,7 +108,7 @@ public class Response {
         response.addHeader("Location: " + url);
         return response;
     }
-    
+
     public void addHeader(String header) {
         if (headerCount >= headers.length) {
             headers = Arrays.copyOf(headers, headers.length + 4);
@@ -133,7 +133,7 @@ public class Response {
         int keyLength = key.length();
         for (int i = 1; i < headerCount; i++) {
             if (headers[i].regionMatches(true, 0, key, 0, keyLength)) {
-                return headers[i].substring(keyLength);
+                return Request.trim(headers[i], keyLength);
             }
         }
         return null;

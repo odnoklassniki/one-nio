@@ -208,7 +208,7 @@ public class Request {
         int keyLength = key.length();
         for (int i = 0; i < headerCount; i++) {
             if (headers[i].regionMatches(true, 0, key, 0, keyLength)) {
-                return headers[i].substring(keyLength);
+                return trim(headers[i], keyLength);
             }
         }
         return null;
@@ -218,7 +218,7 @@ public class Request {
         int keyLength = prefix.length();
         for (int i = 0; i < headerCount; i++) {
             if (headers[i].regionMatches(true, 0, prefix, 0, keyLength)) {
-                suffixConsumer.accept(headers[i].substring(keyLength));
+                suffixConsumer.accept(trim(headers[i], keyLength));
             }
         }
     }
@@ -256,7 +256,7 @@ public class Request {
     }
 
     public String getHost() {
-        String host = getHeader("Host: ");
+        String host = getHeader("Host:");
         if (host == null) {
             return null;
         }
@@ -289,5 +289,12 @@ public class Request {
     @Override
     public String toString() {
         return new String(toBytes(), StandardCharsets.UTF_8);
+    }
+
+    static String trim(String s, int from) {
+        int to = s.length();
+        while (from < to && s.charAt(from) <= ' ') from++;
+        while (from < to && s.charAt(to - 1) <= ' ') to--;
+        return s.substring(from, to);
     }
 }

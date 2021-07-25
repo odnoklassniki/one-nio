@@ -33,9 +33,8 @@ import java.util.ArrayList;
 public class HttpClient extends SocketPool {
     protected static final Log log = LogFactory.getLog(HttpClient.class);
 
-    private static final int BUFFER_SIZE = 8000;
-
     protected String[] permanentHeaders;
+    protected int bufferSize;
 
     public HttpClient(ConnectionString conn) {
         this(conn,
@@ -69,6 +68,8 @@ public class HttpClient extends SocketPool {
                 setProxy(new HttpProxy(proxyAddr, 3128));
             }
         }
+
+        bufferSize = conn.getIntParam("bufferSize", 8000);
     }
 
     public Response invoke(Request request) throws InterruptedException, PoolException, IOException, HttpException {
@@ -86,7 +87,7 @@ public class HttpClient extends SocketPool {
             try {
                 socket.setTimeout(timeout == 0 ? readTimeout : timeout);
                 socket.writeFully(rawRequest, 0, rawRequest.length);
-                responseReader = new ResponseReader(socket, BUFFER_SIZE);
+                responseReader = new ResponseReader(socket, bufferSize);
             } catch (SocketTimeoutException e) {
                 throw e;
             } catch (IOException e) {
@@ -94,11 +95,11 @@ public class HttpClient extends SocketPool {
                 destroyObject(socket);
                 socket = createObject();
                 socket.writeFully(rawRequest, 0, rawRequest.length);
-                responseReader = new ResponseReader(socket, BUFFER_SIZE);
+                responseReader = new ResponseReader(socket, bufferSize);
             }
 
             Response response = responseReader.readResponse(method);
-            keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection: "));
+            keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection:"));
             return response;
         } finally {
             if (keepAlive) {
@@ -219,10 +220,10 @@ public class HttpClient extends SocketPool {
             }
 
             if (method != Request.METHOD_HEAD && mayHaveBody(response.getStatus())) {
-                if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding: "))) {
+                if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding:"))) {
                     response.setBody(readChunkedBody());
                 } else {
-                    String contentLength = response.getHeader("Content-Length: ");
+                    String contentLength = response.getHeader("Content-Length:");
                     if (contentLength == null) {
                         if (log.isDebugEnabled()) {
                             log.debug("Content-Length unspecified: " + response.toString());
@@ -265,7 +266,7 @@ public class HttpClient extends SocketPool {
             ArrayList<byte[]> chunks = new ArrayList<>(4);
             int totalBytes = 0;
 
-            for (;;) {
+            while (true) {
                 int chunkSize = Integer.parseInt(readLine(), 16);
                 if (chunkSize == 0) {
                     readLine();

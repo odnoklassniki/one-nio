@@ -146,7 +146,7 @@ public class HttpMethodTest {
             }
 
             Response response = responseReader.readResponse(Request.METHOD_GET);
-            keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection: "));
+            keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection:"));
             assertEquals(400, response.getStatus());
         } finally {
             if (keepAlive) {

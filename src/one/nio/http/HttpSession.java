@@ -189,7 +189,7 @@ public class HttpSession extends Session {
                 }
             } else {
                 // Empty line -- there is next request or body of the current request
-                String contentLengthHeader = parsing.getHeader("Content-Length: ");
+                String contentLengthHeader = parsing.getHeader("Content-Length:");
                 if (contentLengthHeader != null) {
                     i += startParsingRequestBody(contentLengthHeader, buffer, i, length - i);
                     if (requestBodyOffset < parsing.getBody().length) {
@@ -233,7 +233,7 @@ public class HttpSession extends Session {
 
         server.incRequestsProcessed();
 
-        String connection = handling.getHeader("Connection: ");
+        String connection = handling.getHeader("Connection:");
         boolean keepAlive = handling.isHttp11()
                 ? !"close".equalsIgnoreCase(connection)
                 : "Keep-Alive".equalsIgnoreCase(connection);
