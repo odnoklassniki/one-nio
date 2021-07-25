@@ -18,9 +18,11 @@ package one.nio.net;
 
 import one.nio.mem.DirectMemory;
 import one.nio.os.Mem;
+import one.nio.util.JavaInternals;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -28,6 +30,14 @@ import java.nio.ByteBuffer;
 
 class NativeSocket extends Socket {
     private static final int INET_FAMILY = initNatives(Boolean.getBoolean("java.net.preferIPv4Stack"));
+
+    private static final Field ARRAY_FIELD;
+    private static final Field OFFSET_FIELD;
+
+    static {
+        ARRAY_FIELD = JavaInternals.getField(ByteBuffer.class, "hb");
+        OFFSET_FIELD = JavaInternals.getField(ByteBuffer.class, "offset");
+    }
 
     int fd;
 
@@ -125,10 +135,18 @@ class NativeSocket extends Socket {
 
     private int sendTo(ByteBuffer src, int flags, Object address, int port) throws IOException {
         int result;
-        if (src.hasArray()) {
-            result = sendTo0(src.array(), src.arrayOffset() + src.position(), src.remaining(), flags, address, port);
-        } else {
+        if (src.isDirect()) {
             result = sendTo1(DirectMemory.getAddress(src) + src.position(), src.remaining(), flags, address, port);
+        } else if (src.hasArray()) {
+            result = sendTo0(src.array(), src.arrayOffset() + src.position(), src.remaining(), flags, address, port);
+        } else if (src.isReadOnly()) {
+            try {
+                result = sendTo0(getArray(src), getOffset(src) + src.position(), src.remaining(), flags, address, port);
+            } catch (IllegalAccessException e) {
+                throw new IOException("Failed to access array in readonly ByteBuffer", e);
+            }
+        } else {
+            throw new IOException("Cannot handle ByteBuffer " + src);
         }
 
         if (result > 0) {
@@ -136,6 +154,14 @@ class NativeSocket extends Socket {
         }
 
         return result;
+    }
+
+    private byte[] getArray(ByteBuffer src) throws IllegalAccessException {
+        return (byte[]) ARRAY_FIELD.get(src);
+    }
+
+    private int getOffset(ByteBuffer src) throws IllegalAccessException {
+        return OFFSET_FIELD.getInt(src);
     }
 
     @Override
@@ -179,10 +205,10 @@ class NativeSocket extends Socket {
     @Override
     public int read(ByteBuffer dst) throws IOException {
         int bytes;
-        if (dst.hasArray()) {
-            bytes = read(dst.array(), dst.arrayOffset() + dst.position(), dst.remaining(), 0);
-        } else {
+        if (dst.isDirect()) {
             bytes = readRaw(DirectMemory.getAddress(dst) + dst.position(), dst.remaining(), 0);
+        } else {
+            bytes = read(dst.array(), dst.arrayOffset() + dst.position(), dst.remaining(), 0);
         }
         dst.position(dst.position() + bytes);
         return bytes;
@@ -191,10 +217,19 @@ class NativeSocket extends Socket {
     @Override
     public int write(ByteBuffer src) throws IOException {
         int bytes;
-        if (src.hasArray()) {
-            bytes = write(src.array(), src.arrayOffset() + src.position(), src.remaining(), 0);
-        } else {
+
+        if (src.isDirect()) {
             bytes = writeRaw(DirectMemory.getAddress(src) + src.position(), src.remaining(), 0);
+        } else if (src.hasArray()) {
+            bytes = write(src.array(), src.arrayOffset() + src.position(), src.remaining(), 0);
+        } else if (src.isReadOnly()) {
+            try {
+                bytes = write(getArray(src), getOffset(src) + src.position(), src.remaining(), 0);
+            } catch (IllegalAccessException e) {
+                throw new IOException("Failed to access array in readonly ByteBuffer", e);
+            }
+        } else {
+            throw new IOException("Cannot handle ByteBuffer " + src);
         }
         src.position(src.position() + bytes);
         return bytes;

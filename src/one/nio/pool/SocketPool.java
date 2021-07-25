@@ -32,7 +32,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected Proxy proxy;
 
     public SocketPool(ConnectionString conn) {
-        super(conn.getIntParam("clientMinPoolSize", 0),
+        super(conn.getIntParam("clientMinPoolSize", 0) > 0 ? 1 : 0,
               conn.getIntParam("clientMaxPoolSize", 10),
               conn.getIntParam("timeout", 3000));
 
@@ -130,6 +130,14 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     @Override
     public void setFifo(boolean fifo) {
         this.fifo = fifo;
+    }
+
+    public SslContext getSslContext() {
+        return sslContext;
+    }
+
+    public void setSslContext(SslContext sslContext) {
+        this.sslContext = sslContext;
     }
 
     public Proxy getProxy() {

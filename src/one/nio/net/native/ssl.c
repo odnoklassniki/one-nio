@@ -195,34 +195,34 @@ static void ssl_debug(const SSL* ssl, const char* fmt, ...) {
 }
 
 static long get_session_counter(SSL_CTX* ctx, int key) {
-	switch (key) {
-		case 0:
-			return SSL_CTX_sess_number(ctx);
-		case 1:
-			return SSL_CTX_sess_connect(ctx);
-		case 2:
-			return SSL_CTX_sess_connect_good(ctx);
-		case 3:
-			return SSL_CTX_sess_connect_renegotiate(ctx);
-		case 4:
-			return SSL_CTX_sess_accept(ctx);
-		case 5:
-			return SSL_CTX_sess_accept_good(ctx);
-		case 6:
-			return SSL_CTX_sess_accept_renegotiate(ctx);
-		case 7:
-			return SSL_CTX_sess_hits(ctx);
-		case 8:
-			return SSL_CTX_sess_cb_hits(ctx);
-		case 9:
-			return SSL_CTX_sess_misses(ctx);
-		case 10:
-			return SSL_CTX_sess_timeouts(ctx);
-		case 11:
-			return SSL_CTX_sess_cache_full(ctx);
-		default:
-			return 0;
-	}
+    switch (key) {
+        case 0:
+            return SSL_CTX_sess_number(ctx);
+        case 1:
+            return SSL_CTX_sess_connect(ctx);
+        case 2:
+            return SSL_CTX_sess_connect_good(ctx);
+        case 3:
+            return SSL_CTX_sess_connect_renegotiate(ctx);
+        case 4:
+            return SSL_CTX_sess_accept(ctx);
+        case 5:
+            return SSL_CTX_sess_accept_good(ctx);
+        case 6:
+            return SSL_CTX_sess_accept_renegotiate(ctx);
+        case 7:
+            return SSL_CTX_sess_hits(ctx);
+        case 8:
+            return SSL_CTX_sess_cb_hits(ctx);
+        case 9:
+            return SSL_CTX_sess_misses(ctx);
+        case 10:
+            return SSL_CTX_sess_timeouts(ctx);
+        case 11:
+            return SSL_CTX_sess_cache_full(ctx);
+        default:
+            return 0;
+    }
 }
 
 static void setup_dh_params(SSL_CTX* ctx) {
@@ -838,7 +838,7 @@ Java_one_nio_net_NativeSslContext_getSessionCounters(JNIEnv* env, jobject self, 
 
     for (i = 0; i < MAX_COUNTERS; i++) {
         if (keysBitmap & (1 << i)) {
-	        raw_values[i] = get_session_counter(ctx, i);
+            raw_values[i] = get_session_counter(ctx, i);
         }
     }
 
