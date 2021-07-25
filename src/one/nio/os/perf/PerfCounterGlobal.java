@@ -16,13 +16,16 @@
 
 package one.nio.os.perf;
 
+import one.nio.os.bpf.BpfMap;
+import one.nio.os.bpf.MapType;
+
 import java.io.IOException;
 
 public class PerfCounterGlobal extends PerfCounter {
-    private final int[] fds;
+    final int[] fds;
 
-    PerfCounterGlobal(PerfEvent event, int[] fds) {
-        super(event, null, 0);
+    PerfCounterGlobal(PerfEvent event, long readFormat, int[] fds) {
+        super(event, null, readFormat, 0);
         this.fds = fds;
     }
 
@@ -46,14 +49,58 @@ public class PerfCounterGlobal extends PerfCounter {
         return sum;
     }
 
+    @Override
+    public CounterValue getValue() throws IOException {
+        int vals = hasReadFormat(ReadFormat.TOTAL_TIME_RUNNING | ReadFormat.TOTAL_TIME_ENABLED) ? 3 : 1;
+        long[] buf = new long[3 * fds.length];
+        for (int cpu = 0; cpu < fds.length; cpu++) {
+            Perf.getValue(fds[cpu], buf, cpu * 3, vals);
+        }
+        return new GlobalValue(buf);
+    }
+
     public long getForCpu(int cpu) throws IOException {
         return Perf.get(fds[cpu]);
     }
 
+    public LocalValue getValueForCpu(int cpu) throws IOException {
+        long[] buf = newBuffer();
+        Perf.getValue(fds[cpu], buf, 0, buf.length);
+        return toValue(buf);
+    }
+
     @Override
-    void ioctl(int cmd, int arg) {
+    protected long[] getRawValue() throws IOException {
+        long[] buf = newBuffer();
+        long[] total = newBuffer();
+        for (int fd : fds) {
+            Perf.getValue(fd, buf, 0, buf.length);
+            for (int i = 0; i < buf.length; i++) {
+                total[i] += buf[i];
+            }
+        }
+        return total;
+    }
+
+    @Override
+    void ioctl(int cmd, int arg) throws IOException {
         for (int fd : fds) {
             Perf.ioctl(fd, cmd, arg);
         }
+    }
+
+    public void storeTo(BpfMap map) throws IOException {
+        assert fds.length == BpfMap.CPUS : "Are some cpus offline?";
+        for (int i = 0; i < fds.length; i++) {
+            storeTo(map, i);
+        }
+    }
+
+    public void storeTo(BpfMap map, int cpu) throws IOException {
+        if (map.type != MapType.PERF_EVENT_ARRAY) {
+            throw new IllegalArgumentException();
+        }
+
+        map.put(BpfMap.bytes(cpu), BpfMap.bytes(fds[cpu]));
     }
 }

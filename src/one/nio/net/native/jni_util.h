@@ -25,7 +25,10 @@ int array_equals(JNIEnv* env, jbyteArray array, void* buf, int buflen);
 void throw_by_name(JNIEnv* env, const char* exception, const char* msg);
 void throw_socket_closed(JNIEnv* env);
 void throw_channel_closed(JNIEnv* env);
+void throw_illegal_argument(JNIEnv* env);
+void throw_illegal_argument_msg(JNIEnv* env, const char* msg);
 void throw_io_exception(JNIEnv* env);
+void throw_io_exception_code(JNIEnv* env, int error_code);
 
 static inline int is_io_exception(int fd) {
     if (errno == EINTR) {

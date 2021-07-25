@@ -34,7 +34,13 @@ static const int ioctl_cmd[] = {
     PERF_EVENT_IOC_RESET,
     PERF_EVENT_IOC_ENABLE,
     PERF_EVENT_IOC_DISABLE,
-    PERF_EVENT_IOC_REFRESH
+    PERF_EVENT_IOC_REFRESH,
+    PERF_EVENT_IOC_PERIOD,
+    PERF_EVENT_IOC_SET_OUTPUT,
+    PERF_EVENT_IOC_SET_FILTER,
+    PERF_EVENT_IOC_ID,
+    PERF_EVENT_IOC_SET_BPF,
+    PERF_EVENT_IOC_PAUSE_OUTPUT
 };
 
 static inline unsigned int get_uint_param(const char* op) {
@@ -152,6 +158,24 @@ Java_one_nio_os_perf_Perf_get(JNIEnv* env, jclass cls, jint fd) {
         return 0;
     }
     return counter;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_os_perf_Perf_getValue(JNIEnv* env, jclass cls, jint fd, jlongArray result, jint offset, jint length) {
+    if (fd == -1) {
+        throw_channel_closed(env);
+        return;
+    }
+
+    jlong buf[length]; 
+
+    size_t bytes_read = read(fd, buf, sizeof(buf));
+    if (bytes_read < length * sizeof(jlong)) {
+        throw_io_exception(env);
+        return;
+    }
+
+    (*env)->SetLongArrayRegion(env, result, offset, length, buf);
 }
 
 JNIEXPORT void JNICALL

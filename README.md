@@ -8,10 +8,11 @@ It features OS capabilities and JDK internal APIs essential for making your high
 
 one-nio highlights
 ==================
- - Own native socket library.
- - APIs for managing gigabytes of RAM beyond Java Heap.
+ - Optimized native socket library.
+ - API for managing gigabytes of RAM beyond Java Heap.
  - Fast and compact serialization mechanism.
  - RPC client/server technology which is an order of magnitude faster than Java RMI.
+ - Java accessors for perf events and eBFP.
 
 More info on the wiki page
 ==========================

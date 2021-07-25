@@ -51,8 +51,15 @@ void throw_channel_closed(JNIEnv* env) {
     throw_by_name(env, "java/nio/channels/ClosedChannelException", NULL);
 }
 
-void throw_io_exception(JNIEnv* env) {
-    int error_code = errno;
+void throw_illegal_argument(JNIEnv* env) {
+    throw_by_name(env, "java/lang/IllegalArgumentException", NULL);
+}
+
+void throw_illegal_argument_msg(JNIEnv* env, const char* msg) {
+    throw_by_name(env, "java/lang/IllegalArgumentException", msg);
+}
+
+void throw_io_exception_code(JNIEnv* env, int error_code) {
     switch (error_code) {
         case ETIMEDOUT:
         case EINPROGRESS:
@@ -82,4 +89,8 @@ void throw_io_exception(JNIEnv* env) {
             throw_by_name(env, "java/io/IOException", strerror(error_code));
             break;
     }
+}
+
+void throw_io_exception(JNIEnv* env) {
+    throw_io_exception_code(env, errno);
 }

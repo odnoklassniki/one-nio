@@ -23,15 +23,17 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 public class PerfCounter implements Closeable {
     private final PerfEvent event;
     private final RingBuffer ringBuffer;
+    protected final long readFormat;
     volatile int fd;
 
     static final AtomicIntegerFieldUpdater<PerfCounter> fdUpdater =
             AtomicIntegerFieldUpdater.newUpdater(PerfCounter.class, "fd");
 
-    PerfCounter(PerfEvent event, RingBuffer ringBuffer, int fd) {
+    PerfCounter(PerfEvent event, RingBuffer ringBuffer, long readFormat, int fd) {
         this.event = event;
         this.ringBuffer = ringBuffer;
         this.fd = fd;
+        this.readFormat = readFormat;
     }
 
     public final PerfEvent event() {
@@ -53,6 +55,32 @@ public class PerfCounter implements Closeable {
         return Perf.get(fd);
     }
 
+    public CounterValue getValue() throws IOException {
+        return toValue(getRawValue());
+    }
+
+    protected long[] getRawValue() throws IOException {
+        long[] buf = newBuffer();
+        Perf.getValue(fd, buf, 0, buf.length);
+        return buf;
+    }
+
+    protected long[] newBuffer() {
+        return new long[1 + Long.bitCount(readFormat)];
+    }
+
+    protected LocalValue toValue(long[] raw) {
+        long value = raw[0];
+        int i = 1;
+        long enabled = hasReadFormat(ReadFormat.TOTAL_TIME_ENABLED) ? raw[i++] : 0;
+        long running = hasReadFormat(ReadFormat.TOTAL_TIME_RUNNING) ? raw[i] : 0;
+        return new LocalValue(value, running, enabled);
+    }
+
+    public boolean hasReadFormat(int readFormat) {
+        return readFormat == (this.readFormat & readFormat);
+    }
+
     public PerfSample nextSample() {
         if (ringBuffer == null) {
             throw new IllegalStateException("Not a sampling counter");
@@ -60,26 +88,30 @@ public class PerfCounter implements Closeable {
         return ringBuffer.nextSample();
     }
 
-    public void reset() {
+    public void reset() throws IOException {
         ioctl(Perf.IOCTL_RESET, 0);
     }
 
-    public void enable() {
+    public void attachBpf(int fd) throws IOException {
+        ioctl(Perf.IOCTL_SET_BPF, fd);
+    }
+
+    public void enable() throws IOException {
         ioctl(Perf.IOCTL_ENABLE, 0);
     }
 
-    public void disable() {
+    public void disable() throws IOException {
         ioctl(Perf.IOCTL_DISABLE, 0);
     }
 
-    public void refresh(int count) {
+    public void refresh(int count) throws IOException {
         if (count < 0) {
             throw new IllegalArgumentException("count must be > 0");
         }
         ioctl(Perf.IOCTL_REFRESH, count);
     }
 
-    void ioctl(int cmd, int arg) {
+    void ioctl(int cmd, int arg) throws IOException {
         Perf.ioctl(fd, cmd, arg);
     }
 }

@@ -27,7 +27,7 @@ public class PerfEvent implements Serializable {
     private static final int PERF_TYPE_SOFTWARE = 1;
     private static final int PERF_TYPE_TRACEPOINT = 2;
     private static final int PERF_TYPE_HW_CACHE = 3;
-    private static final int PERF_TYPE_RAW = 4;
+    private static final int PERF_TYPE_RAW_CPU = 4;
     private static final int PERF_TYPE_BREAKPOINT = 5;
 
     public static final PerfEvent
@@ -102,7 +102,11 @@ public class PerfEvent implements Serializable {
     }
 
     public static PerfEvent raw(long config) {
-        return new PerfEvent("RAW:" + Long.toHexString(config), PERF_TYPE_RAW, config);
+        return raw(PERF_TYPE_RAW_CPU, config);
+    }
+
+    public static PerfEvent raw(int type, long config) {
+        return new PerfEvent("RAW:" + type + ":" + Long.toHexString(config), type, config);
     }
 
     public static PerfEvent tracepoint(int id) {
@@ -132,5 +136,9 @@ public class PerfEvent implements Serializable {
 
         return new PerfEvent("BREAKPOINT:" + type.name() + ':' + Long.toHexString(addr),
                 PERF_TYPE_BREAKPOINT, addr, type.ordinal() | len << 8);
+    }
+
+    public static int getEventType(String name) throws IOException {
+        return Integer.parseInt(Files.readAllLines(Paths.get("/sys/bus/event_source/devices/" + name + "/type")).get(0).trim());
     }
 }

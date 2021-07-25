@@ -16,34 +16,32 @@
 
 package one.nio.os.perf;
 
+import one.nio.os.Cpus;
 import one.nio.os.NativeLibrary;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.annotation.Native;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class Perf {
     public static final boolean IS_SUPPORTED = NativeLibrary.IS_SUPPORTED
             && new File("/proc/sys/kernel/perf_event_paranoid").exists();
 
-    private static final int REAL_CPU_COUNT = getRealCpuCount();
-
     public static final int CURRENT_PID = 0;
     public static final int ANY_PID = -1;
     public static final int ANY_CPU = -1;
 
     public static PerfCounter open(PerfEvent event, int pid, int cpu, PerfOption... options) throws IOException {
-        if (cpu == ANY_CPU && (pid == ANY_PID || hasOption(options, PerfOption.PID_CGROUP))) {
+        if (cpu == ANY_CPU && (pid == ANY_PID || hasOption(options, PerfOption.PID_CGROUP) || option(options, PerfOption.GROUP_GLOBAL) != null)) {
             return openGlobal(event, pid, options);
         }
 
         int group = (int) optionValue(options, "GROUP");
+        long readFormat = optionBits(options, "FORMAT");
         int fd = openEvent(pid, cpu, event.type, event.config, event.breakpoint, group, optionString(options));
         RingBuffer ringBuffer = createRingBuffer(fd, options);
-        return new PerfCounter(event, ringBuffer, fd);
+        return new PerfCounter(event, ringBuffer, readFormat, fd);
     }
 
     public static PerfCounter open(PerfEvent event, String cgroup, int cpu, PerfOption... options) throws IOException {
@@ -58,13 +56,15 @@ public class Perf {
         }
     }
 
-    private static PerfCounter openGlobal(PerfEvent event, int pid, PerfOption... options) throws IOException {
+    public static PerfCounterGlobal openGlobal(PerfEvent event, int pid, PerfOption... options) throws IOException {
         String optionString = optionString(options);
-        int[] fds = new int[REAL_CPU_COUNT];
+        int[] fds = new int[Cpus.PRESENT];
 
+        PerfOptionGlobalGroup group = (PerfOptionGlobalGroup) option(options, PerfOption.GROUP_GLOBAL);
         try {
             for (int cpu = 0; cpu < fds.length; cpu++) {
-                fds[cpu] = openEvent(pid, cpu, event.type, event.config, event.breakpoint, -1, optionString);
+                int groupFd = group == null ? -1 : group.fds[cpu];
+                fds[cpu] = openEvent(pid, cpu, event.type, event.config, event.breakpoint, groupFd, optionString);
             }
         } catch (Throwable e) {
             for (int fd : fds) {
@@ -75,7 +75,8 @@ public class Perf {
             throw e;
         }
 
-        return new PerfCounterGlobal(event, fds);
+        long readFormat = optionBits(options, "FORMAT");
+        return new PerfCounterGlobal(event, readFormat, fds);
     }
 
     private static RingBuffer createRingBuffer(int fd, PerfOption... options) throws IOException {
@@ -118,12 +119,27 @@ public class Perf {
     }
 
     private static long optionValue(PerfOption[] options, String name) {
+        PerfOption o = option(options, name);
+        return o == null ? -1 : o.value;
+    }
+
+    private static PerfOption option(PerfOption[] options, String name) {
         for (PerfOption o : options) {
             if (o.name == name) {
-                return o.value;
+                return o;
             }
         }
-        return -1;
+        return null;
+    }
+
+    private static long optionBits(PerfOption[] options, String name) {
+        long value = 0;
+        for (PerfOption o : options) {
+            if (o.name == name) {
+                value |= o.value;
+            }
+        }
+        return value;
     }
 
     private static boolean hasOption(PerfOption[] options, PerfOption option) {
@@ -135,34 +151,27 @@ public class Perf {
         return false;
     }
 
-    private static int getRealCpuCount() {
-        try (FileInputStream in = new FileInputStream("/sys/devices/system/cpu/present")) {
-            byte[] buf = new byte[1024];
-            int bytes = in.read(buf);
-            if (bytes > 0) {
-                String s = new String(buf, 0, bytes, StandardCharsets.ISO_8859_1).trim();
-                int idx = Math.max(s.lastIndexOf('-'), s.lastIndexOf(','));
-                return Integer.parseInt(s.substring(idx + 1)) + 1;
-            }
-        } catch (IOException e) {
-            // fall through
-        }
-        return Runtime.getRuntime().availableProcessors();
-    }
-
     @Native static final int IOCTL_RESET = 0;
     @Native static final int IOCTL_ENABLE = 1;
     @Native static final int IOCTL_DISABLE = 2;
     @Native static final int IOCTL_REFRESH = 3;
+    @Native static final int IOCTL_PERIOD = 4;
+    @Native static final int IOCTL_SET_OUTPUT = 5;
+    @Native static final int IOCTL_SET_FILTER = 6;
+    @Native static final int IOCTL_ID = 7;
+    @Native static final int IOCTL_SET_BPF = 8;
+    @Native static final int IOCTL_PAUSE_OUTPUT = 9;
 
     static native int openEvent(int pid, int cpu, int type, long config, int breakpoint,
                                 int group, String options) throws IOException;
 
-    static native int openFile(String fileName) throws IOException;
+    public static native int openFile(String fileName) throws IOException;
 
-    static native void close(int fd);
+    public static native void close(int fd);
 
     static native long get(int fd) throws IOException;
 
-    static native void ioctl(int fd, int cmd, int arg);
+    static native void getValue(int fd, long[] value, int off, int len) throws IOException;
+
+    static native void ioctl(int fd, int cmd, int arg) throws IOException;
 }

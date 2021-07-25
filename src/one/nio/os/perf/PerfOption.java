@@ -52,16 +52,17 @@ public class PerfOption implements Serializable {
             FORMAT_GROUP = format(ReadFormat.GROUP);
 
     static final PerfOption PID_CGROUP = new PerfOption("PID_CGROUP");
+    static final String GROUP_GLOBAL = "GROUP_GLOBAL";
 
     final String name;
     final long value;
 
-    private PerfOption(String name) {
+    protected PerfOption(String name) {
         this.name = name;
         this.value = -1;
     }
 
-    private PerfOption(String name, long value) {
+    protected PerfOption(String name, long value) {
         this.name = name;
         this.value = value;
     }
@@ -118,6 +119,8 @@ public class PerfOption implements Serializable {
     }
 
     public static PerfOption group(PerfCounter leader) {
-        return new PerfOption("GROUP", leader.fd);
+        return leader instanceof PerfCounterGlobal
+                ? new PerfOptionGlobalGroup(GROUP_GLOBAL, ((PerfCounterGlobal) leader).fds)
+                : new PerfOption("GROUP", leader.fd);
     }
 }
