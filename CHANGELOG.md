@@ -1,3 +1,12 @@
+1.4.0
+ * eBPF and extended perf_events support
+ * HttpClient fixes
+ * Reflection and serialization now works for classes with missing field types
+ * Improved serialization performance
+ * OffheapMap API enhancements; compatibility with newer JDKs
+ * Configure scheduling policy for thread pools
+ * Fixed `byte[]` <-> `long` conversion
+
 1.3.2
  * Optimized serialization of empty collections
  * `schedulingPolicy` option for NIO server threads
