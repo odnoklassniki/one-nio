@@ -16,7 +16,7 @@ public class JavaDatagramSocketTest {
     @Test
     public void testConnectedSocket() throws IOException {
         DatagramChannel jdkChannel = DatagramChannel.open();
-        jdkChannel.bind(new InetSocketAddress(InetAddress.getLocalHost(), 0));
+        jdkChannel.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
         jdkChannel.socket().setSoTimeout(1000);
 
         JavaDatagramSocket oneSocket = new JavaDatagramSocket();

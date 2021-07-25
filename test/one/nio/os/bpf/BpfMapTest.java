@@ -18,6 +18,7 @@ package one.nio.os.bpf;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.LongBuffer;
 
 import org.junit.Test;
@@ -82,7 +83,7 @@ public class BpfMapTest {
         assert map.totalValueSize == 8 * BpfMap.CPUS;
         assert map.get(BpfMap.bytes(1)) == null;
 
-        ByteBuffer buf = ByteBuffer.allocate(map.totalValueSize);
+        ByteBuffer buf = ByteBuffer.allocate(map.totalValueSize).order(ByteOrder.nativeOrder());
         LongBuffer lbuf = buf.asLongBuffer();
         for (int i = 0; i < BpfMap.CPUS; i++) {
             lbuf.put(i);
