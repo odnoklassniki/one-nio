@@ -33,11 +33,11 @@ public class ByteArrayBuilder {
     public ByteArrayBuilder(int capacity) {
         this.buf = new byte[capacity];
     }
-        
+
     public final byte[] buffer() {
         return buf;
     }
-    
+
     public final int length() {
         return count;
     }
@@ -45,15 +45,15 @@ public class ByteArrayBuilder {
     public final void setLength(int newCount) {
         count = newCount;
     }
-    
+
     public final int capacity() {
         return buf.length;
     }
-    
+
     public final byte byteAt(int index) {
         return buf[index];
     }
-    
+
     public final void crop(int offset) {
         if (offset < count) {
             count -= offset;
@@ -82,7 +82,7 @@ public class ByteArrayBuilder {
 
     public final ByteArrayBuilder append(byte b) {
         ensureCapacity(1);
-        buf[count++] = b; 
+        buf[count++] = b;
         return this;
     }
 
@@ -96,7 +96,7 @@ public class ByteArrayBuilder {
         count += length;
         return this;
     }
-    
+
     public final ByteArrayBuilder append(ByteBuffer bb, int length) {
         ensureCapacity(length);
         bb.get(buf, count, length);
@@ -132,17 +132,17 @@ public class ByteArrayBuilder {
         appendNumber(n);
         return this;
     }
-    
+
     public final ByteArrayBuilder appendCodePoint(int c) {
         ensureCapacity(3);
         if (c <= 0x7f) {
             buf[count++] = (byte) c;
         } else if (c <= 0x7ff) {
-            buf[count]     = (byte) (0xc0 | ((c >>> 6) & 0x1f));
+            buf[count] = (byte) (0xc0 | ((c >>> 6) & 0x1f));
             buf[count + 1] = (byte) (0x80 | (c & 0x3f));
             count += 2;
         } else {
-            buf[count]     = (byte) (0xe0 | ((c >>> 12) & 0x0f));
+            buf[count] = (byte) (0xe0 | ((c >>> 12) & 0x0f));
             buf[count + 1] = (byte) (0x80 | ((c >>> 6) & 0x3f));
             buf[count + 2] = (byte) (0x80 | (c & 0x3f));
             count += 3;
@@ -178,10 +178,14 @@ public class ByteArrayBuilder {
 
     private void appendNumber(long n) {
         if (n < 0) {
+            if (n == Long.MIN_VALUE) {
+                count += Utf8.write("-9223372036854775808", buf, count);
+                return;
+            }
             buf[count++] = '-';
             n = -n;
         }
-        
+
         int i = count;
         for (long limit = 10; n >= limit && limit > 0; limit *= 10) {
             i++;

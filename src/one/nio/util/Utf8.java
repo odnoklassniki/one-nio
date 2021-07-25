@@ -206,6 +206,12 @@ public final class Utf8 {
             throw new NumberFormatException();
         }
 
+        boolean minus = buf[offset] == '-' && length > 1;
+        if (minus) {
+            offset++;
+            length--;
+        }
+
         long result = 0;
         do {
             int digit = buf[offset] - '0';
@@ -216,6 +222,7 @@ public final class Utf8 {
             offset++;
             length--;
         } while (length > 0);
-        return result;
+
+        return minus ? -result : result;
     }
 }
