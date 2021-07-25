@@ -348,31 +348,36 @@ public class Repository {
                 renamedClasses.put(renamed.from(), cls);
             }
 
-            if (cls.isArray()) {
-                serializer = new ObjectArraySerializer(cls);
-            } else if (cls.isEnum()) {
-                serializer = new EnumSerializer(cls);
-            } else if (Externalizable.class.isAssignableFrom(cls)) {
-                if (Serializer.class.isAssignableFrom(cls)) {
-                    serializer = new SerializerSerializer(cls);
+            try {
+                if (cls.isArray()) {
+                    serializer = new ObjectArraySerializer(cls);
+                } else if (cls.isEnum()) {
+                    serializer = new EnumSerializer(cls);
+                } else if (Externalizable.class.isAssignableFrom(cls)) {
+                    if (Serializer.class.isAssignableFrom(cls)) {
+                        serializer = new SerializerSerializer(cls);
+                    } else {
+                        serializer = new ExternalizableSerializer(cls);
+                    }
+                } else if (SerializedWrapper.class.isAssignableFrom(cls)) {
+                    serializer = classMap.get(SerializedWrapper.class);
+                    classMap.put(cls, serializer);
+                    return serializer;
+                } else if (Collection.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
+                    serializer = new CollectionSerializer(cls);
+                } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
+                    serializer = new MapSerializer(cls);
+                } else if (Serializable.class.isAssignableFrom(cls)) {
+                    serializer = new GeneratedSerializer(cls);
                 } else {
-                    serializer = new ExternalizableSerializer(cls);
+                    serializer = new InvalidSerializer(cls);
                 }
-            } else if (SerializedWrapper.class.isAssignableFrom(cls)) {
-                serializer = classMap.get(SerializedWrapper.class);
-                classMap.put(cls, serializer);
-                return serializer;
-            } else if (Collection.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
-                serializer = new CollectionSerializer(cls);
-            } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
-                serializer = new MapSerializer(cls);
-            } else if (Serializable.class.isAssignableFrom(cls)) {
-                serializer = new GeneratedSerializer(cls);
-            } else {
-                serializer = new InvalidSerializer(cls);
+                serializer.generateUid();
+            } catch (Throwable e) {
+                log.error("Failed to generate serialized for " + cls.getName());
+                throw e;
             }
 
-            serializer.generateUid();
             provideSerializer(serializer);
             return serializer;
         }

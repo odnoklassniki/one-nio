@@ -48,7 +48,11 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     protected String dumpPath;
 
     public BytecodeGenerator() {
-        super(BytecodeGenerator.class.getClassLoader());
+        this(BytecodeGenerator.class.getClassLoader());
+    }
+
+    public BytecodeGenerator(ClassLoader parent) {
+        super(parent);
         this.totalClasses = new AtomicInteger();
         this.totalBytes = new AtomicInteger();
         this.dumpPath = System.getProperty("one.nio.gen.dump");

@@ -20,6 +20,7 @@ import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.StubGenerator;
+import one.nio.util.NativeReflection;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -274,7 +275,7 @@ public class GeneratedSerializer extends Serializer {
     private void getSerializableFields(Class cls, Field parentField, ArrayList<Field> list) {
         if (cls != null) {
             getSerializableFields(cls.getSuperclass(), parentField, list);
-            for (Field f : cls.getDeclaredFields()) {
+            for (Field f : getDeclaredFields(cls)) {
                 int modifiers = f.getModifiers();
                 if ((modifiers & Modifier.STATIC) != 0) {
                     continue;
@@ -292,6 +293,22 @@ public class GeneratedSerializer extends Serializer {
                     getSerializableFields(f.getType(), f, list);
                 }
             }
+        }
+    }
+
+    private Field[] getDeclaredFields(Class cls) {
+        try {
+            return cls.getDeclaredFields();
+        } catch (NoClassDefFoundError e) {
+            Repository.log.warn("[" + Long.toHexString(uid) + "] Fields of the class " + cls.getName() +
+                    " refer to nonexistent class: " + e.getMessage());
+            if (NativeReflection.IS_SUPPORTED) {
+                Field[] filteredFields = NativeReflection.getFields(cls, false);
+                if (filteredFields != null) {
+                    return filteredFields;
+                }
+            }
+            throw e;
         }
     }
 
