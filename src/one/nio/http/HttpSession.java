@@ -26,7 +26,7 @@ import java.nio.BufferOverflowException;
 import java.util.LinkedList;
 
 public class HttpSession extends Session {
-    private static final int MAX_HEADERS = 48;
+    private static final int MAX_HEADERS = 256;
     private static final int MAX_FRAGMENT_LENGTH = 2048;
     private static final int MAX_PIPELINE_LENGTH = 256;
     private static final int MAX_REQUEST_BODY_LENGTH = 65536;
