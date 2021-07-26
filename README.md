@@ -12,7 +12,7 @@ one-nio highlights
  - API for managing gigabytes of RAM beyond Java Heap.
  - Fast and compact serialization mechanism.
  - RPC client/server technology which is an order of magnitude faster than Java RMI.
- - Java accessors for perf events and eBFP.
+ - Java accessors for perf events and eBPF.
 
 More info on the wiki page
 ==========================
