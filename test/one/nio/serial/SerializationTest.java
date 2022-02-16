@@ -17,9 +17,11 @@
 package one.nio.serial;
 
 import one.nio.serial.sample.Sample;
+import one.nio.util.Base64;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -528,7 +530,114 @@ public class SerializationTest {
         assertEquals("abcabcabcabc", gs3.s);
     }
 
+    @Test(expected = NotSerializableException.class)
+    public void testNotSerializable() throws IOException {
+        new PersistStream().writeObject(new Object());
+    }
+
+    static class SomeData implements Serializable {
+        final String s1;
+        @NotSerial
+        final String s2;
+        final transient String s3;
+
+        public SomeData(String s1, String s2, String s3) {
+            this.s1 = s1;
+            this.s2 = s2;
+            this.s3 = s3;
+        }
+
+        @Override
+        public String toString() {
+            return "SomeData{" +
+                    "s1='" + s1 + '\'' +
+                    ", s2='" + s2 + '\'' +
+                    ", s3='" + s3 + '\'' +
+                    '}';
+        }
+    }
+
+    @Test
+    public void testNotSerial() throws IOException, ClassNotFoundException {
+        SomeData someData = new SomeData("s1", "s2", "s3");
+        assertEquals("s1", someData.s1);
+        assertEquals("s2", someData.s2);
+        assertEquals("s3", someData.s3);
+
+        SomeData clone = (SomeData) clone(someData);
+        assertEquals("s1", clone.s1);
+        assertNull(clone.s2);
+        assertNull(clone.s3);
+
+        String json = Json.toJson(someData);
+        assertEquals("{\"s1\":\"s1\"}", json);
+
+        byte[] bytes = "{\"s1\":\"s1\",\"s2\":\"s2\",\"s3\":\"s3\"}".getBytes();
+        SomeData fromJson = new JsonReader(bytes).readObject(SomeData.class);
+
+        assertEquals("s1", fromJson.s1);
+        assertNull(fromJson.s2);
+        assertNull(fromJson.s3);
+    }
+
+    @Test
+    public void testMissingField() throws IOException, ClassNotFoundException {
+//        SomeData someData = new SomeData("s1", "s2", "s3", "s4");
+//        CalcSizeStream css = new CalcSizeStream();
+//        css.writeObject(someData);
+//        int length = css.count();
+//        byte[] buf = new byte[length];
+//        SerializeStream out = new SerializeStream(buf);
+//        out.writeObject(someData);
+//        String someDataBase64 = new String(Base64.encodeToChars(buf));
+//        System.out.println(someDataBase64);
+//
+//        Serializer<SomeData> someDataSerializer = Repository.get(SomeData.class);
+//        css = new CalcSizeStream();
+//        css.writeObject(someDataSerializer);
+//        length = css.count();
+//        buf = new byte[length];
+//        out = new SerializeStream(buf);
+//        out.writeObject(someDataSerializer);
+//        String someDataSerializerBase64 = new String(Base64.encodeToChars(buf));
+//        System.out.println(someDataSerializerBase64);
+
+        // Old SomeData instance with the 'final String s4;' field which is missing in the current version
+        String someDataBase64 = "HpVKIjDpW8vuAAJzMf/uAAJzNA==";
+
+        // Old SomeData Serializer
+        String someDataSerializerBase64 = "zQApb25lLm5pby5zZXJpYWwuU2VyaWFsaXphdGlvblRlc3QkU29tZURhdGEelUoiMOlbywADAAJzMf8AEGphdmEubGFuZy5TdHJpbmcAAnMy/wAQamF2YS5sYW5nLlN0cmluZwACczT/ABBqYXZhLmxhbmcuU3RyaW5n";
+        Repository.provideSerializer(someDataSerializerBase64);
+
+        DeserializeStream in = new DeserializeStream(Base64.decodeFromChars(someDataBase64.toCharArray()));
+        SomeData clone = (SomeData) in.readObject();
+        assertEquals("s1", clone.s1);
+        assertNull(clone.s2);
+        assertNull(clone.s3);
+    }
 /*
+    static record SomeRecord(String s1, @NotSerial String s2) implements Serializable {}
+
+    @Test
+    public void testNotSerialRecord() throws IOException, ClassNotFoundException {
+        SomeRecord someRecord = new SomeRecord("s1", "s2");
+        assertEquals("s1", someRecord.s1);
+        assertEquals("s2", someRecord.s2);
+
+        SomeRecord clone = (SomeRecord) clone(someRecord);
+        assertEquals("s1", clone.s1);
+        assertNull(clone.s2);
+
+        String json = Json.toJson(someRecord);
+        assertEquals("{\"s1\":\"s1\"}", json);
+
+        byte[] bytes = "{\"s1\":\"s1\",\"s2\":\"s2\"}".getBytes();
+        SomeRecord fromJson = new JsonReader(bytes).readObject(SomeRecord.class);
+
+        assertEquals("s1", fromJson.s1);
+        assertNull(fromJson.s2);
+    }
+
     record Color(String name, int r, int g, int b) implements Serializable {
 
         public Color(String name, String rgb) {
@@ -548,6 +657,16 @@ public class SerializationTest {
         Color pink = (Color) clone(new Color("pink", "#FFC0CB"));
         Color pink2 = (Color) clone(new Color("pink", 255, 192, 203));
         assertEquals(pink, pink2);
+    }
+
+    private record PrivateRecord(float x, double y) implements Serializable {
+        private PrivateRecord {
+        }
+    }
+
+    @Test
+    public void testPrivateRecord() throws IOException, ClassNotFoundException {
+        checkSerialize(new PrivateRecord(12.34f, 56.789));
     }
 
     record Node(Object value, Node left, Node right) implements Serializable {

@@ -22,9 +22,7 @@ import one.nio.serial.gen.DelegateGenerator;
 import org.junit.Test;
 
 import java.io.Serializable;
-import java.lang.reflect.Field;
 import java.math.BigInteger;
-import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 
