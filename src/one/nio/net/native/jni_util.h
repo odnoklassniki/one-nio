@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #define MAX_STACK_BUF 65536
 #define SIG_WAKEUP (__SIGRTMAX - 2)
 

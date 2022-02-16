@@ -56,7 +56,7 @@ public class SocketTest {
     @Test
     public void testNativeSocketOpts() throws IOException {
         if (NativeLibrary.IS_SUPPORTED) {
-            SocketTest.testSocketOpts(new NativeSocket(false), false);
+            SocketTest.testSocketOpts(new NativeSocket(0, Socket.SOCK_STREAM), false);
         }
     }
 

@@ -22,7 +22,6 @@ import one.nio.util.JavaInternals;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -31,22 +30,13 @@ import java.nio.ByteBuffer;
 class NativeSocket extends Socket {
     private static final int INET_FAMILY = initNatives(Boolean.getBoolean("java.net.preferIPv4Stack"));
 
-    private static final Field ARRAY_FIELD;
-    private static final Field OFFSET_FIELD;
-
-    static {
-        ARRAY_FIELD = JavaInternals.getField(ByteBuffer.class, "hb");
-        OFFSET_FIELD = JavaInternals.getField(ByteBuffer.class, "offset");
-    }
+    private static final long ARRAY_FIELD = JavaInternals.fieldOffset(ByteBuffer.class, "hb");
+    private static final long OFFSET_FIELD = JavaInternals.fieldOffset(ByteBuffer.class, "offset");
 
     int fd;
 
-    NativeSocket(int domain, boolean datagram) throws IOException {
-        this.fd = socket0(domain, datagram);
-    }
-
-    NativeSocket(boolean datagram) throws IOException {
-        this.fd = socket0(INET_FAMILY, datagram);
+    NativeSocket(int domain, int type) throws IOException {
+        this.fd = socket0(domain != 0 ? domain : INET_FAMILY, type);
     }
 
     NativeSocket(int fd) {
@@ -157,11 +147,11 @@ class NativeSocket extends Socket {
     }
 
     private byte[] getArray(ByteBuffer src) throws IllegalAccessException {
-        return (byte[]) ARRAY_FIELD.get(src);
+        return (byte[]) JavaInternals.unsafe.getObject(src, ARRAY_FIELD);
     }
 
     private int getOffset(ByteBuffer src) throws IllegalAccessException {
-        return OFFSET_FIELD.getInt(src);
+        return JavaInternals.unsafe.getInt(src, OFFSET_FIELD);
     }
 
     @Override
@@ -233,6 +223,16 @@ class NativeSocket extends Socket {
         }
         src.position(src.position() + bytes);
         return bytes;
+    }
+
+    @Override
+    public int sendMsg(Msg msg, int flags) throws IOException {
+        return sendMsg0(msg.data(), msg.cmsgType(), msg.cmsgData(), flags);
+    }
+
+    @Override
+    public int recvMsg(Msg msg, int flags) throws IOException {
+        return recvMsg0(msg.data(), msg, flags);
     }
 
     @Override
@@ -310,7 +310,7 @@ class NativeSocket extends Socket {
 
     private static native int initNatives(boolean preferIPv4);
 
-    private static native int socket0(int domain, boolean datagram) throws IOException;
+    private static native int socket0(int domain, int type) throws IOException;
 
     final native void connect0(Object address, int port) throws IOException;
     final native void bind0(Object address, int port) throws IOException;
@@ -320,4 +320,6 @@ class NativeSocket extends Socket {
     final native int sendTo1(long buf, int size, int flags, Object address, int port) throws IOException;
     final native int recvFrom0(byte[] data, int offset, int maxSize, int flags, AddressHolder holder) throws IOException;
     final native int recvFrom1(long buf, int maxSize, int flags, AddressHolder holder) throws IOException;
+    final native int sendMsg0(byte[] data, int cmsgType, int[] cmsgData, int flags) throws IOException;
+    final native int recvMsg0(byte[] data, Msg msg, int flags) throws IOException;
 }

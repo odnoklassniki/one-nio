@@ -16,6 +16,8 @@
 
 // Compatibility layer between OpenSSL 1.0.x and 1.1.0
 
+#pragma once
+
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 
 // The following symbols will be overridden if linked against libssl.so.11

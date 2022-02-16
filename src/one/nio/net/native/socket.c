@@ -35,6 +35,8 @@
 
 static int use_IPv6 = 0;
 static jfieldID f_fd;
+static jfieldID f_cmsgType;
+static jfieldID f_cmsgData;
 static jclass c_AddressHolder;
 static jfieldID f_address;
 static jmethodID m_createIPv4Address;
@@ -194,6 +196,10 @@ Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean pref
     // Cache field ID to access NativeSocket.fd
     f_fd = cache_field(env, "one/nio/net/NativeSocket", "fd", "I");
 
+    // Cache Msg fields
+    f_cmsgType = cache_field(env, "one/nio/net/Msg", "cmsgType", "I");
+    f_cmsgData = cache_field(env, "one/nio/net/Msg", "cmsgData", "[I");
+
     // Cache method IDs to produce InetSocketAddress
     c_AddressHolder = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/AddressHolder"));
     f_address = (*env)->GetFieldID(env, c_AddressHolder, "address", "Ljava/net/InetSocketAddress;");
@@ -215,8 +221,8 @@ Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean pref
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls, jint domain, jboolean datagram) {
-    int result = socket(domain, datagram ? SOCK_DGRAM : SOCK_STREAM, 0);
+Java_one_nio_net_NativeSocket_socket0(JNIEnv* env, jclass cls, jint domain, jint type) {
+    int result = socket(domain, type, 0);
     if (result == -1) {
         throw_io_exception(env);
     }
@@ -535,6 +541,119 @@ Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer,
             return result;
         } else if (result == 0) {
             throw_socket_closed(env);
+        } else if (is_io_exception(fd)) {
+            throw_io_exception(env);
+        }
+    }
+    return 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_sendMsg0(JNIEnv* env, jobject self, jbyteArray data,
+                                       jint cmsgType, jintArray cmsgData, jint flags) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    jbyte data_buf[MAX_STACK_BUF - 4096];
+    struct {
+        struct cmsghdr hdr;
+        jint data[1000];
+    } cmsg_buf;
+
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else {
+        struct msghdr msg = {0};
+        struct iovec iov;
+
+        if (data != NULL) {
+            jint data_len = (*env)->GetArrayLength(env, data);
+            if (data_len > sizeof(data_buf)) {
+                data_len = sizeof(data_buf);
+            }
+            (*env)->GetByteArrayRegion(env, data, 0, data_len, data_buf);
+
+            iov.iov_base = data_buf;
+            iov.iov_len = data_len;
+            msg.msg_iov = &iov;
+            msg.msg_iovlen = 1;
+        }
+
+        if (cmsgData != NULL) {
+            jint cmsgLen = (*env)->GetArrayLength(env, cmsgData);
+            if (cmsgLen > sizeof(cmsg_buf.data) / sizeof(jint)) {
+                cmsgLen = sizeof(cmsg_buf.data) / sizeof(jint);
+            }
+            (*env)->GetIntArrayRegion(env, cmsgData, 0, cmsgLen, cmsg_buf.data);
+
+            cmsg_buf.hdr.cmsg_level = SOL_SOCKET;
+            cmsg_buf.hdr.cmsg_type = cmsgType;
+            cmsg_buf.hdr.cmsg_len = CMSG_LEN(cmsgLen * sizeof(jint));
+            msg.msg_control = &cmsg_buf;
+            msg.msg_controllen = CMSG_SPACE(cmsgLen * sizeof(jint));
+        }
+
+        ssize_t result = sendmsg(fd, &msg, flags);
+
+        if (result >= 0) {
+            return result;
+        } else if (is_io_exception(fd)) {
+            throw_io_exception(env);
+        }
+    }
+    return 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_recvMsg0(JNIEnv* env, jobject self, jbyteArray data,
+                                       jobject jmsg, jint flags) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    jbyte data_buf[MAX_STACK_BUF - 4096];
+    struct {
+        struct cmsghdr hdr;
+        jint data[1000];
+    } cmsg_buf;
+
+    if (fd == -1) {
+        throw_socket_closed(env);
+    } else {
+        struct msghdr msg = {0};
+        struct iovec iov;
+
+        if (data != NULL) {
+            int data_len = (*env)->GetArrayLength(env, data);
+            if (data_len > sizeof(data_buf)) {
+                data_len = sizeof(data_buf);
+            }
+
+            iov.iov_base = data_buf;
+            iov.iov_len = data_len;
+            msg.msg_iov = &iov;
+            msg.msg_iovlen = 1;
+        }
+
+        if (jmsg != NULL) {
+            msg.msg_control = &cmsg_buf;
+            msg.msg_controllen = sizeof(cmsg_buf);
+        }
+
+        ssize_t result = recvmsg(fd, &msg, flags);
+
+        if (result >= 0) {
+            if (data != NULL) {
+                (*env)->SetByteArrayRegion(env, data, 0, result, data_buf);
+            }
+
+            struct cmsghdr* hdr = CMSG_FIRSTHDR(&msg);
+            if (jmsg != NULL && hdr != NULL && hdr->cmsg_level == SOL_SOCKET) {
+                jint cmsgLen = (hdr->cmsg_len - CMSG_LEN(0)) / sizeof(jint);
+                jintArray cmsgData = (*env)->NewIntArray(env, cmsgLen);
+                if (cmsgData != NULL) {
+                    (*env)->SetIntArrayRegion(env, cmsgData, 0, cmsgLen, cmsg_buf.data);
+                    (*env)->SetIntField(env, jmsg, f_cmsgType, hdr->cmsg_type);
+                    (*env)->SetObjectField(env, jmsg, f_cmsgData, cmsgData);
+                }
+            }
+
+            return result;
         } else if (is_io_exception(fd)) {
             throw_io_exception(env);
         }

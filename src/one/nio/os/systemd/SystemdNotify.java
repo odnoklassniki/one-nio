@@ -54,7 +54,7 @@ public class SystemdNotify {
             return;
         }
 
-        try (Socket socket = Socket.createUnixSocket()) {
+        try (Socket socket = Socket.createUnixSocket(Socket.SOCK_DGRAM)) {
             if (log.isDebugEnabled()) {
                 log.debug(String.format("send '%s' to notify socket '%s'", state, notifySocket));
             }

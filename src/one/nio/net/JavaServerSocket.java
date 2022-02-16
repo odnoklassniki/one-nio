@@ -123,6 +123,16 @@ final class JavaServerSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public int sendMsg(Msg msg, int flags) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int recvMsg(Msg msg, int flags) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public final void setBlocking(boolean blocking) {
         try {
             ch.configureBlocking(blocking);

@@ -32,6 +32,13 @@ public abstract class Socket implements ByteChannel {
     public static final int AF_INET  = 2;
     public static final int AF_INET6 = 10;
 
+    // Socket types
+    public static final int SOCK_STREAM    = 1;
+    public static final int SOCK_DGRAM     = 2;
+    public static final int SOCK_RAW       = 3;
+    public static final int SOCK_RDM       = 4;
+    public static final int SOCK_SEQPACKET = 5;
+
     // Use when the address has no port (i.e. for AF_UNIX address)
     public static final int NO_PORT = -1;
 
@@ -56,6 +63,29 @@ public abstract class Socket implements ByteChannel {
     public static final int IPTOS_RELIABILITY = 0x04;
     public static final int IPTOS_THROUGHPUT  = 0x08;
     public static final int IPTOS_LOWDELAY    = 0x10;
+
+    // Socket options
+    public static final int SO_DEBUG     = 1;
+    public static final int SO_REUSEADDR = 2;
+    public static final int SO_TYPE      = 3;
+    public static final int SO_ERROR     = 4;
+    public static final int SO_DONTROUTE = 5;
+    public static final int SO_BROADCAST = 6;
+    public static final int SO_SNDBUF    = 7;
+    public static final int SO_RCVBUF    = 8;
+    public static final int SO_KEEPALIVE = 9;
+    public static final int SO_OOBINLINE = 10;
+    public static final int SO_NO_CHECK  = 11;
+    public static final int SO_PRIORITY  = 12;
+    public static final int SO_LINGER    = 13;
+    public static final int SO_BSDCOMPAT = 14;
+    public static final int SO_REUSEPORT = 15;
+    public static final int SO_PASSCRED  = 16;
+    public static final int SO_PEERCRED  = 17;
+    public static final int SO_RCVLOWAT  = 18;
+    public static final int SO_SNDLOWAT  = 19;
+    public static final int SO_RCVTIMEO  = 20;
+    public static final int SO_SNDTIMEO  = 21;
 
     // TCP socket options
     public static final int TCP_NODELAY      = 1;
@@ -88,6 +118,8 @@ public abstract class Socket implements ByteChannel {
     public abstract void readFully(byte[] data, int offset, int count) throws IOException;
     public abstract InetSocketAddress recv(ByteBuffer dst, int flags) throws IOException;
     public abstract long sendFile(RandomAccessFile file, long offset, long count) throws IOException;
+    public abstract int sendMsg(Msg msg, int flags) throws IOException;
+    public abstract int recvMsg(Msg msg, int flags) throws IOException;
     public abstract void setBlocking(boolean blocking);
     public abstract boolean isBlocking();
     public abstract void setTimeout(int timeout);
@@ -149,23 +181,23 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket create() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(false) : new JavaSocket();
+        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(0, SOCK_STREAM) : new JavaSocket();
     }
 
     public static Socket createServerSocket() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(false) : new JavaServerSocket();
+        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(0, SOCK_STREAM) : new JavaServerSocket();
     }
 
     public static Socket createDatagramSocket() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(true) : new JavaDatagramSocket();
+        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(0, SOCK_DGRAM) : new JavaDatagramSocket();
     }
 
-    public static Socket createUnixSocket() throws IOException {
+    public static Socket createUnixSocket(int type) throws IOException {
         if (!NativeLibrary.IS_SUPPORTED) {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
-        return new NativeSocket(AF_UNIX, true);
+        return new NativeSocket(AF_UNIX, type);
     }
 
     public static Socket connectInet(InetAddress address, int port) throws IOException {
@@ -186,7 +218,7 @@ public abstract class Socket implements ByteChannel {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
-        NativeSocket sock = new NativeSocket(AF_UNIX, false);
+        NativeSocket sock = new NativeSocket(AF_UNIX, SOCK_STREAM);
         sock.connect(unixPath.getAbsolutePath(), NO_PORT);
         return sock;
     }
@@ -196,7 +228,7 @@ public abstract class Socket implements ByteChannel {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
-        NativeSocket sock = new NativeSocket(AF_UNIX, false);
+        NativeSocket sock = new NativeSocket(AF_UNIX, SOCK_STREAM);
         sock.bind(unixPath.getAbsolutePath(), NO_PORT, backlog);
         sock.listen(backlog);
         return sock;
