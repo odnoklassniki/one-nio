@@ -118,7 +118,7 @@ public class ObjectOutputChannel extends DataStream {
 
         if (size > available()) {
             unsafe.freeMemory(address);
-            int newBufSize = Math.max(size + 32000, available() * 3 / 2);
+            int newBufSize = Math.max(Math.max(size, 32000), available() * 2);
             long newAddress = unsafe.allocateMemory(newBufSize);
 
             this.address = newAddress;

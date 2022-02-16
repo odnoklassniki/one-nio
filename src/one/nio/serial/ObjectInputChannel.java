@@ -61,6 +61,8 @@ public class ObjectInputChannel extends DataStream {
         if (b >= 0) {
             offset--;
             serializer = Repository.requestSerializer(readLong());
+        } else if (b <= FIRST_BOOT_UID) {
+            serializer = Repository.requestBootstrapSerializer(b);
         } else {
             switch (b) {
                 case REF_NULL:
@@ -74,7 +76,7 @@ public class ObjectInputChannel extends DataStream {
                     Repository.provideSerializer(serializer);
                     break;
                 default:
-                    serializer = Repository.requestBootstrapSerializer(b);
+                    return readRef(b);
             }
         }
 
@@ -119,7 +121,7 @@ public class ObjectInputChannel extends DataStream {
     private void fetch(int size) throws IOException {
         int available = (int) (limit - offset);
         if (available + size > capacity) {
-            int newBufSize = Math.max(available + size + 32000, capacity * 3 / 2);
+            int newBufSize = Math.max(Math.max(available + size, 32000), capacity * 2);
             long newAddress = unsafe.allocateMemory(newBufSize);
             if (available > 0) {
                 unsafe.copyMemory(null, offset, null, newAddress, available);
