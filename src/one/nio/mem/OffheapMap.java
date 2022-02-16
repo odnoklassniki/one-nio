@@ -197,8 +197,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         try {
             for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
                 if (unsafe.getLong(entry + HASH_OFFSET) == hashCode && equalsAt(entry, key)) {
-                    int oldSize = sizeOf(entry);
-                    if (newSize <= oldSize) {
+                    if (reuseEntry(entry, newSize)) {
                         setTimeAt(entry);
                         setValueAt(entry, value);
                         return false;
@@ -537,6 +536,10 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         return null;  // override it in child classes if needed
     }
 
+    protected boolean reuseEntry(long entry, int newSize) {
+        return newSize <= sizeOf(entry);
+    }
+
     protected abstract long hashCode(K key);
     protected abstract boolean equalsAt(long entry, K key);
     protected abstract V valueAt(long entry);
@@ -609,8 +612,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             int newSize = map.sizeOf(value);
 
             if (entry != 0) {
-                int oldSize = map.sizeOf(entry);
-                if (newSize <= oldSize) {
+                if (map.reuseEntry(entry, newSize)) {
                     map.setTimeAt(entry);
                     map.setValueAt(entry, value);
                     return;
