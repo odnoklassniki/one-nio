@@ -36,19 +36,19 @@
 
     <dependencies>
         <dependency>
-            <groupId>asm</groupId>
+            <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
-            <version>3.3</version>
+            <version>9.2</version>
         </dependency>
         <dependency>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
-            <version>1.0.3</version>
+            <version>1.2</version>
         </dependency>
         <dependency>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
-            <version>1.2.15</version>
+            <version>1.2.17</version>
             <exclusions>
                 <exclusion>
                     <groupId>javax.jms</groupId>
@@ -93,7 +93,7 @@
                             <target name="compile-native">
                                 <property name="build.dir"      value="target"/>
                                 <property name="src.dir"        value="src"/>
-                                <property name="gcc.extra.args" value=""/>
+                                <property name="gcc.args"       value="-O3 -fno-omit-frame-pointer -momit-leaf-frame-pointer"/>
 
                                 <echo message="Compiling native library..."/>
 
@@ -104,8 +104,9 @@
                                 </pathconvert>
 
                                 <exec os="Linux" executable="gcc">
-                                    <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args}
-                                               -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so
+                                    <arg line="-D_GNU_SOURCE -fPIC -shared -Wl,-soname,libonenio.so ${gcc.args}
+                                               -o ${build.dir}/native/libonenio.so
+                                               -I ${java.home}/include -I ${java.home}/include/linux
                                                -I ${java.home}/../include -I ${java.home}/../include/linux
                                                ${src.native} -ldl -lrt"/>
                                 </exec>

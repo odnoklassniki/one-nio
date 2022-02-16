@@ -17,47 +17,63 @@
 package one.nio.net;
 
 import one.nio.util.JavaInternals;
-import sun.nio.ch.Net;
-import sun.nio.ch.SelChImpl;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.SocketTimeoutException;
 import java.nio.channels.SelectableChannel;
+
+import static one.nio.util.JavaInternals.unsafe;
 
 /**
  * @author ivan.grigoryev
  */
 public abstract class SelectableJavaSocket extends Socket {
-    private static final MethodHandle poll = getPollMethodHandle();
+    private static final Log log = LogFactory.getLog(SelectableJavaSocket.class);
 
-    private static MethodHandle getPollMethodHandle() {
+    private static final MethodHandle poll = getMethodHandle("sun.nio.ch.Net", "poll", FileDescriptor.class, int.class, long.class);
+    private static final MethodHandle getFD = getMethodHandle("sun.nio.ch.SelChImpl", "getFD");
+
+    static final int POLL_READ = getFieldValue("sun.nio.ch.Net", "POLLIN");
+    static final int POLL_WRITE = getFieldValue("sun.nio.ch.Net", "POLLOUT");
+
+    private static MethodHandle getMethodHandle(String cls, String name, Class<?>... params) {
         try {
-            Method m = JavaInternals.getMethod(Net.class, "poll", FileDescriptor.class, int.class, long.class);
-            if (m != null) {
-                return MethodHandles.publicLookup().unreflect(m);
-            }
+            Method m = Class.forName(cls).getDeclaredMethod(name, params);
+            JavaInternals.setAccessible(m);
+            return MethodHandles.publicLookup().unreflect(m);
         } catch (Throwable e) {
-            // ignore
+            log.debug("Failed to access sun.nio.ch API", e);
         }
         return null;
     }
 
-    static final int POLL_READ = Net.POLLIN;
-    static final int POLL_WRITE = Net.POLLOUT;
+    private static int getFieldValue(String cls, String name) {
+        try {
+            Field f = Class.forName(cls).getDeclaredField(name);
+            return unsafe.getShort(unsafe.staticFieldBase(f), unsafe.staticFieldOffset(f));
+        } catch (Throwable e) {
+            log.debug("Failed to access sun.nio.ch API", e);
+            return 0;
+        }
+    }
 
     void checkTimeout(int events, long timeout) throws IOException {
-        if (timeout <= 0 || poll == null) {
+        if (timeout <= 0 || poll == null || getFD == null) {
             return;
         }
 
         try {
             long endTime = System.currentTimeMillis() + timeout;
             do {
-                int result = (int) poll.invokeExact(((SelChImpl) getSelectableChannel()).getFD(), events, timeout);
+                FileDescriptor fd = (FileDescriptor) getFD.invoke(getSelectableChannel());
+                int result = (int) poll.invokeExact(fd, events, timeout);
                 if (result > 0) {
                     return;
                 }

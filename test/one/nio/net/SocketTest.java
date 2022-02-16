@@ -29,7 +29,7 @@ public class SocketTest {
         Socket s = Socket.create();
         s.setTimeout(3000);
 
-        s.connect("www.ru", 80);
+        s.connect("google.com", 80);
         System.out.println("connected from " + s.getLocalAddress() + " to " + s.getRemoteAddress());
         s.close();
     }
@@ -38,7 +38,7 @@ public class SocketTest {
         Socket s = Socket.create();
         s.setTimeout(3000);
 
-        s.connect("::1", 22);
+        s.connect("2a00:1450:4010:c07::71", 80);
         System.out.println("connected from " + s.getLocalAddress() + " to " + s.getRemoteAddress());
 
         byte[] b = new byte[1000];
