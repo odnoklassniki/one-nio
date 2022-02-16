@@ -19,7 +19,7 @@ package one.nio.serial;
 import java.util.Arrays;
 
 public class SerializationContext {
-    private static final int INITIAL_CAPACITY = 64;
+    public static final int INITIAL_CAPACITY = 64;
 
     private Object first;
     private Object[] keys;
@@ -38,9 +38,12 @@ public class SerializationContext {
     }
 
     public int capacity() {
-        return keys.length;
+        return keys != null ? keys.length : 0;
     }
 
+    /**
+     * @return index for existing objects, -1-index for new
+     */
     public int put(Object obj) {
         if (first == null) {
             first = obj;
@@ -62,7 +65,7 @@ public class SerializationContext {
         keys[i] = obj;
         values[i] = size;
         if (++size >= threshold) resize();
-        return -1;
+        return -size;
     }
 
     public int indexOf(Object obj) {
@@ -86,16 +89,12 @@ public class SerializationContext {
     }
 
     public void clear() {
-        this.first = null;
-        this.size = 1;
-
-        if (keys != null) {
-            if (keys.length > INITIAL_CAPACITY) {
-                this.keys = null;
-                this.values = null;
-            } else {
-                Arrays.fill(keys, null);
-            }
+        if (keys == null) {
+            this.first = null;
+        } else {
+            Arrays.fill(keys, null);
+            this.first = this;
+            this.size = 0;
         }
     }
 
@@ -133,5 +132,17 @@ public class SerializationContext {
         this.keys = newKeys;
         this.values = newValues;
         this.threshold = newLength * 2 / 3;
+    }
+
+    public Object[] toArray() {
+        if (keys == null) {
+            return first == null ? new Object[0] : new Object[]{first}; 
+        }
+        Object[] array = new Object[size];
+        for (int i = 0; i < keys.length; i++) {
+            Object key = keys[i];
+            if (key != null) array[values[i]] = key;
+        }
+        return array;
     }
 }

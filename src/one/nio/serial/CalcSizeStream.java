@@ -25,6 +25,13 @@ public class CalcSizeStream extends SerializationContext implements ObjectOutput
     protected int count;
     protected boolean hasCycles;
 
+    public CalcSizeStream() {
+    }
+
+    public CalcSizeStream(int capacity) {
+        super(capacity);
+    }
+
     public int count() {
         return count;
     }

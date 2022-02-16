@@ -56,6 +56,8 @@ public class SerializerCollector extends DataStream {
             offset--;
             serializer = Repository.requestSerializer(readLong());
             serializers.add(serializer);
+        } else if (b <= FIRST_BOOT_UID) {
+            serializer = Repository.requestBootstrapSerializer(b);
         } else if (b == REF_NULL) {
             return null;
         } else if (b == REF_RECURSIVE) {
@@ -65,7 +67,7 @@ public class SerializerCollector extends DataStream {
             offset += 4;
             return null;
         } else {
-            serializer = Repository.requestBootstrapSerializer(b);
+            return readRef(b);
         }
 
         serializer.skip(this);

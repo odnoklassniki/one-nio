@@ -32,7 +32,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
     protected static final byte REF_RECURSIVE  = -2;
     protected static final byte REF_RECURSIVE2 = -3;
     protected static final byte REF_EMBEDDED   = -4;
-    protected static final byte FIRST_APP_UID  = -10;
+    protected static final byte FIRST_BOOT_UID = -10;
 
     protected byte[] array;
     protected long address;
@@ -285,12 +285,16 @@ public class DataStream implements ObjectInput, ObjectOutput {
         if (b >= 0) {
             offset--;
             serializer = Repository.requestSerializer(readLong());
-        } else if (b == REF_NULL) {
-            return null;
-        } else {
+        } else if (b <= FIRST_BOOT_UID) {
             serializer = Repository.requestBootstrapSerializer(b);
+        } else {
+            return b == REF_NULL ? null : readRef(b);
         }
         return serializer.read(this);
+    }
+
+    protected Object readRef(byte tag) throws IOException, ClassNotFoundException {
+        throw new IOException("Invalid reference tag: " + tag);
     }
 
     public void read(ByteBuffer dst) throws IOException {

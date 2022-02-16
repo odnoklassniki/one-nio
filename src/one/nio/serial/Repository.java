@@ -70,7 +70,7 @@ public class Repository {
     public static final int CUSTOM_STUBS     = 16;
     public static final int DEFAULT_OPTIONS  = ARRAY_STUBS | COLLECTION_STUBS | MAP_STUBS | ENUM_STUBS | CUSTOM_STUBS;
 
-    private static byte nextBootstrapUid = DataStream.FIRST_APP_UID;
+    private static byte nextBootstrapUid = DataStream.FIRST_BOOT_UID;
     private static int options = Integer.getInteger("one.nio.serial.options", DEFAULT_OPTIONS);
 
     static {
@@ -114,7 +114,7 @@ public class Repository {
         addBootstrap(new MapSerializer(Hashtable.class));
         addBootstrap(new MapSerializer(IdentityHashMap.class));
         addBootstrap(new MapSerializer(ConcurrentHashMap.class));
-        
+
         addBootstrap(new SerializerSerializer(ObjectArraySerializer.class));
         addBootstrap(new SerializerSerializer(EnumSerializer.class));
         addBootstrap(new SerializerSerializer(CollectionSerializer.class));
@@ -131,6 +131,7 @@ public class Repository {
         addBootstrap(new SerializerSerializer(MethodSerializer.class));
         addBootstrap(new HttpRequestSerializer());
         addBootstrap(new SerializedWrapperSerializer());
+        addBootstrap(new SerializerSerializer(SerializerSerializer.class));
 
         classMap.put(int.class, classMap.get(Integer.class));
         classMap.put(long.class, classMap.get(Long.class));
@@ -156,7 +157,7 @@ public class Repository {
 
         Management.registerMXBean(new SerializationMXBeanImpl(), "one.nio.serial:type=Serialization");
     }
-    
+
     private static void addBootstrap(Serializer serializer) {
         serializer.uid = nextBootstrapUid--;
         provideSerializer(serializer);

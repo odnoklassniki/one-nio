@@ -50,6 +50,8 @@ public class DeserializeStream extends DataStream {
         if (b >= 0) {
             offset--;
             serializer = Repository.requestSerializer(readLong());
+        } else if (b <= FIRST_BOOT_UID) {
+            serializer = Repository.requestBootstrapSerializer(b);
         } else {
             switch (b) {
                 case REF_NULL:
@@ -62,7 +64,7 @@ public class DeserializeStream extends DataStream {
                     serializer = (Serializer) readObject();
                     break;
                 default:
-                    serializer = Repository.requestBootstrapSerializer(b);
+                    return readRef(b);
             }
         }
 
