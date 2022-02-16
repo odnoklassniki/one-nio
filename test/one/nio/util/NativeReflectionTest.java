@@ -60,4 +60,31 @@ public class NativeReflectionTest {
         Method[] nativeInstanceMethods = NativeReflection.getMethods(HashMap.class, false);
         Assert.assertArrayEquals(javaInstanceMethods, nativeInstanceMethods);
     }
+
+    @Test
+    public void testOpenModules() throws Exception {
+        if (!NativeReflection.IS_SUPPORTED) {
+            return;
+        }
+
+        if (System.getProperty("java.version").startsWith("1.")) {
+            return;
+        }
+
+        Class<?> cls = Class.forName("jdk.internal.ref.Cleaner");
+        Method create = cls.getMethod("create", Object.class, Runnable.class);
+        Runnable r = () -> {};
+        try {
+            create.invoke(null, new Object(), r);
+            Assert.fail("Should not reach here");
+        } catch (IllegalAccessException e) {
+            // Expected: should throw an exception before openModules()
+        }
+
+        NativeReflection.openModules();
+
+        // Should succeed after openModules()
+        Object cleaner = create.invoke(null, new Object(), r);
+        Assert.assertEquals(cls, cleaner.getClass());
+    }
 }

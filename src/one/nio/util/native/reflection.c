@@ -16,6 +16,7 @@
 
 #include <jvmti.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 static jvmtiEnv* jvmti = NULL;
@@ -122,4 +123,72 @@ Java_one_nio_util_NativeReflection_getMethods(JNIEnv* env, jclass self, jclass c
     (*jvmti)->Deallocate(jvmti, (unsigned char*)methods);
 
     return arr;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_util_NativeReflection_openModules(JNIEnv* env, jclass self) {
+#ifdef JNI_VERSION_9
+    jclass Module = (*env)->FindClass(env, "java/lang/Module");
+    if (Module == NULL) {
+        // Seems like pre-module JDK
+        (*env)->ExceptionClear(env);
+        return;
+    }
+
+    jmethodID getPackages = (*env)->GetMethodID(env, Module, "getPackages", "()Ljava/util/Set;");
+
+    jclass ClassLoader = (*env)->FindClass(env, "java/lang/ClassLoader");
+    jmethodID getUnnamedModule = (*env)->GetMethodID(env, ClassLoader, "getUnnamedModule", "()Ljava/lang/Module;");
+
+    jclass Object = (*env)->FindClass(env, "java/lang/Object");
+    jmethodID toString = (*env)->GetMethodID(env, Object, "toString", "()Ljava/lang/String;");
+
+    jobject current_loader;
+    if ((*jvmti)->GetClassLoader(jvmti, self, &current_loader) != 0) {
+        return;
+    }
+
+    jobject unnamed_module = (*env)->CallObjectMethod(env, current_loader, getUnnamedModule);
+    if (unnamed_module == NULL) {
+        return;
+    }
+
+    jint module_count;
+    jobject* modules;
+    if ((*jvmti)->GetAllModules(jvmti, &module_count, &modules) != 0) {
+        return;
+    }
+
+    // Scan all loaded modules
+    int i;
+    for (i = 0; i < module_count; i++) {
+        (*jvmti)->AddModuleReads(jvmti, modules[i], unnamed_module);
+
+        // Get all module packages as one string: "[java.lang, java.io, ...]"
+        jobject packages = (*env)->CallObjectMethod(env, modules[i], getPackages);
+        jstring str = (jstring) (*env)->CallObjectMethod(env, packages, toString);
+        if (str == NULL) continue;
+
+        char* c_str = (char*) (*env)->GetStringUTFChars(env, str, NULL);
+        if (c_str == NULL) continue;
+
+        // Export and open every package to the unnamed module
+        char* saveptr = NULL;
+        char* package = strtok_r(c_str + 1, ", ]", &saveptr);
+        while (package != NULL) {
+            (*jvmti)->AddModuleExports(jvmti, modules[i], package, unnamed_module);
+            (*jvmti)->AddModuleOpens(jvmti, modules[i], package, unnamed_module);
+            package = strtok_r(NULL, ", ]", &saveptr);
+        }
+
+        (*env)->ReleaseStringUTFChars(env, str, c_str);
+    }
+
+    (*jvmti)->Deallocate(jvmti, (unsigned char*) modules);
+
+#else
+
+#warning Compiling on pre-module JDK. Some features are disabled.
+
+#endif
 }

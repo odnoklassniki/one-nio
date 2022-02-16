@@ -33,4 +33,6 @@ public class NativeReflection {
 
     public static native Field[] getFields(Class<?> cls, boolean includeStatic);
     public static native Method[] getMethods(Class<?> cls, boolean includeStatic);
+
+    public static native void openModules();
 }
