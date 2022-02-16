@@ -16,9 +16,29 @@
 
 package one.nio.util;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+
 import static one.nio.util.JavaInternals.*;
 
 public final class Utf8 {
+    private static final MethodHandle compactStringConstructor = getCompactStringConstructor();
+
+    private static MethodHandle getCompactStringConstructor() {
+        try {
+            Field compactStrings = getField(String.class, "COMPACT_STRINGS");
+            if (compactStrings == null || !compactStrings.getBoolean(null)) {
+                return null;
+            }
+
+            Constructor<String> c = getConstructor(String.class, byte[].class, byte.class);
+            return c == null ? null : MethodHandles.lookup().unreflectConstructor(c);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     public static int length(String s) {
         int result = 0;
@@ -52,19 +72,11 @@ public final class Utf8 {
     }
 
     public static int write(String s, byte[] buf, int start) {
-        return write(s, buf, byteArrayOffset + start);
+        return write(s, 0, s.length(), buf, byteArrayOffset + start);
     }
 
     public static int write(String s, int stringStart, int maxChars, byte[] buf, int bufferStart) {
         return write(s, stringStart, maxChars, buf, byteArrayOffset + bufferStart);
-    }
-
-    public static int write(char[] c, int length, byte[] buf, int start) {
-        return write(c, length, buf, byteArrayOffset + start);
-    }
-
-    public static String read(byte[] buf, int start, int length) {
-        return read(buf, byteArrayOffset + start, length);
     }
 
     public static int write(String s, Object obj, long start) {
@@ -93,6 +105,10 @@ public final class Utf8 {
         return (int) (pos - outStart);
     }
 
+    public static int write(char[] c, int length, byte[] buf, int start) {
+        return write(c, length, buf, byteArrayOffset + start);
+    }
+
     public static int write(char[] c, int length, Object obj, long start) {
         long pos = start;
         for (int i = 0; i < length; i++) {
@@ -113,7 +129,15 @@ public final class Utf8 {
         return (int) (pos - start);
     }
 
+    public static String read(byte[] buf, int start, int length) {
+        return read(buf, byteArrayOffset + start, length);
+    }
+
     public static String read(Object obj, long start, int length) {
+        if (compactStringConstructor != null && isAsciiString(obj, start, length)) {
+            return toAsciiString(obj, start, length);
+        }
+
         char[] result = new char[length];
         int chars = 0;
         long end = start + length;
@@ -131,6 +155,44 @@ public final class Utf8 {
             }
         }
         return new String(result, 0, chars);
+    }
+
+    private static boolean isAsciiString(Object obj, long start, int length) {
+        while (length >= 8) {
+            if ((unsafe.getLong(obj, start) & 0x8080808080808080L) != 0) {
+                return false;
+            }
+            start += 8;
+            length -= 8;
+        }
+        if ((length & 4) != 0) {
+            if ((unsafe.getInt(obj, start) & 0x80808080) != 0) {
+                return false;
+            }
+            start += 4;
+        }
+        if ((length & 2) != 0) {
+            if ((unsafe.getShort(obj, start) & 0x8080) != 0) {
+                return false;
+            }
+            start += 2;
+        }
+        if ((length & 1) != 0) {
+            return unsafe.getByte(obj, start) >= 0;
+        }
+        return true;
+    }
+
+    // Optimize instantiation of a compact string (JDK 9+)
+    // by calling a private String constructor
+    private static String toAsciiString(Object obj, long start, int length) {
+        byte[] result = new byte[length];
+        unsafe.copyMemory(obj, start, result, byteArrayOffset, length);
+        try {
+            return (String) compactStringConstructor.invokeExact(result, (byte) 0);
+        } catch (Throwable e) {
+            return null;
+        }
     }
 
     public static byte[] toBytes(String s) {
