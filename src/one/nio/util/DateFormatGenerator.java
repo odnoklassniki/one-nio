@@ -92,7 +92,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<clinit>", "()V", null, null);
         mv.visitCode();
         mv.visitLdcInsn(timeZone);
-        mv.visitMethodInsn(INVOKESTATIC, "java/util/TimeZone", "getTimeZone", "(Ljava/lang/String;)Ljava/util/TimeZone;");
+        mv.visitMethodInsn(INVOKESTATIC, "java/util/TimeZone", "getTimeZone", "(Ljava/lang/String;)Ljava/util/TimeZone;", false);
         mv.visitFieldInsn(PUTSTATIC, className, "tz", "Ljava/util/TimeZone;");
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
@@ -101,7 +101,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
         mv = cv.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESPECIAL, "one/nio/util/DateFormat", "<init>", "()V");
+        mv.visitMethodInsn(INVOKESPECIAL, "one/nio/util/DateFormat", "<init>", "()V", false);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -115,7 +115,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
             mv.visitVarInsn(LLOAD, 1);
             mv.visitFieldInsn(GETSTATIC, className, "tz", "Ljava/util/TimeZone;");
             mv.visitVarInsn(LLOAD, 1);
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/util/TimeZone", "getOffset", "(J)I");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/util/TimeZone", "getOffset", "(J)I", false);
             if ((fieldSet & (1 << ZONE_OFFSET)) != 0) {
                 mv.visitInsn(DUP);
                 mv.visitVarInsn(ISTORE, 4);
@@ -128,7 +128,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
         if ((fieldSet & (1 << YEAR | 1 << MONTH | 1 << DAY_OF_MONTH)) != 0) {
             // int date = dateOfMillis(millis);
             mv.visitVarInsn(LLOAD, 1);
-            mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "dateOfMillis", "(J)I");
+            mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "dateOfMillis", "(J)I", false);
             mv.visitVarInsn(ISTORE, 5);
         }
 
@@ -162,29 +162,29 @@ public class DateFormatGenerator extends BytecodeGenerator {
                 switch (cf.type) {
                     case YEAR:
                         mv.visitVarInsn(ILOAD, 5);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "year", "(I)I");
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putYear" + cf.width, "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "year", "(I)I", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putYear" + cf.width, "([CII)V", false);
                         break;
                     case MONTH:
                         mv.visitVarInsn(ILOAD, 5);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "month", "(I)I");
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", cf.width == 3 ? "putMonth" : "putInt", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "month", "(I)I", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", cf.width == 3 ? "putMonth" : "putInt", "([CII)V", false);
                         break;
                     case DAY_OF_MONTH:
                         mv.visitVarInsn(ILOAD, 5);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "day", "(I)I");
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "day", "(I)I", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V", false);
                         break;
                     case DAY_OF_WEEK:
                         mv.visitVarInsn(LLOAD, 1);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "dayNum", "(J)I");
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putDayOfWeek", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/Dates", "dayNum", "(J)I", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putDayOfWeek", "([CII)V", false);
                         break;
                     case HOUR:
                         mv.visitVarInsn(ILOAD, 6);
                         emitInt(mv, 3600);
                         mv.visitInsn(IDIV);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V", false);
                         break;
                     case MINUTE:
                         mv.visitVarInsn(ILOAD, 6);
@@ -192,13 +192,13 @@ public class DateFormatGenerator extends BytecodeGenerator {
                         mv.visitInsn(IREM);
                         emitInt(mv, 60);
                         mv.visitInsn(IDIV);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V", false);
                         break;
                     case SECOND:
                         mv.visitVarInsn(ILOAD, 6);
                         emitInt(mv, 60);
                         mv.visitInsn(IREM);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putInt", "([CII)V", false);
                         break;
                     case MILLISECOND:
                         mv.visitVarInsn(LLOAD, 1);
@@ -207,7 +207,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
                         mv.visitLdcInsn(1000L);
                         mv.visitInsn(LREM);
                         mv.visitInsn(L2I);
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putMillis" + cf.width, "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putMillis" + cf.width, "([CII)V", false);
                         break;
                     case ZONE_OFFSET:
                         if (isUTC) {
@@ -217,7 +217,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
                             emitInt(mv, 60000);
                             mv.visitInsn(IDIV);
                         }
-                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putZoneOffset", "([CII)V");
+                        mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/DateFormatGenerator", "putZoneOffset", "([CII)V", false);
                         break;
                     case TIME_ZONE:
                         String id = TimeZone.getTimeZone(timeZone).getDisplayName(false, TimeZone.SHORT, Locale.US);
@@ -240,7 +240,7 @@ public class DateFormatGenerator extends BytecodeGenerator {
         mv.visitTypeInsn(NEW, "java/lang/String");
         mv.visitInsn(DUP);
         mv.visitVarInsn(ALOAD, 3);
-        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/String", "<init>", "([C)V");
+        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/String", "<init>", "([C)V", false);
 
         mv.visitInsn(ARETURN);
         mv.visitMaxs(0, 0);

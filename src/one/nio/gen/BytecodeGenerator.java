@@ -17,6 +17,7 @@
 package one.nio.gen;
 
 import one.nio.mgt.Management;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.objectweb.asm.MethodVisitor;
@@ -24,6 +25,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandleInfo;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -124,20 +127,46 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         String holder = Type.getInternalName(m.getDeclaringClass());
         String name = m.getName();
         String sig = Type.getMethodDescriptor(m);
-        mv.visitMethodInsn(opcode, holder, name, sig);
+        mv.visitMethodInsn(opcode, holder, name, sig, opcode == INVOKEINTERFACE);
+    }
+
+    public static void emitInvoke(MethodVisitor mv, MethodHandleInfo m) {
+        int opcode;
+        if ((m.getModifiers() & Modifier.STATIC) != 0) {
+            opcode = INVOKESTATIC;
+        } else if ((m.getModifiers() & Modifier.PRIVATE) != 0) {
+            opcode = INVOKESPECIAL;
+        } else if (m.getDeclaringClass().isInterface()) {
+            opcode = INVOKEINTERFACE;
+        } else {
+            opcode = INVOKEVIRTUAL;
+        }
+
+        String holder = Type.getInternalName(m.getDeclaringClass());
+        String name = m.getName();
+        String sig = getMethodDescriptor(m.getMethodType());
+        mv.visitMethodInsn(opcode, holder, name, sig, opcode == INVOKEINTERFACE);
+    }
+
+    private static String getMethodDescriptor(final MethodType method) {
+        StringBuilder b = new StringBuilder().append('(');
+        for (Class<?> parameter : method.parameterArray()) {
+            b.append(Type.getDescriptor(parameter));
+        }
+        return b.append(')').append(Type.getDescriptor(method.returnType())).toString();
     }
 
     public static void emitInvoke(MethodVisitor mv, Constructor c) {
         String holder = Type.getInternalName(c.getDeclaringClass());
         String sig = Type.getConstructorDescriptor(c);
-        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig);
+        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig, false);
     }
 
     public static void emitThrow(MethodVisitor mv, String exceptionClass, String message) {
         mv.visitTypeInsn(NEW, exceptionClass);
         mv.visitInsn(DUP);
         mv.visitLdcInsn(message);
-        mv.visitMethodInsn(INVOKESPECIAL, exceptionClass, "<init>", "(Ljava/lang/String;)V");
+        mv.visitMethodInsn(INVOKESPECIAL, exceptionClass, "<init>", "(Ljava/lang/String;)V", false);
         mv.visitInsn(ATHROW);
     }
 
@@ -185,21 +214,21 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
 
     public static void emitBoxing(MethodVisitor mv, Class type) {
         if (type == boolean.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false);
         } else if (type == byte.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;", false);
         } else if (type == char.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false);
         } else if (type == short.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;", false);
         } else if (type == int.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false);
         } else if (type == float.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false);
         } else if (type == long.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
         } else if (type == double.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false);
         } else if (type == void.class) {
             mv.visitInsn(ACONST_NULL);
         } else {
@@ -209,21 +238,21 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
 
     public static void emitUnboxing(MethodVisitor mv, Class type) {
         if (type == Boolean.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false);
         } else if (type == Byte.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B", false);
         } else if (type == Character.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C", false);
         } else if (type == Short.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S", false);
         } else if (type == Integer.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false);
         } else if (type == Float.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false);
         } else if (type == Long.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
         } else if (type == Double.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false);
         } else {
             throw new IllegalArgumentException("Not a wrapper type: " + type);
         }

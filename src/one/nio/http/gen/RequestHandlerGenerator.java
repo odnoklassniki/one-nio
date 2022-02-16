@@ -63,7 +63,7 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
 
         mv.visitVarInsn(ALOAD, 0);
         mv.visitInsn(DUP);
-        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V");
+        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
         mv.visitVarInsn(ALOAD, 1);
         mv.visitFieldInsn(PUTFIELD, className, "router", routerType);
 
@@ -85,7 +85,7 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
         emitInvoke(mv, m);
 
         if (m.getReturnType() == Response.class) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/HttpSession", "sendResponse", "(Lone/nio/http/Response;)V");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/HttpSession", "sendResponse", "(Lone/nio/http/Response;)V", false);
         }
 
         mv.visitInsn(RETURN);
@@ -100,7 +100,7 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
             mv.visitInsn(DUP);
             mv.visitLdcInsn("Invalid parameters");
             mv.visitVarInsn(ALOAD, 3);
-            mv.visitMethodInsn(INVOKESPECIAL, "one/nio/http/HttpException", "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V");
+            mv.visitMethodInsn(INVOKESPECIAL, "one/nio/http/HttpException", "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V", false);
             mv.visitInsn(ATHROW);
         }
 
@@ -164,12 +164,12 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
 
         boolean needNullCheck = false;
         if (param.required()) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getRequiredParameter", "(Ljava/lang/String;)Ljava/lang/String;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getRequiredParameter", "(Ljava/lang/String;)Ljava/lang/String;", false);
         } else if (defaultValue != null) {
             mv.visitLdcInsn(defaultValue);
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getParameter", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getParameter", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", false);
         } else {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getParameter", "(Ljava/lang/String;)Ljava/lang/String;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getParameter", "(Ljava/lang/String;)Ljava/lang/String;", false);
             needNullCheck = true;
         }
 
@@ -190,12 +190,12 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
 
         boolean needNullCheck = false;
         if (header.required()) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getRequiredHeader", "(Ljava/lang/String;)Ljava/lang/String;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getRequiredHeader", "(Ljava/lang/String;)Ljava/lang/String;", false);
         } else if (defaultValue != null) {
             mv.visitLdcInsn(defaultValue);
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getHeader", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getHeader", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", false);
         } else {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getHeader", "(Ljava/lang/String;)Ljava/lang/String;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/Request", "getHeader", "(Ljava/lang/String;)Ljava/lang/String;", false);
             needNullCheck = true;
         }
 
@@ -209,22 +209,22 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
 
         if (type.isPrimitive()) {
             if (type == int.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "parseInt", "(Ljava/lang/String;)I");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "parseInt", "(Ljava/lang/String;)I", false);
             } else if (type == long.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "parseLong", "(Ljava/lang/String;)J");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "parseLong", "(Ljava/lang/String;)J", false);
             } else if (type == byte.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "parseByte", "(Ljava/lang/String;)B");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "parseByte", "(Ljava/lang/String;)B", false);
             } else if (type == short.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "parseShort", "(Ljava/lang/String;)S");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "parseShort", "(Ljava/lang/String;)S", false);
             } else if (type == float.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "parseFloat", "(Ljava/lang/String;)F");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "parseFloat", "(Ljava/lang/String;)F", false);
             } else if (type == double.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "parseDouble", "(Ljava/lang/String;)D");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "parseDouble", "(Ljava/lang/String;)D", false);
             } else if (type == boolean.class) {
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z");
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z", false);
             } else if (type == char.class) {
                 mv.visitInsn(ICONST_0);
-                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/String", "charAt", "(I)C");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/String", "charAt", "(I)C", false);
             }
             return;
         }
@@ -241,19 +241,19 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
         }
 
         if (type == Integer.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(Ljava/lang/String;)Ljava/lang/Integer;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(Ljava/lang/String;)Ljava/lang/Integer;", false);
         } else if (type == Long.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(Ljava/lang/String;)Ljava/lang/Long;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(Ljava/lang/String;)Ljava/lang/Long;", false);
         } else if (type == Byte.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "valueOf", "(Ljava/lang/String;)Ljava/lang/Byte;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Byte", "valueOf", "(Ljava/lang/String;)Ljava/lang/Byte;", false);
         } else if (type == Short.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "valueOf", "(Ljava/lang/String;)Ljava/lang/Short;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Short", "valueOf", "(Ljava/lang/String;)Ljava/lang/Short;", false);
         } else if (type == Float.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "valueOf", "(Ljava/lang/String;)Ljava/lang/Float;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "valueOf", "(Ljava/lang/String;)Ljava/lang/Float;", false);
         } else if (type == Double.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(Ljava/lang/String;)Ljava/lang/Double;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(Ljava/lang/String;)Ljava/lang/Double;", false);
         } else if (type == Boolean.class) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Ljava/lang/String;)Ljava/lang/Boolean;");
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Ljava/lang/String;)Ljava/lang/Boolean;", false);
         } else {
             throw new IllegalArgumentException("Unsupported argument type: " + type.getName());
         }

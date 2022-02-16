@@ -42,7 +42,7 @@ public class StubGenerator extends BytecodeGenerator {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V");
+        mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -98,7 +98,7 @@ public class StubGenerator extends BytecodeGenerator {
         mv.visitVarInsn(ALOAD, 0);
         mv.visitVarInsn(ALOAD, 1);
         mv.visitVarInsn(ILOAD, 2);
-        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Enum", "<init>", "(Ljava/lang/String;I)V");
+        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Enum", "<init>", "(Ljava/lang/String;I)V", false);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -115,7 +115,7 @@ public class StubGenerator extends BytecodeGenerator {
             mv.visitInsn(DUP);
             mv.visitLdcInsn(constants[i]);
             emitInt(mv, i);
-            mv.visitMethodInsn(INVOKESPECIAL, internalClassName, "<init>", "(Ljava/lang/String;I)V");
+            mv.visitMethodInsn(INVOKESPECIAL, internalClassName, "<init>", "(Ljava/lang/String;I)V", false);
             mv.visitInsn(DUP);
             mv.visitFieldInsn(PUTSTATIC, internalClassName, constants[i], classDesc);
             mv.visitInsn(AASTORE);
@@ -137,7 +137,7 @@ public class StubGenerator extends BytecodeGenerator {
         mv.visitCode();
         mv.visitLdcInsn(Type.getObjectType(internalClassName));
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESTATIC, "java/lang/Enum", "valueOf", "(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;");
+        mv.visitMethodInsn(INVOKESTATIC, "java/lang/Enum", "valueOf", "(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;", false);
         mv.visitTypeInsn(CHECKCAST, internalClassName);
         mv.visitInsn(ARETURN);
         mv.visitMaxs(0, 0);
