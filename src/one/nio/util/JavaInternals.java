@@ -18,6 +18,7 @@ package one.nio.util;
 
 import sun.misc.Unsafe;
 
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -27,6 +28,9 @@ public final class JavaInternals {
     public static final Unsafe unsafe = getUnsafe();
     public static final long byteArrayOffset = unsafe.arrayBaseOffset(byte[].class);
 
+    private static final boolean hasModules = !System.getProperty("java.version").startsWith("1.");
+    private static final long accessibleOffset = getAccessibleOffset();
+
     public static Unsafe getUnsafe() {
         try {
             return (Unsafe) getField(Unsafe.class, "theUnsafe").get(null);
@@ -35,9 +39,33 @@ public final class JavaInternals {
         }
     }
 
+    public static boolean hasModules() {
+        return hasModules;
+    }
+
+    private static long getAccessibleOffset() {
+        if (hasModules) {
+            try {
+                Method m0 = JavaInternals.class.getDeclaredMethod("getAccessibleOffset");
+                Method m1 = JavaInternals.class.getDeclaredMethod("getAccessibleOffset");
+                m1.setAccessible(true);
+
+                // Work around JDK 17 restrictions on calling setAccessible()
+                for (long offset = 8; offset < 128; offset++) {
+                    if (unsafe.getByte(m0, offset) == 0 && unsafe.getByte(m1, offset) == 1) {
+                        return offset;
+                    }
+                }
+            } catch (Exception e) {
+                // Fall back to default setAccessible() implementation
+            }
+        }
+        return 0;
+    }
+
     public static Field getField(Class<?> cls, String name) {
         Field f = findField(cls, name);
-        if (f != null) f.setAccessible(true);
+        if (f != null) setAccessible(f);
         return f;
     }
 
@@ -69,7 +97,7 @@ public final class JavaInternals {
 
     public static Method getMethod(Class<?> cls, String name, Class<?>... params) {
         Method m = findMethod(cls, name, params);
-        if (m != null) m.setAccessible(true);
+        if (m != null) setAccessible(m);
         return m;
     }
 
@@ -101,7 +129,7 @@ public final class JavaInternals {
 
     public static <T> Constructor<T> getConstructor(Class<T> cls, Class<?>... params) {
         Constructor<T> c = findConstructor(cls, params);
-        if (c != null) c.setAccessible(true);
+        if (c != null) setAccessible(c);
         return c;
     }
 
@@ -118,6 +146,14 @@ public final class JavaInternals {
             return findConstructor(Class.forName(cls), params);
         } catch (ClassNotFoundException e) {
             return null;
+        }
+    }
+
+    public static void setAccessible(AccessibleObject ao) {
+        if (accessibleOffset != 0) {
+            unsafe.putByte(ao, accessibleOffset, (byte) 1);
+        } else {
+            ao.setAccessible(true);
         }
     }
 

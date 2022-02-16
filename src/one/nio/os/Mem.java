@@ -19,12 +19,11 @@ package one.nio.os;
 import one.nio.util.JavaInternals;
 
 import java.io.FileDescriptor;
-import java.lang.reflect.Field;
 
 public final class Mem {
     public static final boolean IS_SUPPORTED = NativeLibrary.IS_SUPPORTED;
 
-    private static final Field fdField = JavaInternals.getField(FileDescriptor.class, "fd");
+    private static final long fdField = JavaInternals.fieldOffset(FileDescriptor.class, "fd");
 
     public static final int PROT_NONE  = 0;
     public static final int PROT_READ  = 1;
@@ -91,18 +90,10 @@ public final class Mem {
     }
 
     public static int getFD(FileDescriptor fd) {
-        try {
-            return fdField.getInt(fd);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException("Should not happen");
-        }
+        return JavaInternals.unsafe.getInt(fd, fdField);
     }
 
     public static void setFD(FileDescriptor fd, int val) {
-        try {
-            fdField.setInt(fd, val);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException("Should not happen");
-        }
+        JavaInternals.unsafe.putInt(fd, fdField, val);
     }
 }
