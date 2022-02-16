@@ -19,6 +19,7 @@ package one.nio.serial;
 import one.nio.util.Base64;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 
 public class Json {
@@ -84,5 +85,15 @@ public class Json {
     public static Object fromJson(String s) throws IOException, ClassNotFoundException {
         JsonReader reader = new JsonReader(s.getBytes(StandardCharsets.UTF_8));
         return reader.readObject();
+    }
+
+    public static <T> T fromJson(String s, Class<T> cls) throws IOException, ClassNotFoundException {
+        JsonReader reader = new JsonReader(s.getBytes(StandardCharsets.UTF_8));
+        return reader.readObject(cls);
+    }
+
+    public static Object fromJson(String s, Type type) throws IOException, ClassNotFoundException {
+        JsonReader reader = new JsonReader(s.getBytes(StandardCharsets.UTF_8));
+        return reader.readObject(type);
     }
 }
