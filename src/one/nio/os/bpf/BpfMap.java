@@ -124,7 +124,12 @@ public class BpfMap extends BpfObj implements Closeable {
     }
 
     public static BpfMap newMap(MapType type, int keySize, int valueSize, int maxEntries, String name, int flags) throws IOException {
-        int fd = Bpf.mapCreate(type.ordinal(), keySize, valueSize, maxEntries, name, flags);
+        int fd = Bpf.mapCreate(type.ordinal(), keySize, valueSize, maxEntries, name, flags, 0);
+        return getByFd(fd);
+    }
+
+    public static BpfMap newMapOfMaps(MapType type, int keySize, int maxEntries, String name, int flags, BpfMap innerMap) throws IOException {
+        int fd = Bpf.mapCreate(type.ordinal(), keySize, 4, maxEntries, name, flags, innerMap.fd());
         return getByFd(fd);
     }
 
@@ -154,6 +159,10 @@ public class BpfMap extends BpfObj implements Closeable {
 
     public static byte[] bytes(long i) {
         return ByteBuffer.allocate(8).order(ByteOrder.nativeOrder()).putLong(i).array();
+    }
+
+    public static ByteBuffer bytes(byte[] value) {
+        return ByteBuffer.wrap(value).order(ByteOrder.nativeOrder());
     }
 
     public static IntBuffer ints(byte[] value) {

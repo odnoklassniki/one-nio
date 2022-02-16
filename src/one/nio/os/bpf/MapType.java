@@ -42,6 +42,13 @@ public enum MapType {
     PERCPU_CGROUP_STORAGE,
     QUEUE,
     STACK,
+    SK_STORAGE,
+    DEVMAP_HASH,
+    STRUCT_OPS,
+    RINGBUF,
+    INODE_STORAGE,
+    TASK_STORAGE,
+    BLOOM_FILTER
     ;
 
     final boolean perCpu = name().contains("PERCPU_");

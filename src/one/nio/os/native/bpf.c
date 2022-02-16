@@ -274,7 +274,7 @@ Java_one_nio_os_bpf_Bpf_rawTracepointOpen(JNIEnv* env, jclass cls, jint prog_fd,
 
 JNIEXPORT jint JNICALL
 Java_one_nio_os_bpf_Bpf_mapCreate(JNIEnv* env, jclass cls, jint type, jint key_size, jint value_size,
-                                  jint max_entries, jstring name, jint flags) {
+                                  jint max_entries, jstring name, jint flags, jint inner_map_fd) {
     union bpf_attr attr;
     memset(&attr, 0, sizeof(attr));
     attr.map_type = type;
@@ -282,6 +282,7 @@ Java_one_nio_os_bpf_Bpf_mapCreate(JNIEnv* env, jclass cls, jint type, jint key_s
     attr.value_size = value_size;
     attr.max_entries = max_entries;
     attr.map_flags = flags;
+    attr.inner_map_fd = inner_map_fd;
 
     if (name != NULL) {
         jsize name_len = (*env)->GetStringUTFLength(env, name);

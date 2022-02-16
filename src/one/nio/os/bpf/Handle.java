@@ -34,7 +34,7 @@ public class Handle implements Closeable {
         this.fd = fd;
     }
 
-    protected int fd() {
+    public int fd() {
         if (fd <= 0) {
             throw new IllegalStateException(getClass().getSimpleName() + " is closed");
         }

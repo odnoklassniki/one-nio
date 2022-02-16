@@ -47,13 +47,16 @@ public class Bpf {
 
     static native String mapGetInfo(int fd, int[] result /*type,id,key_size,value_size,max_entries,flags*/) throws IOException;
 
-    static native int mapCreate(int type, int keySize, int valueSize, int maxEntries, String name, int flags) throws IOException;
+    static native int mapCreate(int type, int keySize, int valueSize, int maxEntries, String name, int flags, int innerMapFd) throws IOException;
 
     /* flags for lookup/update */
     @Native static final int BPF_ANY     = 0;  // create new element or update existing
     @Native static final int BPF_NOEXIST = 1;  // create new element if it didn't exist
     @Native static final int BPF_EXIST   = 2;  // update existing element
     @Native static final int BPF_F_LOCK  = 4;  // spin_lock-ed map_lookup/map_update
+
+    /* flags for map creation */
+    public static final int BPF_F_MMAPABLE = (1 << 10);
 
     static native boolean mapLookup(int fd, byte[] key, byte[] result, int flags) throws IOException;
 
