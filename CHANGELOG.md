@@ -1,3 +1,20 @@
+1.5.0
+ * JDK 17 support. Workaround `setAccessible` restrictions
+ * New BPF map types
+ * `SOCK_SEQPACKET` support
+ * `sendMsg`/`recvMsg` for passing descriptors over a UNIX domain socket
+ * Serializer generator now tolerates missing class files
+ * Fixed serialization of private Records
+ * Optimize `Utf8.read` for Compact Strings
+ * Customizable strategy for reusing OffheapMap entries
+ * Allow custom reference tags in serialization streams
+ * Fixed overflow bugs in `ObjectInput(Output)Channel`
+ * A method to open all JDK modules
+ * `Json.fromJson` with a given Class or Type
+ * A few new methods in HTTP API 
+ * Migrated to ASM 9
+ * Reduced size of libonenio binary
+
 1.4.0
  * eBPF and extended perf_events support
  * HttpClient fixes
