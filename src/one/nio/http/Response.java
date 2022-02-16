@@ -16,9 +16,11 @@
 
 package one.nio.http;
 
+import one.nio.serial.Json;
 import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -100,6 +102,18 @@ public class Response {
     public static Response ok(String plainText) {
         Response response = new Response(OK, plainText.getBytes(StandardCharsets.UTF_8));
         response.addHeader("Content-Type: text/plain; charset=utf-8");
+        return response;
+    }
+
+    public static Response json(Object obj) {
+        String jsonText;
+        try {
+            jsonText = Json.toJson(obj);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+        Response response = new Response(OK, jsonText.getBytes(StandardCharsets.UTF_8));
+        response.addHeader("Content-Type: application/json; charset=utf-8");
         return response;
     }
 

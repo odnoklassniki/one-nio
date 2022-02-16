@@ -23,6 +23,7 @@ import one.nio.util.Utf8;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -194,6 +195,44 @@ public class Request {
                 return new QueryParameterIterator(uri.substring(params + 1));
             }
         };
+    }
+
+    public Map<String, String> getPostParams() {
+        if (method != METHOD_POST || body == null || body.length == 0) {
+            return Collections.emptyMap();
+        }
+
+        String rawParams = new String(body, StandardCharsets.UTF_8);
+
+        Map<String, String> params = new HashMap<>();
+        int cur = 0;
+
+        while (cur >= 0 && cur < rawParams.length()) {
+            int eqIdx = rawParams.indexOf('=', cur);
+            if (eqIdx < 0) return params;
+
+            int ampIdx = rawParams.indexOf('&', eqIdx);
+            if (eqIdx == cur) {
+                // key=value&=
+                if (eqIdx == rawParams.length() - 1) break;
+
+                // filtering invalid sequences =&..
+                cur = ampIdx + 1;
+                continue;
+            }
+
+            String key = URLEncoder.decode(rawParams.substring(cur, eqIdx));
+            if (ampIdx == -1) {
+                // last key-value pair
+                params.put(key, URLEncoder.decode(rawParams.substring(eqIdx + 1)));
+                break;
+            }
+
+            params.put(key, URLEncoder.decode(rawParams.substring(eqIdx + 1, ampIdx)));
+            cur = ampIdx + 1;
+        }
+
+        return params;
     }
 
     public int getHeaderCount() {

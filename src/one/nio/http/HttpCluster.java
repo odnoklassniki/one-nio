@@ -29,6 +29,7 @@ import java.util.StringTokenizer;
 public class HttpCluster extends WeightCluster<HttpProvider> {
     protected volatile int retries = 3;
     protected volatile int maxFailures = 5;
+    protected volatile boolean logTimeouts;
 
     public void setRetries(int retries) {
         this.retries = retries;
@@ -36,6 +37,10 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
 
     public void setMaxFailures(int maxFailures) {
         this.maxFailures = maxFailures;
+    }
+
+    public void setLogTimeouts(boolean logTimeouts) {
+        this.logTimeouts = logTimeouts;
     }
 
     public void configure(String configuration) {
@@ -76,10 +81,11 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
                 if (provider.getFailures().incrementAndGet() >= maxFailures) {
                     disableProvider(provider);
                 }
-                if ((e instanceof SocketTimeoutException || e.getCause() instanceof SocketTimeoutException) && !log.isTraceEnabled()) {
+                if ((e instanceof SocketTimeoutException || e.getCause() instanceof SocketTimeoutException)
+                        && !(log.isTraceEnabled() || logTimeouts)) {
                     log.debug(provider + " timed out");
                 } else {
-                    log.warn(provider + " invocation failed", e);
+                    log.warn(provider + " invocation failed " + request.getURI(), e);
                 }
             }
         }
