@@ -6,7 +6,7 @@
     <property name="lib.dir"        value="lib"/>
     <property name="target.jar"     value="${build.dir}/${ant.project.name}.jar"/>
     <property name="download.repo"  value="https://repo1.maven.org/maven2"/>
-    <property name="gcc.extra.args" value=""/>
+    <property name="gcc.args"       value="-O3 -fno-omit-frame-pointer -momit-leaf-frame-pointer"/>
 
     <target name="init">
         <mkdir dir="${build.dir}"/>
@@ -20,9 +20,9 @@
     <target name="retrieve-libs" unless="lib.dir.exists">
         <echo message="Downloading external libraries..."/>
         <mkdir dir="${lib.dir}"/>
-        <get src="${download.repo}/asm/asm/3.3/asm-3.3.jar" dest="${lib.dir}/asm-3.3.jar"/>
-        <get src="${download.repo}/commons-logging/commons-logging/1.0.3/commons-logging-1.0.3.jar" dest="${lib.dir}/commons-logging-1.0.3.jar"/>
-        <get src="${download.repo}/log4j/log4j/1.2.15/log4j-1.2.15.jar" dest="${lib.dir}/log4j-1.2.15.jar"/>
+        <get src="${download.repo}/org/ow2/asm/asm/9.2/asm-9.2.jar" dest="${lib.dir}/asm-9.2.jar"/>
+        <get src="${download.repo}/commons-logging/commons-logging/1.2/commons-logging-1.2.jar" dest="${lib.dir}/commons-logging-1.2.jar"/>
+        <get src="${download.repo}/log4j/log4j/1.2.17/log4j-1.2.17.jar" dest="${lib.dir}/log4j-1.2.17.jar"/>
     </target>
 
     <target name="clean">
@@ -50,8 +50,9 @@
         </pathconvert>
 
         <exec os="Linux" executable="gcc">
-            <arg line="-g -O3 -fPIC -D_GNU_SOURCE ${gcc.extra.args}
-                       -o ${build.dir}/native/libonenio.so -shared -Wl,-soname,libonenio.so
+            <arg line="-D_GNU_SOURCE -fPIC -shared -Wl,-soname,libonenio.so ${gcc.args}
+                       -o ${build.native}/libonenio.so
+                       -I ${java.home}/include -I ${java.home}/include/linux
                        -I ${java.home}/../include -I ${java.home}/../include/linux
                        ${src.native} -ldl -lrt"/>
         </exec>
