@@ -132,6 +132,7 @@ public class Repository {
         addBootstrap(new HttpRequestSerializer());
         addBootstrap(new SerializedWrapperSerializer());
         addBootstrap(new SerializerSerializer(SerializerSerializer.class));
+        addBootstrap(new SerializerSerializer(JavaTimeSerializer.class));
 
         classMap.put(int.class, classMap.get(Integer.class));
         classMap.put(long.class, classMap.get(Long.class));
@@ -369,7 +370,11 @@ public class Repository {
                 } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
                     serializer = new MapSerializer(cls);
                 } else if (Serializable.class.isAssignableFrom(cls)) {
-                    serializer = new GeneratedSerializer(cls);
+                    if (cls.getName().startsWith("java.time.") && JavaInternals.findMethod(cls, "writeReplace") != null) {
+                        serializer = new JavaTimeSerializer(cls);
+                    } else {
+                        serializer = new GeneratedSerializer(cls);
+                    }
                 } else {
                     serializer = new InvalidSerializer(cls);
                 }

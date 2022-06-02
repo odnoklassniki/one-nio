@@ -30,9 +30,14 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.*;
+import java.time.chrono.ChronoZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.time.zone.ZoneRules;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
@@ -405,6 +410,20 @@ public class SerializationTest {
 
         checkSerialize(list.subList(10, 20));
         checkSerialize(map.keySet());
+    }
+
+    @Test
+    public void testJavaTime() throws IOException, ClassNotFoundException {
+        checkSerialize(Clock.systemDefaultZone().instant());
+        checkSerialize(LocalDateTime.now());
+        checkSerialize(ZoneOffset.UTC);
+        checkSerialize(ZoneId.getAvailableZoneIds().stream().map(ZoneId::of).collect(Collectors.toList()));
+        checkSerialize(OffsetTime.of(10, 20, 30, 40, ZoneOffset.MIN));
+        checkSerialize(ChronoZonedDateTime.from(Clock.systemUTC().instant().atZone(ZoneId.of("UTC+1"))));
+        checkSerialize(Duration.of(123_456_789_000L, ChronoUnit.NANOS));
+        checkSerialize(Period.of(5, 6, 7));
+        checkSerialize(Year.MAX_VALUE);
+        checkSerialize(ZoneRules.of(ZoneOffset.ofHours(-8)));
     }
 
     static class Parent implements Serializable {
