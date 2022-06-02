@@ -139,7 +139,7 @@ public class RpcStreamImpl<S, R> implements RpcStream, BidiStream<S, R> {
     @Override
     public void readFully(byte[] b, int off, int len) throws IOException {
         try {
-            in.read(b, off, len);
+            in.readFully(b, off, len);
         } catch (Throwable e) {
             invalidate();
             throw e;

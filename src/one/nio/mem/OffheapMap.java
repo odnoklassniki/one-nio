@@ -29,9 +29,9 @@ import sun.misc.Unsafe;
 
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.TimeoutException;
 
 public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     protected static final Log log = LogFactory.getLog(OffheapMap.class);
@@ -307,7 +307,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
     public Record<K, V> lockRecordForRead(K key, long timeout) throws TimeoutException {
         long hashCode = hashCode(key);
         RWLock lock = lockFor(hashCode);
-        if (!lock.lockRead(timeout)){
+        if (!lock.lockRead(timeout)) {
             throw new TimeoutException();
         }
         return createRecord(key, hashCode, lock);
@@ -560,10 +560,13 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             this.entry = entry;
         }
 
+        public OffheapMap<K, V> map() {
+            return map;
+        }
 
-        public OffheapMap<K, V> map() { return map; }
-
-        public RWLock lock() { return lock; }
+        public RWLock lock() {
+            return lock;
+        }
 
         public long entry() {
             return entry;
@@ -634,11 +637,37 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             map.count.incrementAndGet();
         }
 
+        public long create(int entrySize) throws OutOfMemoryException {
+            if (!isNull()) {
+                throw new IllegalStateException("Entry already exists");
+            }
+
+            long hash = map.hashCode(key);
+            entry = map.allocateEntry(key, hash, entrySize);
+            unsafe.putLong(entry + HASH_OFFSET, hash);
+            unsafe.putAddress(entry + NEXT_OFFSET, unsafe.getAddress(currentPtr));
+
+            unsafe.putAddress(currentPtr, entry);
+            map.count.incrementAndGet();
+            return entry;
+        }
+
+        public void touch() {
+            if (isNull()) {
+                throw new IllegalStateException("Entry is null");
+            }
+            map.setTimeAt(entry);
+        }
+
         public void remove() {
             unsafe.putAddress(currentPtr, unsafe.getAddress(entry + NEXT_OFFSET));
             map.destroyEntry(entry);
             map.count.decrementAndGet();
             entry = 0;
+        }
+
+        public boolean isNull() {
+            return entry == 0;
         }
 
         public boolean isNullOrExpired() {

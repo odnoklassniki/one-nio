@@ -16,6 +16,8 @@
 
 package one.nio.mem;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import one.nio.util.JavaInternals;
 
 import static one.nio.util.JavaInternals.unsafe;
@@ -33,17 +35,23 @@ public class FixedSizeAllocator implements Allocator {
     protected volatile long head;
     private volatile long q1, q2, q3, q4, q5, q6, q7 = 0;  // padding against false sharing
 
-    protected long entrySize;
-    protected long chunkSize;
+    protected AtomicLong usedPages = new AtomicLong();
+
+    protected final long startAddress;
+    protected final long entrySize;
+    protected final long chunkSize;
     protected long totalMemory;
+    protected long totalPages;
 
     public FixedSizeAllocator(long entrySize, long chunkSize) {
         this.entrySize = entrySize;
         this.chunkSize = chunkSize;
+        this.startAddress = 0;
         requestMoreMemory();
     }
 
     public FixedSizeAllocator(long startAddress, long totalMemory, long entrySize) {
+        this.startAddress = startAddress;
         this.entrySize = entrySize;
         this.chunkSize = 0;
         this.totalMemory = totalMemory;
@@ -54,13 +62,17 @@ public class FixedSizeAllocator implements Allocator {
         for (long entry = startAddress; entry < lastEntry; ) {
             unsafe.putAddress(entry, entry += entrySize);
         }
+        this.totalPages = totalMemory / entrySize;
     }
-    
+
     public FixedSizeAllocator(long startAddress, long totalMemory, long entrySize, long head) {
+        this.startAddress = startAddress;
         this.entrySize = entrySize;
         this.chunkSize = 0;
         this.totalMemory = totalMemory;
         this.head = head;
+        this.totalPages = totalMemory / entrySize;
+        this.usedPages.set(totalPages - countFreePages());
     }
 
     public static void relocate(long currentPtr, long delta) {
@@ -70,7 +82,11 @@ public class FixedSizeAllocator implements Allocator {
         }
     }
 
-    public int countFreePages() {
+    public long head() {
+        return head;
+    }
+
+    protected int countFreePages() {
         int count = 0;
         for (long entry = head & ADDR_MASK; entry != 0; entry = unsafe.getAddress(entry)) {
             count++;
@@ -84,6 +100,10 @@ public class FixedSizeAllocator implements Allocator {
 
     public long chunkSize() {
         return chunkSize;
+    }
+
+    public long startAddress() {
+        return startAddress;
     }
 
     public long totalMemory() {
@@ -101,6 +121,7 @@ public class FixedSizeAllocator implements Allocator {
 
             long nextEntry = unsafe.getAddress(entry);
             if (unsafe.compareAndSwapLong(this, headOffset, head, nextEntry + (head & COUNTER_MASK) + COUNTER_INC)) {
+                usedPages.incrementAndGet();
                 return entry;
             }
         }
@@ -126,6 +147,7 @@ public class FixedSizeAllocator implements Allocator {
             head = this.head;
             unsafe.putAddress(entry, head & ADDR_MASK);
         } while (!unsafe.compareAndSwapLong(this, headOffset, head, entry + (head & COUNTER_MASK) + COUNTER_INC));
+        usedPages.decrementAndGet();
     }
 
     @Override
@@ -154,6 +176,8 @@ public class FixedSizeAllocator implements Allocator {
             head = this.head;
             unsafe.putAddress(lastEntry, head & ADDR_MASK);
         } while (!unsafe.compareAndSwapLong(this, headOffset, head, newChunk));
+
+        this.totalPages = totalMemory / entrySize;
     }
 
     // Override this with a custom way to get a large chunk of the off-heap memory
@@ -163,5 +187,21 @@ public class FixedSizeAllocator implements Allocator {
             throw new OutOfMemoryException("FixedSizeAllocator has reached its limit");
         }
         return unsafe.allocateMemory(size);
+    }
+
+    public long usedPages() {
+        return usedPages.get();
+    }
+
+    public long totalPages() {
+        return totalPages;
+    }
+
+    public long freePages() {
+        return totalPages - usedPages.get();
+    }
+
+    public long usedMemory() {
+        return usedPages.get() * entrySize;
     }
 }
