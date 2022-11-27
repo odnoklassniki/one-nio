@@ -35,7 +35,9 @@ public class PerfCounterGlobal extends PerfCounter {
             for (int i = 0; i < fds.length; i++) {
                 int fd = fds[i];
                 fds[i] = -1;
-                Perf.close(fd);
+                if (fd > 0) {
+                    Perf.close(fd);
+                }
             }
         }
     }
@@ -44,7 +46,9 @@ public class PerfCounterGlobal extends PerfCounter {
     public long get() throws IOException {
         long sum = 0;
         for (int fd : fds) {
-            sum += Perf.get(fd);
+            if (fd > 0) {
+                sum += Perf.get(fd);
+            }
         }
         return sum;
     }
@@ -54,18 +58,25 @@ public class PerfCounterGlobal extends PerfCounter {
         int vals = hasReadFormat(ReadFormat.TOTAL_TIME_RUNNING | ReadFormat.TOTAL_TIME_ENABLED) ? 3 : 1;
         long[] buf = new long[3 * fds.length];
         for (int cpu = 0; cpu < fds.length; cpu++) {
-            Perf.getValue(fds[cpu], buf, cpu * 3, vals);
+            int fd = fds[cpu];
+            if (fd > 0) {
+                Perf.getValue(fd, buf, cpu * 3, vals);
+            }
         }
         return new GlobalValue(buf);
     }
 
     public long getForCpu(int cpu) throws IOException {
-        return Perf.get(fds[cpu]);
+        int fd = fds[cpu];
+        return fd > 0 ? Perf.get(fd) : 0;
     }
 
     public LocalValue getValueForCpu(int cpu) throws IOException {
+        int fd = fds[cpu];
+        if (fd <= 0) return LocalValue.ZERO;
+        
         long[] buf = newBuffer();
-        Perf.getValue(fds[cpu], buf, 0, buf.length);
+        Perf.getValue(fd, buf, 0, buf.length);
         return toValue(buf);
     }
 
@@ -74,9 +85,11 @@ public class PerfCounterGlobal extends PerfCounter {
         long[] buf = newBuffer();
         long[] total = newBuffer();
         for (int fd : fds) {
-            Perf.getValue(fd, buf, 0, buf.length);
-            for (int i = 0; i < buf.length; i++) {
-                total[i] += buf[i];
+            if (fd > 0) {
+                Perf.getValue(fd, buf, 0, buf.length);
+                for (int i = 0; i < buf.length; i++) {
+                    total[i] += buf[i];
+                }
             }
         }
         return total;
@@ -85,7 +98,9 @@ public class PerfCounterGlobal extends PerfCounter {
     @Override
     void ioctl(int cmd, int arg) throws IOException {
         for (int fd : fds) {
-            Perf.ioctl(fd, cmd, arg);
+            if (fd > 0) {
+                Perf.ioctl(fd, cmd, arg);
+            }
         }
     }
 
@@ -101,6 +116,9 @@ public class PerfCounterGlobal extends PerfCounter {
             throw new IllegalArgumentException();
         }
 
-        map.put(BpfMap.bytes(cpu), BpfMap.bytes(fds[cpu]));
+        int fd = fds[cpu];
+        if (fd > 0) {
+            map.put(BpfMap.bytes(cpu), BpfMap.bytes(fd));
+        }
     }
 }

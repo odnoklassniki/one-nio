@@ -28,7 +28,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 public class BpfMap extends BpfObj implements Closeable {
-    public static final int CPUS = Cpus.POSSIBLE;
+    public static final int CPUS = Cpus.COUNT;
     public static final int ARRAY_KEY_SIZE = 4;
 
     public final MapType type;

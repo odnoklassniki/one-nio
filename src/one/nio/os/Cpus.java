@@ -16,41 +16,43 @@
 
 package one.nio.os;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import one.nio.util.Utf8;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import one.nio.util.Utf8;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.BitSet;
 
 public class Cpus {
     private static final Log log = LogFactory.getLog(Cpus.class);
 
-    public static final int ONLINE = cpus("/sys/devices/system/cpu/online");
-    public static final int POSSIBLE = cpus("/sys/devices/system/cpu/possible");
-    public static final int PRESENT = cpus("/sys/devices/system/cpu/present");
-
-    private static int cpus(String rangeFile) {
+    public static final BitSet ONLINE = cpus("/sys/devices/system/cpu/online");
+    public static final BitSet PRESENT = cpus("/sys/devices/system/cpu/present");
+    public static final BitSet POSSIBLE = cpus("/sys/devices/system/cpu/possible");
+    public static final int COUNT = POSSIBLE.cardinality();
+    
+    private static BitSet cpus(String rangeFile) {
         try {
             byte[] bytes = Files.readAllBytes(Paths.get(rangeFile));
             String rangeStr = Utf8.read(bytes, 0, bytes.length).trim();
-            int cpus = 0;
+            BitSet cpus = new BitSet();
             for (String range : rangeStr.split(",")) {
                 String[] s = range.split("-");
-                if (s.length == 1) {
-                    cpus++;
-                } else {
-                    cpus += 1 + Integer.parseInt(s[1]) - Integer.parseInt(s[0]);
-                }
+                int from = Integer.parseInt(s[0]);
+                int to = s.length == 1 ? from : Integer.parseInt(s[1]);
+                cpus.set(from, to);
             }
             return cpus;
         } catch (IOException e) {
             if (log.isDebugEnabled()) {
                 log.debug("Failed to read " + rangeFile, e);
             }
-            return Runtime.getRuntime().availableProcessors();
+            BitSet cpus = new BitSet();
+            cpus.set(0, Runtime.getRuntime().availableProcessors());
+            return cpus;
         }
     }
 }

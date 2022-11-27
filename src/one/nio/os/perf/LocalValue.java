@@ -17,6 +17,8 @@
 package one.nio.os.perf;
 
 public class LocalValue implements CounterValue {
+    public static final LocalValue ZERO = new LocalValue(0, 0, 0);
+    
     public final long value;
     public final long running;
     public final long enabled;

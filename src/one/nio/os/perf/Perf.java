@@ -58,13 +58,15 @@ public class Perf {
 
     public static PerfCounterGlobal openGlobal(PerfEvent event, int pid, PerfOption... options) throws IOException {
         String optionString = optionString(options);
-        int[] fds = new int[Cpus.PRESENT];
+        int[] fds = new int[Cpus.COUNT];
 
         PerfOptionGlobalGroup group = (PerfOptionGlobalGroup) option(options, PerfOption.GROUP_GLOBAL);
         try {
             for (int cpu = 0; cpu < fds.length; cpu++) {
-                int groupFd = group == null ? -1 : group.fds[cpu];
-                fds[cpu] = openEvent(pid, cpu, event.type, event.config, event.breakpoint, groupFd, optionString);
+                if (Cpus.ONLINE.get(cpu)) {
+                    int groupFd = group == null ? -1 : group.fds[cpu];
+                    fds[cpu] = openEvent(pid, cpu, event.type, event.config, event.breakpoint, groupFd, optionString);
+                }
             }
         } catch (Throwable e) {
             for (int fd : fds) {

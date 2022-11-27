@@ -111,10 +111,6 @@ Java_one_nio_os_perf_Perf_openEvent(JNIEnv* env, jclass cls, jint pid, jint cpu,
         attr.config = config;
     }
 
-    if (type == PERF_TYPE_SOFTWARE) {
-        attr.precise_ip = 2;
-    }
-
     unsigned long flags = parse_perf_options(env, options, &attr);
 
     int fd = syscall(__NR_perf_event_open, &attr, pid, cpu, group, flags);
@@ -180,5 +176,7 @@ Java_one_nio_os_perf_Perf_getValue(JNIEnv* env, jclass cls, jint fd, jlongArray 
 
 JNIEXPORT void JNICALL
 Java_one_nio_os_perf_Perf_ioctl(JNIEnv* env, jclass cls, jint fd, jint cmd, jint arg) {
-    ioctl(fd, ioctl_cmd[cmd], arg);
+    if (ioctl(fd, ioctl_cmd[cmd], arg) < 0) {
+        throw_io_exception(env);
+    }
 }
