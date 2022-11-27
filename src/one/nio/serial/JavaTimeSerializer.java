@@ -90,7 +90,9 @@ public class JavaTimeSerializer extends Serializer {
     @Override
     public Object read(DataStream in) throws IOException, ClassNotFoundException {
         try {
-            return readExternal.invokeExact((DataInput) in);
+            Object result = readExternal.invokeExact((DataInput) in);
+            in.register(result);
+            return result;
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
