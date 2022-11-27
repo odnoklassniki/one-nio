@@ -97,15 +97,12 @@ public class HttpSession extends Session {
     }
 
     protected void handleSocketClosed() {
-        if (closing) {
-            return;
-        }
         // Unsubscribe from read events
         listen(queueHead == null ? 0 : WRITEABLE);
 
         if (handling == null) {
             scheduleClose();
-        } else {
+        } else if (!closing) {
             pipeline.addLast(FIN);
         }
     }
