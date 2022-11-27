@@ -18,6 +18,7 @@ package one.nio.serial;
 
 import one.nio.serial.sample.Sample;
 import one.nio.util.Base64;
+import one.nio.util.Utf8;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -240,6 +241,27 @@ public class SerializationTest {
         checkSerialize(ComplexEnum.A1);
         checkSerialize(new EnumSerializer(SimpleEnum.class));
         checkSerialize(new EnumSerializer(ComplexEnum.class));
+    }
+
+    private enum MagicEnum {
+        MAGIC1, MAGIC2, MAGIC3
+    }
+
+    @Test
+    public void testEnumDoubleConvert() throws IOException, ClassNotFoundException {
+        Serializer<MagicEnum> enumSerializer = Repository.get(MagicEnum.class);
+        byte[] bytes = Serializer.serialize(enumSerializer);
+
+        Repository.removeSerializer(enumSerializer.uid);
+
+        // Exchange the order of MAGIC1 and MAGIC3 in the serialized form
+        int m1 = Utf8.indexOf(MagicEnum.MAGIC1.name().getBytes(), bytes);
+        int m3 = Utf8.indexOf(MagicEnum.MAGIC3.name().getBytes(), bytes);
+        bytes[m1 + 5] = '3';
+        bytes[m3 + 5] = '1';
+
+        byte[] copy = Serializer.serialize(Serializer.deserialize(bytes));
+        assertArrayEquals(bytes, copy);
     }
 
     @Test

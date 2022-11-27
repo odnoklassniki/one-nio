@@ -28,51 +28,55 @@ public class EnumSerializer extends Serializer<Enum> {
     static final AtomicInteger enumCountMismatches = new AtomicInteger();
     static final AtomicInteger enumMissedConstants = new AtomicInteger();
 
+    private String[] names;
     private Enum[] values;
 
     EnumSerializer(Class cls) {
         super(cls);
         this.values = cls().getEnumConstants();
+        this.names = new String[values.length];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = values[i].name();
+        }
     }
 
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         super.writeExternal(out);
-        Enum[] ownValues = cls().getEnumConstants();
-        out.writeShort(ownValues.length);
-        for (Enum v : ownValues) {
-            out.writeUTF(v.name());
+        out.writeShort(names.length);
+        for (String name : names) {
+            out.writeUTF(name);
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        String[] constants = new String[in.readUnsignedShort()];
-        for (int i = 0; i < constants.length; i++) {
-            constants[i] = in.readUTF();
+        this.names = new String[in.readUnsignedShort()];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = in.readUTF();
         }
 
         try {
             super.readExternal(in);
         } catch (ClassNotFoundException e) {
             if ((Repository.getOptions() & Repository.ENUM_STUBS) == 0) throw e;
-            this.cls = StubGenerator.generateEnum(uniqueName("Enum"), constants);
+            this.cls = StubGenerator.generateEnum(uniqueName("Enum"), names);
             this.origin = Origin.GENERATED;
         }
 
         Enum[] ownValues = cls().getEnumConstants();
-        if (ownValues.length != constants.length) {
+        if (ownValues.length != names.length) {
             Repository.log.warn("[" + Long.toHexString(uid) + "] Enum count mismatch for " + descriptor + ": " +
-                    ownValues.length + " local vs. " + constants.length + " stream constants");
+                    ownValues.length + " local vs. " + names.length + " stream constants");
             enumCountMismatches.incrementAndGet();
         }
 
         // 1. Find exact matches
         EnumSet usedConstants = EnumSet.noneOf(cls);
-        this.values = new Enum[constants.length];
-        for (int i = 0; i < constants.length; i++) {
-            values[i] = findMatch(constants[i], usedConstants);
+        this.values = new Enum[names.length];
+        for (int i = 0; i < names.length; i++) {
+            values[i] = findMatch(names[i], usedConstants);
         }
 
         // 2. Handle renaming
