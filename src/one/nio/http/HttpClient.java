@@ -19,6 +19,7 @@ package one.nio.http;
 import one.nio.net.ConnectionString;
 import one.nio.net.HttpProxy;
 import one.nio.net.Socket;
+import one.nio.net.SocketClosedException;
 import one.nio.net.SslContext;
 import one.nio.pool.PoolException;
 import one.nio.pool.SocketPool;
@@ -29,6 +30,8 @@ import org.apache.commons.logging.LogFactory;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class HttpClient extends SocketPool {
     protected static final Log log = LogFactory.getLog(HttpClient.class);
@@ -224,20 +227,16 @@ public class HttpClient extends SocketPool {
                     response.setBody(readChunkedBody());
                 } else {
                     String contentLength = response.getHeader("Content-Length:");
-                    if (contentLength == null) {
+                    if (contentLength != null) {
+                        response.setBody(readBody(Integer.parseInt(contentLength)));
+                    } else if ("close".equalsIgnoreCase(response.getHeader("Connection:"))) {
+                        response.setBody(readBodyUntilClose());
+                    } else {
                         if (log.isDebugEnabled()) {
                             log.debug("Content-Length unspecified: " + response.toString());
                         }
                         throw new HttpException("Content-Length unspecified");
                     }
-
-                    byte[] body = new byte[Integer.parseInt(contentLength)];
-                    int contentBytes = length - pos;
-                    System.arraycopy(buf, pos, body, 0, contentBytes);
-                    if (contentBytes < body.length) {
-                        socket.readFully(body, contentBytes, body.length - contentBytes);
-                    }
-                    response.setBody(body);
                 }
             }
 
@@ -264,7 +263,6 @@ public class HttpClient extends SocketPool {
 
         byte[] readChunkedBody() throws IOException, HttpException {
             ArrayList<byte[]> chunks = new ArrayList<>(4);
-            int totalBytes = 0;
 
             while (true) {
                 int chunkSize = Integer.parseInt(readLine(), 16);
@@ -275,7 +273,6 @@ public class HttpClient extends SocketPool {
 
                 byte[] chunk = new byte[chunkSize];
                 chunks.add(chunk);
-                totalBytes += chunkSize;
 
                 int contentBytes = length - pos;
                 if (contentBytes < chunkSize) {
@@ -293,6 +290,47 @@ public class HttpClient extends SocketPool {
                 }
 
                 readLine();
+            }
+
+            return mergeChunks(chunks);
+        }
+
+        byte[] readBody(int contentLength) throws IOException {
+            byte[] body = new byte[contentLength];
+            int contentBytes = length - pos;
+            System.arraycopy(buf, pos, body, 0, contentBytes);
+            if (contentBytes < body.length) {
+                socket.readFully(body, contentBytes, body.length - contentBytes);
+            }
+            return body;
+        }
+
+        byte[] readBodyUntilClose() throws IOException {
+            ArrayList<byte[]> chunks = new ArrayList<>(4);
+
+            if (pos < length) {
+                chunks.add(Arrays.copyOfRange(buf, pos, length));
+            }
+
+            try {
+                for (int bytes; (bytes = socket.read(buf, 0, buf.length)) >= 0; ) {
+                    chunks.add(Arrays.copyOf(buf, bytes));
+                }
+            } catch (SocketClosedException e) {
+                // expected
+            }
+
+            return mergeChunks(chunks);
+        }
+
+        byte[] mergeChunks(List<byte[]> chunks) {
+            if (chunks.size() == 1) {
+                return chunks.get(0);
+            }
+
+            int totalBytes = 0;
+            for (byte[] chunk : chunks) {
+                totalBytes += chunk.length;
             }
 
             byte[] result = new byte[totalBytes];
