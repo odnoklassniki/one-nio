@@ -114,6 +114,8 @@ static unsigned char dh2048_p[] = {
 static unsigned char dh2048_g[] = { 0x02 };
 
 
+extern void throw_socket_closed_cached(JNIEnv* env);
+
 static void throw_ssl_exception(JNIEnv* env) {
     char buf[256];
     unsigned long err = ERR_get_error();
@@ -129,14 +131,14 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
         case SSL_ERROR_NONE:
             return 0;
         case SSL_ERROR_ZERO_RETURN:
-            throw_socket_closed(env);
+            throw_socket_closed_cached(env);
             return 0;
         case SSL_ERROR_SYSCALL:
             if (ERR_peek_error()) {
                 throw_ssl_exception(env);
             } else if (ret == 0 || errno == 0) {
                 // OpenSSL 1.0 and 1.1 return different error code in case of "dirty" connection close
-                throw_socket_closed(env);
+                throw_socket_closed_cached(env);
             } else {
                 throw_io_exception(env);
             }
@@ -896,12 +898,14 @@ Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, 
         throw_socket_closed(env);
         return 0;
     } else {
-        int result = SSL_write(ssl, (void*)(intptr_t)buf, count);
-        if (result > 0) {
-            return result;
+        while (1) {
+            int result = SSL_write(ssl, (void*)(intptr_t)buf, count);
+            if (result > 0) {
+                return result;
+            } else if (check_ssl_error(env, ssl, result) != SSL_ERROR_WANT_WRITE || errno != EINTR) {
+                return 0;
+            }
         }
-        check_ssl_error(env, ssl, result);
-        return 0;
     }
 }
 
@@ -914,13 +918,16 @@ Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray dat
         throw_socket_closed(env);
         return 0;
     } else {
-        int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
-        (*env)->GetByteArrayRegion(env, data, offset, result, buf);
-        result = SSL_write(ssl, (void*)(intptr_t)buf, result);
-        if (result > 0) {
-            return result;
+        if (count > MAX_STACK_BUF) count = MAX_STACK_BUF;
+        (*env)->GetByteArrayRegion(env, data, offset, count, buf);
+        while (1) {
+            int result = SSL_write(ssl, (void*)(intptr_t)buf, count);
+            if (result > 0) {
+                return result;
+            } else if ((result = check_ssl_error(env, ssl, result)) != SSL_ERROR_WANT_WRITE || errno != EINTR) {
+                return result == SSL_ERROR_WANT_READ ? -1 : 0;
+            }
         }
-        return check_ssl_error(env, ssl, result) == SSL_ERROR_WANT_READ ? -1 : 0;
     }
 }
 
@@ -933,9 +940,10 @@ Java_one_nio_net_NativeSslSocket_writeFully(JNIEnv* env, jobject self, jbyteArra
         throw_socket_closed(env);
     } else {
         while (count > 0) {
-            int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
-            (*env)->GetByteArrayRegion(env, data, offset, result, buf);
-            result = SSL_write(ssl, (void*)(intptr_t)buf, result);
+            int to_write = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
+            (*env)->GetByteArrayRegion(env, data, offset, to_write, buf);
+
+            int result = SSL_write(ssl, (void*)(intptr_t)buf, to_write);
             if (result > 0) {
                 offset += result;
                 count -= result;
@@ -953,11 +961,14 @@ Java_one_nio_net_NativeSslSocket_readRaw(JNIEnv* env, jobject self, jlong buf, j
         throw_socket_closed(env);
         return 0;
     } else {
-        int result = SSL_read(ssl, (void*)(intptr_t)buf, count);
-        if (result > 0) {
-            return result;
+        while (1) {
+            int result = SSL_read(ssl, (void*)(intptr_t)buf, count);
+            if (result > 0) {
+                return result;
+            } else if ((result = check_ssl_error(env, ssl, result)) != SSL_ERROR_WANT_READ || errno != EINTR) {
+                return result == SSL_ERROR_WANT_WRITE ? -1 : 0;
+            }
         }
-        return check_ssl_error(env, ssl, result) == SSL_ERROR_WANT_WRITE ? -1 : 0;
     }
 }
 
@@ -970,12 +981,15 @@ Java_one_nio_net_NativeSslSocket_read(JNIEnv* env, jobject self, jbyteArray data
         throw_socket_closed(env);
         return 0;
     } else {
-        int result = SSL_read(ssl, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF);
-        if (result > 0) {
-            (*env)->SetByteArrayRegion(env, data, offset, result, buf);
-            return result;
+        while (1) {
+            int result = SSL_read(ssl, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF);
+            if (result > 0) {
+                (*env)->SetByteArrayRegion(env, data, offset, result, buf);
+                return result;
+            } else if ((result = check_ssl_error(env, ssl, result)) != SSL_ERROR_WANT_READ || errno != EINTR) {
+                return result == SSL_ERROR_WANT_WRITE ? -1 : 0;
+            }
         }
-        return check_ssl_error(env, ssl, result) == SSL_ERROR_WANT_WRITE ? -1 : 0;
     }
 }
 

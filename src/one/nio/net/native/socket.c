@@ -42,6 +42,7 @@ static jfieldID f_address;
 static jmethodID m_createIPv4Address;
 static jmethodID m_createIPv6Address;
 static jmethodID m_createUnixAddress;
+static jthrowable t_SocketClosedException;
 static pthread_t* fd_table;
 
 // sys/un.h does not have it by either reason
@@ -178,6 +179,11 @@ static inline void wakeup_blocking_call(int fd) {
     }
 }
 
+// Avoid creating a new exception object and getting a stack trace on a fast path
+void throw_socket_closed_cached(JNIEnv* env) {
+    (*env)->Throw(env, t_SocketClosedException);
+}
+
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean preferIPv4) {
@@ -206,6 +212,11 @@ Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean pref
     m_createIPv4Address = (*env)->GetStaticMethodID(env, c_AddressHolder, "createIPv4Address", "(II)Ljava/net/InetSocketAddress;");
     m_createIPv6Address = (*env)->GetStaticMethodID(env, c_AddressHolder, "createIPv6Address", "(IIIII)Ljava/net/InetSocketAddress;");
     m_createUnixAddress = (*env)->GetStaticMethodID(env, c_AddressHolder, "createUnixAddress", "(Ljava/lang/String;)Ljava/net/InetSocketAddress;");
+
+    // Create a shared SocketClosedException for fast throw
+    jclass SocketClosedException = (*env)->FindClass(env, "one/nio/net/SocketClosedException");
+    jmethodID init = (*env)->GetMethodID(env, SocketClosedException, "<init>", "()V");
+    t_SocketClosedException = (*env)->NewGlobalRef(env, (*env)->NewObject(env, SocketClosedException, init));
 
     // Allocate table for thread pointer per file descriptor
     getrlimit(RLIMIT_NOFILE, &max_files);
@@ -306,14 +317,18 @@ Java_one_nio_net_NativeSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jin
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        int result = send(fd, (void*)(intptr_t)buf, count, flags | MSG_NOSIGNAL);
-        if (result > 0) {
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            int result = send(fd, (void*)(intptr_t)buf, count, flags | MSG_NOSIGNAL);
+            if (result > 0) {
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -326,16 +341,21 @@ Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, 
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
-        (*env)->GetByteArrayRegion(env, data, offset, result, buf);
-        result = send(fd, buf, result, flags | MSG_NOSIGNAL);
-        if (result > 0) {
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        if (count > MAX_STACK_BUF) count = MAX_STACK_BUF;
+        (*env)->GetByteArrayRegion(env, data, offset, count, buf);
+
+        do {
+            int result = send(fd, buf, count, flags | MSG_NOSIGNAL);
+            if (result > 0) {
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -349,14 +369,15 @@ Java_one_nio_net_NativeSocket_writeFully(JNIEnv* env, jobject self, jbyteArray d
         throw_socket_closed(env);
     } else {
         while (count > 0) {
-            int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
-            (*env)->GetByteArrayRegion(env, data, offset, result, buf);
-            result = send(fd, buf, result, MSG_NOSIGNAL);
+            int to_write = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
+            (*env)->GetByteArrayRegion(env, data, offset, to_write, buf);
+
+            int result = send(fd, buf, to_write, MSG_NOSIGNAL);
             if (result > 0) {
                 offset += result;
                 count -= result;
             } else if (result == 0) {
-                throw_socket_closed(env);
+                throw_socket_closed_cached(env);
                 break;
             } else if (is_io_exception(fd)) {
                 throw_io_exception(env);
@@ -372,14 +393,18 @@ Java_one_nio_net_NativeSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        int result = recv(fd, (void*)(intptr_t)buf, count, flags);
-        if (result > 0) {
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            int result = recv(fd, (void*)(intptr_t)buf, count, flags);
+            if (result > 0) {
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -392,15 +417,19 @@ Java_one_nio_net_NativeSocket_read(JNIEnv* env, jobject self, jbyteArray data, j
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        int result = recv(fd, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, flags);
-        if (result > 0) {
-            (*env)->SetByteArrayRegion(env, data, offset, result, buf);
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            int result = recv(fd, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, flags);
+            if (result > 0) {
+                (*env)->SetByteArrayRegion(env, data, offset, result, buf);
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -420,7 +449,7 @@ Java_one_nio_net_NativeSocket_readFully(JNIEnv* env, jobject self, jbyteArray da
                 offset += result;
                 count -= result;
             } else if (result == 0) {
-                throw_socket_closed(env);
+                throw_socket_closed_cached(env);
                 break;
             } else if (is_io_exception(fd)) {
                 throw_io_exception(env);
@@ -437,14 +466,18 @@ Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        jlong result = sendfile(fd, sourceFD, (off_t*)&offset, count);
-        if (result > 0) {
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            jlong result = sendfile(fd, sourceFD, (off_t*)&offset, count);
+            if (result > 0) {
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -458,20 +491,24 @@ Java_one_nio_net_NativeSocket_sendTo0(JNIEnv* env, jobject self, jbyteArray data
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        int result = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
-        (*env)->GetByteArrayRegion(env, data, offset, result, buf);
+        if (count > MAX_STACK_BUF) count = MAX_STACK_BUF;
+        (*env)->GetByteArrayRegion(env, data, offset, count, buf);
 
         struct sockaddr_storage sa;
         socklen_t len = sockaddr_from_java(env, address, port, &sa);
-        result = sendto(fd, (void*)(intptr_t)buf, result, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
 
-        if (result > 0) {
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            int result = sendto(fd, (void*)(intptr_t)buf, count, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
+            if (result > 0) {
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -485,15 +522,19 @@ Java_one_nio_net_NativeSocket_sendTo1(JNIEnv* env, jobject self, jlong buffer, j
     } else if (count != 0) {
         struct sockaddr_storage sa;
         socklen_t len = sockaddr_from_java(env, address, port, &sa);
-        int result = sendto(fd, (void*)(intptr_t)buffer, count, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
 
-        if (result > 0) {
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            int result = sendto(fd, (void*)(intptr_t)buffer, count, flags | MSG_NOSIGNAL, (struct sockaddr*)&sa, len);
+            if (result > 0) {
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -507,20 +548,24 @@ Java_one_nio_net_NativeSocket_recvFrom0(JNIEnv* env, jobject self, jbyteArray da
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        struct sockaddr_storage sa;
-        socklen_t len = sizeof(sa);
-        int result = recvfrom(fd, (void*)(intptr_t)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF,
-                              flags, (struct sockaddr*)&sa, &len);
+        do {
+            struct sockaddr_storage sa;
+            socklen_t len = sizeof(sa);
+            int result = recvfrom(fd, (void*)(intptr_t)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF,
+                                  flags, (struct sockaddr*)&sa, &len);
 
-        if (result > 0 || (result == 0 && is_udp_socket(fd))) {
-            (*env)->SetByteArrayRegion(env, data, offset, result, buf);
-            (*env)->SetObjectField(env, holder, f_address, sockaddr_to_java(env, &sa, len));
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+            if (result > 0 || (result == 0 && is_udp_socket(fd))) {
+                (*env)->SetByteArrayRegion(env, data, offset, result, buf);
+                (*env)->SetObjectField(env, holder, f_address, sockaddr_to_java(env, &sa, len));
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -532,18 +577,22 @@ Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer,
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        struct sockaddr_storage sa;
-        socklen_t len = sizeof(sa);
-        int result = recvfrom(fd, (void*)(intptr_t)buffer, count, flags, (struct sockaddr*)&sa, &len);
+        do {
+            struct sockaddr_storage sa;
+            socklen_t len = sizeof(sa);
+            int result = recvfrom(fd, (void*)(intptr_t)buffer, count, flags, (struct sockaddr*)&sa, &len);
 
-        if (result > 0 || (result == 0 && is_udp_socket(fd))) {
-            (*env)->SetObjectField(env, holder, f_address, sockaddr_to_java(env, &sa, len));
-            return result;
-        } else if (result == 0) {
-            throw_socket_closed(env);
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+            if (result > 0 || (result == 0 && is_udp_socket(fd))) {
+                (*env)->SetObjectField(env, holder, f_address, sockaddr_to_java(env, &sa, len));
+                return result;
+            } else if (result == 0) {
+                throw_socket_closed_cached(env);
+                break;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -591,13 +640,15 @@ Java_one_nio_net_NativeSocket_sendMsg0(JNIEnv* env, jobject self, jbyteArray dat
             msg.msg_controllen = CMSG_SPACE(cmsgLen * sizeof(jint));
         }
 
-        ssize_t result = sendmsg(fd, &msg, flags);
-
-        if (result >= 0) {
-            return result;
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+        do {
+            ssize_t result = sendmsg(fd, &msg, flags);
+            if (result >= 0) {
+                return result;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
@@ -635,28 +686,30 @@ Java_one_nio_net_NativeSocket_recvMsg0(JNIEnv* env, jobject self, jbyteArray dat
             msg.msg_controllen = sizeof(cmsg_buf);
         }
 
-        ssize_t result = recvmsg(fd, &msg, flags);
-
-        if (result >= 0) {
-            if (data != NULL) {
-                (*env)->SetByteArrayRegion(env, data, 0, result, data_buf);
-            }
-
-            struct cmsghdr* hdr = CMSG_FIRSTHDR(&msg);
-            if (jmsg != NULL && hdr != NULL && hdr->cmsg_level == SOL_SOCKET) {
-                jint cmsgLen = (hdr->cmsg_len - CMSG_LEN(0)) / sizeof(jint);
-                jintArray cmsgData = (*env)->NewIntArray(env, cmsgLen);
-                if (cmsgData != NULL) {
-                    (*env)->SetIntArrayRegion(env, cmsgData, 0, cmsgLen, cmsg_buf.data);
-                    (*env)->SetIntField(env, jmsg, f_cmsgType, hdr->cmsg_type);
-                    (*env)->SetObjectField(env, jmsg, f_cmsgData, cmsgData);
+        do {
+            ssize_t result = recvmsg(fd, &msg, flags);
+            if (result >= 0) {
+                if (data != NULL) {
+                    (*env)->SetByteArrayRegion(env, data, 0, result, data_buf);
                 }
-            }
 
-            return result;
-        } else if (is_io_exception(fd)) {
-            throw_io_exception(env);
-        }
+                struct cmsghdr* hdr = CMSG_FIRSTHDR(&msg);
+                if (jmsg != NULL && hdr != NULL && hdr->cmsg_level == SOL_SOCKET) {
+                    jint cmsgLen = (hdr->cmsg_len - CMSG_LEN(0)) / sizeof(jint);
+                    jintArray cmsgData = (*env)->NewIntArray(env, cmsgLen);
+                    if (cmsgData != NULL) {
+                        (*env)->SetIntArrayRegion(env, cmsgData, 0, cmsgLen, cmsg_buf.data);
+                        (*env)->SetIntField(env, jmsg, f_cmsgType, hdr->cmsg_type);
+                        (*env)->SetObjectField(env, jmsg, f_cmsgData, cmsgData);
+                    }
+                }
+
+                return result;
+            } else if (is_io_exception(fd)) {
+                throw_io_exception(env);
+                break;
+            }
+        } while (errno == EINTR);
     }
     return 0;
 }
