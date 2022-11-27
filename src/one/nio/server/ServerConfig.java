@@ -35,6 +35,7 @@ public class ServerConfig {
     public int keepAlive;
     public int threadPriority = Thread.NORM_PRIORITY;
     public SchedulingPolicy schedulingPolicy;
+    public boolean closeSessions;
 
     public ServerConfig() {
     }
@@ -58,6 +59,7 @@ public class ServerConfig {
         this.queueTime = conn.getIntParam("queueTime", 0) / 1000;
         this.threadPriority = conn.getIntParam("threadPriority", Thread.NORM_PRIORITY);
         this.schedulingPolicy = SchedulingPolicy.valueOf(conn.getStringParam("schedulingPolicy", "OTHER"));
+        this.closeSessions = conn.getBooleanParam("closeSessions", false);
     }
 
     // Do not use for new servers! Use ConfigParser instead

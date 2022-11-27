@@ -48,6 +48,7 @@ public class Server implements ServerMXBean {
     protected boolean useWorkers;
     protected final WorkerPool workers;
     protected final CleanupThread cleanup;
+    protected boolean closeSessions;
 
     public Server(ServerConfig config) throws IOException {
         List<AcceptorThread> acceptors = new ArrayList<>();
@@ -78,6 +79,8 @@ public class Server implements ServerMXBean {
                 config.threadPriority, config.schedulingPolicy);
 
         this.cleanup = new CleanupThread(selectors, config.keepAlive);
+
+        this.closeSessions = config.closeSessions;
 
         this.selectorStats = new SelectorStats();
         this.queueStats = new QueueStats();
@@ -142,6 +145,7 @@ public class Server implements ServerMXBean {
         }
 
         cleanup.update(this.selectors, config.keepAlive);
+        closeSessions = config.closeSessions;
     }
 
     public synchronized void start() {
@@ -175,6 +179,11 @@ public class Server implements ServerMXBean {
         }
 
         for (SelectorThread selector : selectors) {
+            if (closeSessions) {
+                for (Session session : selector.selector) {
+                    session.close();
+                }
+            }
             selector.shutdown();
         }
 
