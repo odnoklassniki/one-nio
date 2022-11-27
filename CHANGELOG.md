@@ -1,3 +1,13 @@
+1.6.0
+ * java.time serialization
+ * Arena Allocator
+ * PaddedRWLock to avoid false sharing
+ * Handle EINTR in socket read/write
+ * Enum serialization fixes
+ * Fixed global perf counters in presence of offline CPUs
+ * HttpClient should support responses without Content-Length / Transfer-Encoding
+ * Gracefully close sessions when stopping Server
+
 1.5.0
  * JDK 17 support. Workaround `setAccessible` restrictions
  * New BPF map types
