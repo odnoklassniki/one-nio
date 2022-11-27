@@ -51,8 +51,11 @@ Java_one_nio_os_bpf_Bpf_progLoad(JNIEnv* env, jclass cls, jstring pathname, jint
     if (bpf_prog_load == NULL) {
         void* libbpf = dlopen("libbpf.so", RTLD_LAZY | RTLD_GLOBAL);
         if (libbpf == NULL) {
-            throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so");
-            return -EINVAL;
+            libbpf = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
+            if (libbpf == NULL) {
+                throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so");
+                return -EINVAL;
+            }
         }
         bpf_prog_load = dlsym(libbpf, "bpf_prog_load");
         if (bpf_prog_load == NULL) {
