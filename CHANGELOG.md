@@ -1,3 +1,7 @@
+1.6.1
+ * openssl3 support
+ * BigDecimal deserialization
+
 1.6.0
  * java.time serialization
  * Arena Allocator
