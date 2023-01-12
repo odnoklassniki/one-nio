@@ -16,7 +16,6 @@
 
 package one.nio.serial;
 
-import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.StubGenerator;
@@ -55,7 +54,7 @@ public class GeneratedSerializer extends Serializer {
         this.defaultFields = new FieldDescriptor[0];
 
         checkFieldTypes();
-        this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
+        this.delegate = DelegateGenerator.instantiate(cls, fds, code());
     }
 
     @Override
@@ -93,7 +92,7 @@ public class GeneratedSerializer extends Serializer {
         this.defaultFields = assignDefaultFields(ownFields);
 
         checkFieldTypes();
-        this.delegate = BytecodeGenerator.INSTANCE.instantiate(code(), Delegate.class);
+        this.delegate = DelegateGenerator.instantiate(cls, fds, code());
     }
 
     @Override

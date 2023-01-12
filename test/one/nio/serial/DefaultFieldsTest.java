@@ -16,7 +16,6 @@
 
 package one.nio.serial;
 
-import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import org.junit.Test;
@@ -24,7 +23,6 @@ import org.junit.Test;
 import java.io.Serializable;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Field;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -63,9 +61,8 @@ public class DefaultFieldsTest implements Serializable {
         for (int i = 0; i < ownFields.length; i++) {
             defaultFields[i] = new FieldDescriptor(ownFields[i], null, i);
         }
-        byte[] code = DelegateGenerator.generate(DefaultFieldsTest.class, new FieldDescriptor[0], defaultFields);
 
-        Delegate delegate = BytecodeGenerator.INSTANCE.instantiate(code, Delegate.class);
+        Delegate delegate = DelegateGenerator.instantiate(DefaultFieldsTest.class, new FieldDescriptor[0], defaultFields);
         DefaultFieldsTest obj = (DefaultFieldsTest) delegate.read(new DataStream(0));
 
         assertEquals("abc", obj.s);

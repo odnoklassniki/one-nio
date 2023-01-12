@@ -31,8 +31,7 @@ public class NullObjectInputStream extends ObjectInputStream {
         }
     }
 
-    private NullObjectInputStream() throws IOException {
-        // Singleton
+    protected NullObjectInputStream() throws IOException {
     }
 
     @Override

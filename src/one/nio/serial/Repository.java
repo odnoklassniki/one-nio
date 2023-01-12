@@ -28,6 +28,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.*;
 import java.nio.file.Files;
@@ -62,6 +63,7 @@ public class Repository {
     public static final int INLINE = 4;
     public static final int FIELD_SERIALIZATION = 8;
     public static final int SYNTHETIC_FIELDS = 16;
+    public static final int PROVIDE_GET_FIELD = 32;
 
     public static final int ARRAY_STUBS      = 1;
     public static final int COLLECTION_STUBS = 2;
@@ -150,6 +152,7 @@ public class Repository {
         setOptions(StringBuilder.class, SKIP_CUSTOM_SERIALIZATION);
         setOptions(StringBuffer.class, SKIP_CUSTOM_SERIALIZATION);
         setOptions(BigInteger.class, SKIP_CUSTOM_SERIALIZATION);
+        setOptions(BigDecimal.class, PROVIDE_GET_FIELD);
 
         // At some moment InetAddress fields were moved to an auxilary holder class.
         // This resolves backward compatibility problem by inlining holder fields during serialization.

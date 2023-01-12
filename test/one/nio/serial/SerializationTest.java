@@ -287,6 +287,26 @@ public class SerializationTest {
     }
 
     @Test
+    public void testBigInteger() throws IOException, ClassNotFoundException {
+        checkSerialize(new BigInteger("12345678901234567890"));
+        checkSerialize(new BigInteger(-1, new byte[]{11, 22, 33, 44, 55, 66, 77, 88, 99}));
+    }
+
+    @Test
+    public void testBigDecimal() throws IOException, ClassNotFoundException {
+        checkSerialize(new BigDecimal("999.999999999"));
+        checkSerialize(new BigDecimal(999.999999999));
+        checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
+        checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
+        checkSerialize(new BigDecimal("12.3E+7"));
+        checkSerialize(Arrays.asList(
+                new BigDecimal("88888888888888888.88888888888888888888888"), 
+                new BigDecimal("1"), 
+                new BigDecimal(1),
+                new BigDecimal(0)));
+    }
+
+    @Test
     public void testInetAddress() throws IOException, ClassNotFoundException {
         checkSerialize(InetAddress.getByName("123.45.67.89"));
         checkSerialize(InetAddress.getByName("localhost"));
@@ -296,14 +316,6 @@ public class SerializationTest {
         checkSerialize(new InetSocketAddress(21));
         checkSerialize(new InetSocketAddress(InetAddress.getByAddress(new byte[]{8, 8, 8, 8}), 53));
         checkSerialize(new InetSocketAddress("google.com", 443));
-    }
-
-    @Test
-    public void testBigDecimal() throws IOException, ClassNotFoundException {
-        checkSerialize(new BigInteger("12345678901234567890"));
-        checkSerialize(new BigInteger(-1, new byte[]{11, 22, 33, 44, 55, 66, 77, 88, 99}));
-        checkSerialize(new BigDecimal(999.999999999));
-        checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
     }
 
     @Test

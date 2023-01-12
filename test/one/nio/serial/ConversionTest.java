@@ -16,7 +16,6 @@
 
 package one.nio.serial;
 
-import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import org.junit.Test;
@@ -32,12 +31,10 @@ public class ConversionTest implements Serializable {
 
     @Test
     public void testFieldConversion() throws Exception {
-        byte[] code = DelegateGenerator.generate(ConversionTest.class, new FieldDescriptor[]{
+        Delegate delegate = DelegateGenerator.instantiate(ConversionTest.class, new FieldDescriptor[]{
                 fd("intField", BigInteger.class),
                 fd("longField", BigInteger.class)
         }, new FieldDescriptor[0]);
-
-        Delegate delegate = BytecodeGenerator.INSTANCE.instantiate(code, Delegate.class);
 
         byte[] data = new byte[100];
         delegate.write(new ConversionTest(), new DataStream(data));
