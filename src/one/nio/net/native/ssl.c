@@ -449,7 +449,8 @@ static jbyteArray X509_cert_to_jbyteArray(JNIEnv* env, X509* cert) {
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
-    if (dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
+    if (dlopen("libssl.so.3", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
+        dlopen("libssl.so", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
         dlopen("libssl.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL) == NULL &&
         dlopen("libssl.so.10", RTLD_LAZY | RTLD_GLOBAL) == NULL) {
         throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libssl.so");
