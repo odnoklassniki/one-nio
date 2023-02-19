@@ -48,7 +48,7 @@ class LongSerializer extends Serializer<Long> {
 
     @Override
     public void toJson(Long obj, StringBuilder builder) {
-        builder.append(obj.longValue());
+        Json.appendLong(builder, obj);
     }
 
     @Override

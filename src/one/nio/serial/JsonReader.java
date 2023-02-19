@@ -74,10 +74,22 @@ public class JsonReader {
     }
 
     public final boolean readBoolean() throws IOException {
+        boolean readBooleanAsString = false;
+        if (next == '\"')
+        {
+            readBooleanAsString = true;
+            read();
+        }
         int b = read();
         if (b == 't' && read() == 'r' && read() == 'u' && read() == 'e') {
+            if (readBooleanAsString) {
+                expect('\"', "Unexpected end of string");
+            }
             return true;
         } else if (b == 'f' && read() == 'a' && read() == 'l' && read() == 's' && read() == 'e') {
+            if (readBooleanAsString) {
+                expect('\"', "Unexpected end of string");
+            }
             return false;
         }
         throw exception("Expected boolean");
@@ -113,6 +125,13 @@ public class JsonReader {
 
     public final String readNumber() throws IOException {
         StringBuilder sb = new StringBuilder();
+
+        boolean readNumberAsString = false;
+        if (next == '"')
+        {
+            readNumberAsString = true;
+            read();
+        }
 
         // Sign
         if (next == '-') {
@@ -150,6 +169,10 @@ public class JsonReader {
             } while (next >= '0' && next <= '9');
         }
 
+        if (readNumberAsString)
+        {
+            expect('\"', "Unexpected end of string");
+        }
         return sb.toString();
     }
 
@@ -158,9 +181,9 @@ public class JsonReader {
         if (b >= '0' && b <= '9') {
             return b - '0';
         } else if (b >= 'A' && b <= 'F') {
-            return b - 'A';
+            return b - 'A' + 10;
         } else if (b >= 'a' && b <= 'f') {
-            return b - 'a';
+            return b - 'a' + 10;
         }
         throw exception("Invalid escape character");
     }
@@ -193,23 +216,44 @@ public class JsonReader {
     }
 
     public String readString() throws IOException {
-        StringBuilder sb = new StringBuilder();
-        expect('\"', "Expected string");
-        while (next >= 0 && next != '\"') {
-            int b = read();
-            if ((b & 0x80) == 0) {
-                sb.append(b == '\\' ? readEscapeChar() : (char) b);
-            } else if ((b & 0xe0) == 0xc0) {
-                sb.append((char) ((b & 0x1f) << 6 | (read() & 0x3f)));
-            } else if ((b & 0xf0) == 0xe0) {
-                sb.append((char) ((b & 0x0f) << 12 | (read() & 0x3f) << 6 | (read() & 0x3f)));
-            } else {
-                int v = (b & 0x07) << 18 | (read() & 0x3f) << 12 | (read() & 0x3f) << 6 | (read() & 0x3f);
-                sb.append((char) (0xd800 | (v - 0x10000) >>> 10)).append((char) (0xdc00 | (v & 0x3ff)));
-            }
+        switch (next) {
+            case '\"':
+                read();
+                StringBuilder sb = new StringBuilder();
+                while (next >= 0 && next != '\"') {
+                    int b = read();
+                    if ((b & 0x80) == 0) {
+                        sb.append(b == '\\' ? readEscapeChar() : (char) b);
+                    } else if ((b & 0xe0) == 0xc0) {
+                        sb.append((char) ((b & 0x1f) << 6 | (read() & 0x3f)));
+                    } else if ((b & 0xf0) == 0xe0) {
+                        sb.append((char) ((b & 0x0f) << 12 | (read() & 0x3f) << 6 | (read() & 0x3f)));
+                    } else {
+                        int v = (b & 0x07) << 18 | (read() & 0x3f) << 12 | (read() & 0x3f) << 6 | (read() & 0x3f);
+                        sb.append((char) (0xd800 | (v - 0x10000) >>> 10)).append((char) (0xdc00 | (v & 0x3ff)));
+                    }
+                }
+                expect('\"', "Unexpected end of string");
+                return sb.toString();
+            case 'f':
+            case 't':
+                return Boolean.toString(readBoolean());
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case '-':
+            case '.':
+                return readNumber();
+            default:
+                throw exception("Unexpected start of string");
         }
-        expect('\"', "Unexpected end of string");
-        return sb.toString();
     }
 
     public byte[] readBinary() throws IOException {

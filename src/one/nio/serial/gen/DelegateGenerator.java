@@ -17,6 +17,7 @@
 package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
+import one.nio.serial.Before;
 import one.nio.serial.Default;
 import one.nio.serial.FieldDescriptor;
 import one.nio.serial.JsonName;
@@ -38,6 +39,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -401,6 +403,10 @@ public class DelegateGenerator extends BytecodeGenerator {
                     mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendChar", "(Ljava/lang/StringBuilder;C)V", false);
                     mv.visitVarInsn(ALOAD, 2);
                     break;
+                case Long:
+                    mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendLong", "(Ljava/lang/StringBuilder;J)V", false);
+                    mv.visitVarInsn(ALOAD, 2);
+                    break;
                 default:
                     mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", srcType.appendSignature(), false);
             }
@@ -432,6 +438,19 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         // Create instance
         mv.visitTypeInsn(NEW, Type.getInternalName(cls));
+
+        // support for calling constructor annotated with @Before
+        for (Class searchClass = cls; searchClass != null; searchClass = searchClass.getSuperclass()) {
+            Constructor constructor = JavaInternals.findConstructor(searchClass);
+            if (constructor != null && constructor.getAnnotation(Before.class) != null) {
+                if (searchClass != cls) {
+                    throw new IllegalArgumentException("To avoid unexpected behavior it is required to add @Before to no-arg constructor in " + cls + " because parent class does the same.");
+                }
+                mv.visitInsn(DUP);
+                mv.visitMethodInsn(INVOKESPECIAL,Type.getInternalName(cls) , "<init>", "()V", false);
+                break;
+            }
+        }
 
         // Prepare a multimap (fieldHash -> fds) for lookupswitch
         TreeMap<Integer, FieldDescriptor> fieldHashes = new TreeMap<>();
