@@ -16,6 +16,8 @@
 
 package one.nio.serial;
 
+import one.nio.util.DateParser;
+
 import java.io.IOException;
 import java.util.Date;
 
@@ -54,7 +56,24 @@ class DateSerializer extends Serializer<Date> {
 
     @Override
     public Date fromJson(JsonReader in) throws IOException {
-        return new Date(in.readLong());
+        String numberOrParsableText = in.readString();
+        numberOrParsableText = numberOrParsableText.trim();
+        if (numberOrParsableText.length() == 0) {
+            return null;
+        }
+        char ch0 = numberOrParsableText.charAt(0);
+        boolean isNumber = ch0 == '-' || (ch0 >= '0' && ch0 <= '9');
+        for (int i = 1; i < numberOrParsableText.length() && isNumber; i++) {
+            char ch1 = numberOrParsableText.charAt(i);
+            if (ch1 < '0' || ch1 > '9') {
+                isNumber = false;
+            }
+        }
+        if (isNumber) {
+            return new Date(Long.parseLong(numberOrParsableText));
+        } else {
+            return new Date(DateParser.parse(numberOrParsableText));
+        }
     }
 
     @Override
