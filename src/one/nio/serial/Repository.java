@@ -372,14 +372,13 @@ public class Repository {
                     serializer = new CollectionSerializer(cls);
                 } else if (Map.class.isAssignableFrom(cls) && !hasOptions(cls, FIELD_SERIALIZATION)) {
                     serializer = new MapSerializer(cls);
-                } else if (Serializable.class.isAssignableFrom(cls)) {
-                    if (cls.getName().startsWith("java.time.") && JavaInternals.findMethod(cls, "writeReplace") != null) {
+                } else {
+                    boolean extendsSerializable = Serializable.class.isAssignableFrom(cls);
+                    if (extendsSerializable && cls.getName().startsWith("java.time.") && JavaInternals.findMethod(cls, "writeReplace") != null) {
                         serializer = new JavaTimeSerializer(cls);
                     } else {
-                        serializer = new GeneratedSerializer(cls);
+                        serializer = new GeneratedSerializer(cls, !extendsSerializable);
                     }
-                } else {
-                    serializer = new InvalidSerializer(cls);
                 }
                 serializer.generateUid();
             } catch (Throwable e) {

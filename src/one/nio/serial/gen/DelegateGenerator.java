@@ -115,10 +115,10 @@ public class DelegateGenerator extends BytecodeGenerator {
     }
     
     public static Delegate instantiate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
-        return instantiate(cls, fds, generate(cls, fds, defaultFields));
+        return instantiate(cls, fds, generate(cls, fds, defaultFields, false));
     }
 
-    public static byte[] generate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
+    public static byte[] generate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, boolean jsonOnly) {
         String className = "sun/reflect/Delegate" + index.getAndIncrement() + '_' + cls.getSimpleName();
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -126,10 +126,19 @@ public class DelegateGenerator extends BytecodeGenerator {
                 new String[]{"one/nio/serial/gen/Delegate"});
 
         generateConstructor(cv, className);
-        generateCalcSize(cv, cls, fds);
-        generateWrite(cv, cls, fds);
-        generateRead(cv, cls, fds, defaultFields, className);
-        generateSkip(cv, fds);
+
+        if (!jsonOnly) {
+            generateCalcSize(cv, cls, fds);
+            generateWrite(cv, cls, fds);
+            generateRead(cv, cls, fds, defaultFields, className);
+            generateSkip(cv, fds);
+        } else {
+            generateThrowCalcSize(cv, cls);
+            generateThrowWrite(cv, cls);
+            generateThrowRead(cv, cls);
+            generateThrowSkip(cv, cls);
+        }
+
         generateToJson(cv, cls, fds);
         generateFromJson(cv, cls, fds, defaultFields, className);
 
@@ -360,6 +369,30 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    private static void generateThrowNonSerializableMethod(ClassWriter cv, String methodName, String descriptor, Class cls) {
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, methodName, descriptor,
+                null, new String[]{"java/io/NotSerializableException"});
+        mv.visitCode();
+        emitThrow(mv, "java/io/NotSerializableException", cls.getName());
+        mv.visitEnd();
+    }
+
+    private static void generateThrowCalcSize(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V", cls);
+    }
+
+    private static void generateThrowWrite(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V", cls);
+    }
+
+    private static void generateThrowRead(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "read", "(Lone/nio/serial/DataStream;)Ljava/lang/Object;", cls);
+    }
+
+    private static void generateThrowSkip(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "skip", "(Lone/nio/serial/DataStream;)V", cls);
     }
 
     private static void generateToJson(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {

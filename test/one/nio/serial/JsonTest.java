@@ -20,12 +20,11 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 
-public class JsonTest implements Serializable {
+public class JsonTest {
 
     private long lng = Long.MIN_VALUE;
     private Object map = new HashMap<String, String>() {{
@@ -54,7 +53,7 @@ public class JsonTest implements Serializable {
         Assert.assertNull(Json.fromJson("{\"date\":\" \"}", TestObject.class).date);
     }
 
-    public static class TestObject implements Serializable {
+    public static class TestObject {
         @JsonName("test_name")
         public String name;
         public Date date;
