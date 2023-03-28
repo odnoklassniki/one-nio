@@ -84,7 +84,7 @@ public class Json {
     }
 
     public static boolean isJsSafeInteger(long value) {
-        return value >= JS_MIN_SAFE_INTEGER && JS_MAX_SAFE_INTEGER >= value;
+        return JS_MIN_SAFE_INTEGER <= value && value <= JS_MAX_SAFE_INTEGER;
     }
 
     @SuppressWarnings("unchecked")
