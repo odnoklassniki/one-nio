@@ -480,7 +480,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                     throw new IllegalArgumentException("To avoid unexpected behavior it is required to add @Before to no-arg constructor in " + cls + " because parent class does the same.");
                 }
                 mv.visitInsn(DUP);
-                mv.visitMethodInsn(INVOKESPECIAL,Type.getInternalName(cls) , "<init>", "()V", false);
+                mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "<init>", "()V", false);
                 break;
             }
         }
