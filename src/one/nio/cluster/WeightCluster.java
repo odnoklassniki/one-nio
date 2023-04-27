@@ -16,8 +16,8 @@
 
 package one.nio.cluster;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,9 +27,11 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ThreadLocalRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
-    protected static final Log log = LogFactory.getLog(WeightCluster.class);
+    private static final Logger log = LoggerFactory.getLogger(WeightCluster.class);
 
     protected final HashMap<T, Integer> providers = new HashMap<>();
     protected Timer monitorTimer;
@@ -65,7 +67,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
     @Override
     public void enableProvider(T provider) {
         if (provider.enable()) {
-            log.info("Enabled " + provider);
+            log.info("Enabled {}", provider);
             rebuildProviderSelector();
         }
     }
@@ -73,7 +75,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
     @Override
     public void disableProvider(T provider) {
         if (provider.disable()) {
-            log.info("Disabled " + provider);
+            log.info("Disabled {}", provider);
             rebuildProviderSelector();
             monitorTimer.schedule(new MonitoringTask(provider), monitorTimeout, monitorTimeout);
         }
@@ -181,7 +183,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
                     cancel();
                 }
             } catch (Throwable e) {
-                log.warn(provider + " is not available because of " + e);
+                log.warn("{} is not available", provider);
             }
         }
     }

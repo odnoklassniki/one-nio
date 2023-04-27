@@ -21,8 +21,8 @@ import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.mgt.Management;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.LongAdder;
 
 public class Server implements ServerMXBean {
-    private static final Log log = LogFactory.getLog(Server.class);
+    private static final Logger log = LoggerFactory.getLogger(Server.class);
 
     private final LongAdder requestsProcessed = new LongAdder();
     private final LongAdder requestsRejected = new LongAdder();
@@ -107,7 +107,7 @@ public class Server implements ServerMXBean {
                 AcceptorThread oldAcceptor = oldAcceptors[i];
                 if (oldAcceptor != null && oldAcceptor.port == ac.port && oldAcceptor.address.equals(ac.address)) {
                     if (++threads <= ac.threads) {
-                        log.info("Reconfiguring acceptor: " + oldAcceptor.getName());
+                        log.info("Reconfiguring acceptor: {}", oldAcceptor.getName());
                         oldAcceptor.reconfigure(ac);
                         oldAcceptors[i] = null;
                         newAcceptors.add(oldAcceptor);
@@ -117,7 +117,7 @@ public class Server implements ServerMXBean {
 
             for (; threads < ac.threads; threads++) {
                 AcceptorThread newAcceptor = new AcceptorThread(this, ac, threads);
-                log.info("New acceptor: " + newAcceptor.getName());
+                log.info("New acceptor: {}", newAcceptor.getName());
                 newAcceptor.start();
                 newAcceptors.add(newAcceptor);
             }
@@ -125,7 +125,7 @@ public class Server implements ServerMXBean {
 
         for (AcceptorThread oldAcceptor : oldAcceptors) {
             if (oldAcceptor != null) {
-                log.info("Stopping acceptor: " + oldAcceptor.getName());
+                log.info("Stopping acceptor: {}", oldAcceptor.getName());
                 oldAcceptor.shutdown();
             }
         }

@@ -17,8 +17,9 @@
 package one.nio.os.systemd;
 
 import one.nio.net.Socket;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,7 +31,7 @@ import java.nio.charset.StandardCharsets;
  * @see <a href="https://www.freedesktop.org/software/systemd/man/sd_notify.html">man:sd_notify(3)</a>
  */
 public class SystemdNotify {
-    private static final Log log = LogFactory.getLog(SystemdNotify.class);
+    private static final Logger log = LoggerFactory.getLogger(SystemdNotify.class);
 
     public static final String NOTIFY_SOCKET_ENV   = "NOTIFY_SOCKET";
     public static final String READY               = "READY=1";
@@ -55,9 +56,7 @@ public class SystemdNotify {
         }
 
         try (Socket socket = Socket.createUnixSocket(Socket.SOCK_DGRAM)) {
-            if (log.isDebugEnabled()) {
-                log.debug(String.format("send '%s' to notify socket '%s'", state, notifySocket));
-            }
+            log.debug("send '{}' to notify socket '{}'", state, notifySocket);
             ByteBuffer buffer = ByteBuffer.wrap(state.getBytes(StandardCharsets.UTF_8));
             socket.send(buffer, 0, notifySocket, Socket.NO_PORT);
         }

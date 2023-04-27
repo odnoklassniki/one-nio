@@ -16,8 +16,8 @@
 
 package one.nio.mgt;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.Attribute;
 import javax.management.AttributeList;
@@ -31,7 +31,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class Management {
-    private static final Log log = LogFactory.getLog(Management.class);
+    private static final Logger log = LoggerFactory.getLogger(Management.class);
 
     static {
         try {
@@ -39,7 +39,7 @@ public class Management {
             // HotspotRuntimeMBean, getHotspotMemoryMBean etc.
             ManagementFactory.getPlatformMBeanServer().createMBean("sun.management.HotspotInternal", null);
         } catch (Exception e) {
-            log.warn("Cannot register HotspotInternal: " + e);
+            log.warn("Cannot register HotspotInternal", e);
         }
     }
 
@@ -58,7 +58,7 @@ public class Management {
             }
             beanServer.registerMBean(mb, objectName);
         } catch (Exception e) {
-            log.error("Cannot register MXBean " + name, e);
+            log.error("Cannot register MXBean {}", name, e);
         }
     }
 
@@ -70,7 +70,7 @@ public class Management {
                 beanServer.unregisterMBean(objectName);
             }
         } catch (Exception e) {
-            log.error("Cannot unregister MXBean " + name, e);
+            log.error("Cannot unregister MXBean {}", name, e);
         }
     }
 

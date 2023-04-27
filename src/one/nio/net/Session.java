@@ -16,8 +16,8 @@
 
 package one.nio.net;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLException;
 import java.io.Closeable;
@@ -27,7 +27,7 @@ import java.net.SocketException;
 import java.nio.channels.SelectionKey;
 
 public class Session implements Closeable {
-    protected static final Log log = LogFactory.getLog(Session.class);
+    private static final Logger log = LoggerFactory.getLogger(Session.class);
 
     public static final int READABLE   = SelectionKey.OP_READ;
     public static final int WRITEABLE  = SelectionKey.OP_WRITE;
@@ -228,11 +228,11 @@ public class Session implements Closeable {
 
     public void handleException(Throwable e) {
         if (e instanceof SocketException) {
-            if (log.isDebugEnabled()) log.debug("Connection closed: " + getRemoteHost());
+            if (log.isDebugEnabled()) log.debug("Connection closed: {}", getRemoteHost());
         } else if (e instanceof SSLException) {
-            if (log.isDebugEnabled()) log.debug("SSL/TLS failure: " + getRemoteHost());
+            if (log.isDebugEnabled()) log.debug("SSL/TLS failure: {}", getRemoteHost());
         } else {
-            log.error("Cannot process session from " + getRemoteHost(), e);
+            log.error("Cannot process session from {}", getRemoteHost(), e);
         }
         close();
     }
