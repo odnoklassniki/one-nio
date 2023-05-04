@@ -96,7 +96,7 @@ public class CleanupThread extends BatchThread {
                     }
                 }
 
-                if (log.isInfoEnabled() && idleCount + staleCount > 0) {
+                if (idleCount + staleCount > 0) {
                     log.info("{} idle + {} stale sessions closed in {} ms",
                         idleCount, staleCount, System.currentTimeMillis() - cleanTime
                     );

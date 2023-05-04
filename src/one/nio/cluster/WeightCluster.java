@@ -27,11 +27,9 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ThreadLocalRandom;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
-    private static final Logger log = LoggerFactory.getLogger(WeightCluster.class);
+    protected static final Logger log = LoggerFactory.getLogger(WeightCluster.class);
 
     protected final HashMap<T, Integer> providers = new HashMap<>();
     protected Timer monitorTimer;
@@ -183,7 +181,7 @@ public class WeightCluster<T extends ServiceProvider> implements Cluster<T> {
                     cancel();
                 }
             } catch (Throwable e) {
-                log.warn("{} is not available", provider);
+                log.warn("{} is not available", provider, e);
             }
         }
     }

@@ -27,7 +27,7 @@ import java.net.SocketException;
 import java.nio.channels.SelectionKey;
 
 public class Session implements Closeable {
-    private static final Logger log = LoggerFactory.getLogger(Session.class);
+    protected static final Logger log = LoggerFactory.getLogger(Session.class);
 
     public static final int READABLE   = SelectionKey.OP_READ;
     public static final int WRITEABLE  = SelectionKey.OP_WRITE;
@@ -232,7 +232,7 @@ public class Session implements Closeable {
         } else if (e instanceof SSLException) {
             if (log.isDebugEnabled()) log.debug("SSL/TLS failure: {}", getRemoteHost());
         } else {
-            log.error("Cannot process session from {}", getRemoteHost(), e);
+            if (log.isErrorEnabled()) log.error("Cannot process session from {}", getRemoteHost(), e);
         }
         close();
     }

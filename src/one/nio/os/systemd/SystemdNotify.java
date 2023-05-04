@@ -49,9 +49,7 @@ public class SystemdNotify {
     public static void notify(String state) throws IOException {
         String notifySocket = System.getenv(NOTIFY_SOCKET_ENV);
         if (notifySocket == null) {
-            if (log.isDebugEnabled()) {
-                log.debug(NOTIFY_SOCKET_ENV + " environment variable is not defined");
-            }
+            log.debug(NOTIFY_SOCKET_ENV + " environment variable is not defined");
             return;
         }
 

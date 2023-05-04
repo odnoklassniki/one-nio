@@ -33,7 +33,7 @@ public class Cpus {
     public static final BitSet PRESENT = cpus("/sys/devices/system/cpu/present");
     public static final BitSet POSSIBLE = cpus("/sys/devices/system/cpu/possible");
     public static final int COUNT = POSSIBLE.cardinality();
-    
+
     private static BitSet cpus(String rangeFile) {
         try {
             byte[] bytes = Files.readAllBytes(Paths.get(rangeFile));
@@ -47,9 +47,7 @@ public class Cpus {
             }
             return cpus;
         } catch (IOException e) {
-            if (log.isDebugEnabled()) {
-                log.debug("Failed to read {}", rangeFile, e);
-            }
+            log.debug("Failed to read {}", rangeFile, e);
             BitSet cpus = new BitSet();
             cpus.set(0, Runtime.getRuntime().availableProcessors());
             return cpus;
