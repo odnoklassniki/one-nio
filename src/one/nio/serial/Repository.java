@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.nio.file.StandardOpenOption.*;
 
 public class Repository {
-    private static final Logger log = LoggerFactory.getLogger(Repository.class);
+    public static final Logger log = LoggerFactory.getLogger(Repository.class);
 
     static final byte[][] classLocks = new byte[64][0];
     static final ConcurrentHashMap<Class, Serializer> classMap = new ConcurrentHashMap<>(128);

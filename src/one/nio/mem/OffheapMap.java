@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
-    private static final Logger log = LoggerFactory.getLogger(OffheapMap.class);
+    protected static final Logger log = LoggerFactory.getLogger(OffheapMap.class);
     protected static final Unsafe unsafe = JavaInternals.unsafe;
     protected static final long byteArrayOffset = JavaInternals.byteArrayOffset;
     protected static final long MB = 1024 * 1024;
