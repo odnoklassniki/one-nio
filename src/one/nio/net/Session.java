@@ -232,7 +232,7 @@ public class Session implements Closeable {
         } else if (e instanceof SSLException) {
             if (log.isDebugEnabled()) log.debug("SSL/TLS failure: {}", getRemoteHost());
         } else {
-            if (log.isErrorEnabled()) log.error("Cannot process session from {}", getRemoteHost(), e);
+            log.error("Cannot process session from {}", getRemoteHost(), e);
         }
         close();
     }
