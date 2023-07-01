@@ -20,13 +20,12 @@ import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.net.SslContext;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class AcceptorThread extends Thread {
-    private static final Log log = LogFactory.getLog(AcceptorThread.class);
+    private static final Logger log = LoggerFactory.getLogger(AcceptorThread.class);
 
     final String address;
     final int port;
@@ -100,7 +99,7 @@ final class AcceptorThread extends Thread {
         try {
             serverSocket.listen(backlog);
         } catch (IOException e) {
-            log.error("Cannot start listening at " + port, e);
+            log.error("Cannot start listening at {}", port, e);
             return;
         } finally {
             server.startSync.countDown();
@@ -115,7 +114,7 @@ final class AcceptorThread extends Thread {
                 acceptedSessions++;
             } catch (RejectedSessionException e) {
                 if (log.isDebugEnabled()) {
-                    log.debug("Rejected session from " + socket.getRemoteAddress(), e);
+                    log.debug("Rejected session from {}", socket.getRemoteAddress(), e);
                 }
                 rejectedSessions++;
                 socket.close();

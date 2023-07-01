@@ -24,8 +24,9 @@ import one.nio.net.SslContext;
 import one.nio.pool.PoolException;
 import one.nio.pool.SocketPool;
 import one.nio.util.Utf8;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -34,7 +35,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class HttpClient extends SocketPool {
-    protected static final Log log = LogFactory.getLog(HttpClient.class);
+    private static final Logger log = LoggerFactory.getLogger(HttpClient.class);
 
     protected String[] permanentHeaders;
     protected int bufferSize;
@@ -232,9 +233,7 @@ public class HttpClient extends SocketPool {
                     } else if ("close".equalsIgnoreCase(response.getHeader("Connection:"))) {
                         response.setBody(readBodyUntilClose());
                     } else {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Content-Length unspecified: " + response.toString());
-                        }
+                        log.debug("Content-Length unspecified: {}", response);
                         throw new HttpException("Content-Length unspecified");
                     }
                 }

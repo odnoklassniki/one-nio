@@ -16,8 +16,8 @@
 
 package one.nio.net;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.channels.CancelledKeyException;
@@ -30,7 +30,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 final class JavaSelector extends Selector {
-    private static final Log log = LogFactory.getLog(JavaSelector.class);
+    private static final Logger log = LoggerFactory.getLogger(JavaSelector.class);
 
     private final java.nio.channels.Selector impl;
     private final ConcurrentLinkedQueue<Session> pendingSessions;

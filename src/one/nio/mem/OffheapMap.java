@@ -23,8 +23,9 @@ import one.nio.os.BatchThread;
 import one.nio.util.JavaInternals;
 import one.nio.util.QuickSelect;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import sun.misc.Unsafe;
 
 import java.util.Arrays;
@@ -34,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
-    protected static final Log log = LogFactory.getLog(OffheapMap.class);
+    protected static final Logger log = LoggerFactory.getLogger(OffheapMap.class);
     protected static final Unsafe unsafe = JavaInternals.unsafe;
     protected static final long byteArrayOffset = JavaInternals.byteArrayOffset;
     protected static final long MB = 1024 * 1024;
@@ -376,7 +377,7 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
         for (int i = 0; i < CONCURRENCY_LEVEL; i++) {
             RWLock lock = locks[i];
             if (!lock.lockWrite(lockWaitTime)) {
-                log.debug("Could not lock segment " + i + " for cleanup");
+                log.debug("Could not lock segment {} for cleanup", i);
                 continue;
             }
 
@@ -720,12 +721,12 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
                     long elapsed = System.currentTimeMillis() - startTime;
 
                     if (expired != 0) {
-                        log.info(getName() + " cleaned " + expired + " entries in " + elapsed + " ms");
+                        log.info("{} cleaned {} entries in {} ms", getName(), expired, elapsed);
                     }
                 } catch (InterruptedException e) {
                     break;
                 } catch (Throwable e) {
-                    log.error("Exception in " + getName(), e);
+                    log.error("Exception in {}", getName(), e);
                 }
             }
         }
@@ -764,8 +765,9 @@ public abstract class OffheapMap<K, V> implements OffheapMapMXBean {
             int k = entriesToClean < count ? (int) ((long) samples * entriesToClean / count) : 0;
             long expirationAge = System.currentTimeMillis() - QuickSelect.select(timestamps, k, 0, samples - 1);
 
-            log.info(getName() + " needs to clean " + entriesToClean + " entries. Samples collected = "
-                    + samples + ", age = " + expirationAge);
+            log.info("{} needs to clean {} entries. Samples collected = {}, age = {}", getName(), entriesToClean,
+                samples, expirationAge
+            );
             if (log.isDebugEnabled()) {
                 log.debug(Arrays.toString(timestamps));
             }

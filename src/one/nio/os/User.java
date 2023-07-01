@@ -16,8 +16,8 @@
 
 package one.nio.os;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public final class User {
-    private static final Log log = LogFactory.getLog(NativeLibrary.class);
+    private static final Logger log = LoggerFactory.getLogger(NativeLibrary.class);
 
     public static final boolean IS_SUPPORTED = NativeLibrary.IS_SUPPORTED;
 
@@ -104,7 +104,7 @@ public final class User {
                 }
             }
         } catch (IOException e) {
-            log.warn("Cannot read " + file, e);
+            log.warn("Cannot read {}", file, e);
         }
         return null;
     }
