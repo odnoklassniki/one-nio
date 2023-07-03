@@ -174,7 +174,7 @@ public class MappedFile implements Closeable {
             map0 = JavaInternals.getMethod(
                 cls, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class);
             if (map0 != null) {
-                return (long) map0.invoke(f.getChannel(), f.getFD(), mode, start, size, false);
+                return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
             }
             throw new IllegalStateException("map0 method not found");
         } catch (InvocationTargetException e) {
