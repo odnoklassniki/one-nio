@@ -16,6 +16,7 @@
 
 package one.nio.mem;
 
+import java.lang.reflect.Constructor;
 import one.nio.os.Mem;
 import one.nio.serial.DataStream;
 import one.nio.util.JavaInternals;
@@ -160,22 +161,72 @@ public class MappedFile implements Closeable {
         }
 
         try {
-            Class<?> cls = Class.forName("sun.nio.ch.FileChannelImpl");
-            Method map0 = JavaInternals.getMethod(cls, "map0", int.class, long.class, long.class);
-            if (map0 != null) {
-                return (long) map0.invoke(f.getChannel(), mode, start, size);
+            Class<?> fileChannelImplClass = JavaInternals.getClass("sun.nio.ch.FileChannelImpl");
+            if (fileChannelImplClass != null) {
+                Method map0 = JavaInternals.getMethod(
+                    fileChannelImplClass, "map0", int.class, long.class, long.class
+                );
+                if (map0 != null) {
+                    return (long) map0.invoke(f.getChannel(), mode, start, size);
+                }
+                // Newer JDK has an extra 'sync' argument
+                map0 = JavaInternals.getMethod(
+                    fileChannelImplClass, "map0", int.class, long.class, long.class, boolean.class
+                );
+                if (map0 != null) {
+                    return (long) map0.invoke(f.getChannel(), mode, start, size, false);
+                }
+                // Since 19 JDK has an extra 'file descriptor' argument
+                map0 = JavaInternals.getMethod(
+                    fileChannelImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
+                );
+                if (map0 != null) {
+                    return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
+                }
             }
-            // Newer JDK has an extra 'sync' argument
-            map0 = JavaInternals.getMethod(cls, "map0", int.class, long.class, long.class, boolean.class);
-            if (map0 != null) {
-                return (long) map0.invoke(f.getChannel(), mode, start, size, false);
+            // Even newer JDKs (since 20) have the `map0` method moved into the new `FileDispatcherImpl` class as `map`
+            // In reality, the `static native long map0` method is still available via `UnixFileDispatcherImpl`
+            // so it is also probed as an alternative (we don't now which one will get removed earlier /shrug)
+            // See https://github.com/openjdk/jdk/commit/48cc15602b62e81bb179ca9570a1e7d8bbf4d6df
+            Class<?> fileDispatcherImplClass = JavaInternals.getClass("sun.nio.ch.FileDispatcherImpl");
+            if (fileDispatcherImplClass != null) {
+                Method map0 = JavaInternals.getMethod(fileDispatcherImplClass,
+                    "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
+                );
+                if (map0 != null) {
+                    Constructor<?> fileDispatcherImplConstructor = JavaInternals.getConstructor(fileDispatcherImplClass);
+                    if (fileDispatcherImplConstructor != null) {
+                        Object fileDispatcherImpl = fileDispatcherImplConstructor.newInstance();
+                        return (long) map0.invoke(
+                            fileDispatcherImpl,
+                            f.getFD(), f.getChannel(), mode, start, size, false
+                        );
+                    }
+                }
             }
-            // Since 19 JDK has an extra 'file descriptor' argument
-            map0 = JavaInternals.getMethod(
-                cls, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class);
-            if (map0 != null) {
-                return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
+            Class<?> unixFileDispatcherImplClass = JavaInternals.getClass("sun.nio.ch.UnixFileDispatcherImpl");
+            if (unixFileDispatcherImplClass != null) {
+                Method map0 = JavaInternals.getMethod(
+                    unixFileDispatcherImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
+                );
+                if (map0 != null) {
+                    return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
+                }
+                // we also probe the non-static `map` method on this class...
+                map0 = JavaInternals.getMethod(
+                    unixFileDispatcherImplClass, "map", FileDescriptor.class, int.class, long.class, long.class, boolean.class
+                );
+                if (map0 != null) {
+                    Constructor<?> unixFileDispatcherImplConstructor = JavaInternals.getConstructor(unixFileDispatcherImplClass);
+                    if (unixFileDispatcherImplConstructor != null) {
+                        Object unixFileDispatcherImplObject = unixFileDispatcherImplConstructor.newInstance();
+                        return (long) map0.invoke(unixFileDispatcherImplObject,
+                            f.getFD(), f.getChannel(), mode, start, size, false
+                        );
+                    }
+                }
             }
+
             throw new IllegalStateException("map0 method not found");
         } catch (InvocationTargetException e) {
             Throwable target = e.getTargetException();

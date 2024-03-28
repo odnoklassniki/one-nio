@@ -63,6 +63,14 @@ public final class JavaInternals {
         return 0;
     }
 
+    public static Class<?> getClass(String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+    }
+
     public static Field getField(Class<?> cls, String name) {
         Field f = findField(cls, name);
         if (f != null) setAccessible(f);
