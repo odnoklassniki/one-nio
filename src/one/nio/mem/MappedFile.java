@@ -190,14 +190,14 @@ public class MappedFile implements Closeable {
             // See https://github.com/openjdk/jdk/commit/48cc15602b62e81bb179ca9570a1e7d8bbf4d6df
             Class<?> fileDispatcherImplClass = JavaInternals.getClass("sun.nio.ch.FileDispatcherImpl");
             if (fileDispatcherImplClass != null) {
-                Method map0 = JavaInternals.getMethod(fileDispatcherImplClass,
-                    "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
+                Method map = JavaInternals.getMethod(fileDispatcherImplClass,
+                    "map", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
-                if (map0 != null) {
+                if (map != null) {
                     Constructor<?> fileDispatcherImplConstructor = JavaInternals.getConstructor(fileDispatcherImplClass);
                     if (fileDispatcherImplConstructor != null) {
                         Object fileDispatcherImpl = fileDispatcherImplConstructor.newInstance();
-                        return (long) map0.invoke(
+                        return (long) map.invoke(
                             fileDispatcherImpl,
                             f.getFD(), f.getChannel(), mode, start, size, false
                         );
