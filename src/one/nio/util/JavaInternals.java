@@ -109,6 +109,12 @@ public final class JavaInternals {
         return m;
     }
 
+    public static Method getMethodRecursively(Class<?> cls, String name, Class<?>... params) {
+        Method m = findMethodRecursively(cls, name, params);
+        if (m != null) setAccessible(m);
+        return m;
+    }
+
     public static Method findMethod(Class<?> cls, String name, Class<?>... params) {
         try {
             return cls.getDeclaredMethod(name, params);

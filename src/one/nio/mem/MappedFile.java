@@ -184,20 +184,20 @@ public class MappedFile implements Closeable {
                     return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
                 }
             }
-            // Even newer JDKs (since 20) have the `map0` method moved into the new `FileDispatcherImpl` class as `map`
+            // JDKs since 20 have the `map0` method moved into the new `FileDispatcherImpl` class as `map`
             // In reality, the `static native long map0` method is still available via `UnixFileDispatcherImpl`
-            // so it is also probed as an alternative (we don't now which one will get removed earlier /shrug)
+            // so it is also probed as an alternative (we don't know which one will get removed earlier /shrug)
             // See https://github.com/openjdk/jdk/commit/48cc15602b62e81bb179ca9570a1e7d8bbf4d6df
             Class<?> fileDispatcherImplClass = JavaInternals.getClass("sun.nio.ch.FileDispatcherImpl");
             if (fileDispatcherImplClass != null) {
-                Method map = JavaInternals.getMethod(fileDispatcherImplClass,
+                Method map0 = JavaInternals.getMethodRecursively(fileDispatcherImplClass,
                     "map", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
-                if (map != null) {
+                if (map0 != null) {
                     Constructor<?> fileDispatcherImplConstructor = JavaInternals.getConstructor(fileDispatcherImplClass);
                     if (fileDispatcherImplConstructor != null) {
                         Object fileDispatcherImpl = fileDispatcherImplConstructor.newInstance();
-                        return (long) map.invoke(
+                        return (long) map0.invoke(
                             fileDispatcherImpl,
                             f.getFD(), f.getChannel(), mode, start, size, false
                         );
@@ -213,7 +213,7 @@ public class MappedFile implements Closeable {
                     return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
                 }
                 // we also probe the non-static `map` method on this class...
-                map0 = JavaInternals.getMethod(
+                map0 = JavaInternals.getMethodRecursively(
                     unixFileDispatcherImplClass, "map", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
                 if (map0 != null) {
@@ -244,12 +244,53 @@ public class MappedFile implements Closeable {
         }
 
         try {
-            Class<?> cls = Class.forName("sun.nio.ch.FileChannelImpl");
-            Method unmap0 = JavaInternals.getMethod(cls, "unmap0", long.class, long.class);
-            if (unmap0 == null) {
-                throw new IllegalStateException("unmap0 method not found");
+            Class<?> fileChannelImplClass = JavaInternals.getClass("sun.nio.ch.FileChannelImpl");
+            if (fileChannelImplClass != null) {
+                Method unmap0 = JavaInternals.getMethod(fileChannelImplClass, "unmap0", long.class, long.class);
+                if (unmap0 != null) {
+                    unmap0.invoke(null, start, size);
+                    return;
+                }
             }
-            unmap0.invoke(null, start, size);
+
+            // JDKs since 20 have the `unmap0` method moved into the new `FileDispatcherImpl` class as `unmap`
+            // In reality, the `static native long unmap0` method is still available via `UnixFileDispatcherImpl`
+            // so it is also probed as an alternative (we don't know which one will get removed earlier /shrug)
+            // See https://github.com/openjdk/jdk/commit/48cc15602b62e81bb179ca9570a1e7d8bbf4d6df
+            Class<?> fileDispatcherImplClass = JavaInternals.getClass("sun.nio.ch.FileDispatcherImpl");
+            if (fileDispatcherImplClass != null) {
+                Method unmap0 = JavaInternals.getMethodRecursively(fileDispatcherImplClass, "unmap", long.class, long.class);
+                if (unmap0 != null) {
+                    Constructor<?> fileDispatcherImplConstructor = JavaInternals.getConstructor(fileDispatcherImplClass);
+                    if (fileDispatcherImplConstructor != null) {
+                        Object fileDispatcherImpl = fileDispatcherImplConstructor.newInstance();
+                        unmap0.invoke(fileDispatcherImpl, start, size);
+                        return;
+                    }
+                }
+            }
+            Class<?> unixFileDispatcherImplClass = JavaInternals.getClass("sun.nio.ch.UnixFileDispatcherImpl");
+            if (unixFileDispatcherImplClass != null) {
+                Method unmap0 = JavaInternals.getMethod(
+                    unixFileDispatcherImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
+                );
+                if (unmap0 != null) {
+                    unmap0.invoke(start, size);
+                    return;
+                }
+                // we also probe the non-static `map` method on this class...
+                unmap0 = JavaInternals.getMethodRecursively(unixFileDispatcherImplClass, "unmap", long.class, long.class);
+                if (unmap0 != null) {
+                    Constructor<?> unixFileDispatcherImplConstructor = JavaInternals.getConstructor(unixFileDispatcherImplClass);
+                    if (unixFileDispatcherImplConstructor != null) {
+                        Object unixFileDispatcherImplObject = unixFileDispatcherImplConstructor.newInstance();
+                        unmap0.invoke(unixFileDispatcherImplObject,start, size);
+                        return;
+                    }
+                }
+            }
+
+            throw new IllegalStateException("unmap0 method not found");
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
         }
