@@ -210,7 +210,7 @@ public class MappedFile implements Closeable {
                     unixFileDispatcherImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
                 if (map0 != null) {
-                    return (long) map0.invoke(f.getFD(), mode, start, size, false);
+                    return (long) map0.invoke(null, f.getFD(), mode, start, size, false);
                 }
                 // we also probe the non-static `map` method on this class...
                 map0 = JavaInternals.getMethodRecursively(
@@ -275,7 +275,7 @@ public class MappedFile implements Closeable {
                     unixFileDispatcherImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
                 if (unmap0 != null) {
-                    unmap0.invoke(start, size);
+                    unmap0.invoke(null, start, size);
                     return;
                 }
                 // we also probe the non-static `map` method on this class...
@@ -284,7 +284,7 @@ public class MappedFile implements Closeable {
                     Constructor<?> unixFileDispatcherImplConstructor = JavaInternals.getConstructor(unixFileDispatcherImplClass);
                     if (unixFileDispatcherImplConstructor != null) {
                         Object unixFileDispatcherImplObject = unixFileDispatcherImplConstructor.newInstance();
-                        unmap0.invoke(unixFileDispatcherImplObject,start, size);
+                        unmap0.invoke(unixFileDispatcherImplObject, start, size);
                         return;
                     }
                 }
