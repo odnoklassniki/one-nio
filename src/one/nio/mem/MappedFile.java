@@ -181,7 +181,7 @@ public class MappedFile implements Closeable {
                     fileChannelImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
                 if (map0 != null) {
-                    return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
+                    return (long) map0.invoke(f.getChannel(), f.getFD(), mode, start, size, false);
                 }
             }
             // JDKs since 20 have the `map0` method moved into the new `FileDispatcherImpl` class as `map`
@@ -199,7 +199,7 @@ public class MappedFile implements Closeable {
                         Object fileDispatcherImpl = fileDispatcherImplConstructor.newInstance();
                         return (long) map0.invoke(
                             fileDispatcherImpl,
-                            f.getFD(), f.getChannel(), mode, start, size, false
+                            f.getFD(), mode, start, size, false
                         );
                     }
                 }
@@ -210,7 +210,7 @@ public class MappedFile implements Closeable {
                     unixFileDispatcherImplClass, "map0", FileDescriptor.class, int.class, long.class, long.class, boolean.class
                 );
                 if (map0 != null) {
-                    return (long) map0.invoke(f.getFD(), f.getChannel(), mode, start, size, false);
+                    return (long) map0.invoke(f.getFD(), mode, start, size, false);
                 }
                 // we also probe the non-static `map` method on this class...
                 map0 = JavaInternals.getMethodRecursively(
@@ -221,7 +221,7 @@ public class MappedFile implements Closeable {
                     if (unixFileDispatcherImplConstructor != null) {
                         Object unixFileDispatcherImplObject = unixFileDispatcherImplConstructor.newInstance();
                         return (long) map0.invoke(unixFileDispatcherImplObject,
-                            f.getFD(), f.getChannel(), mode, start, size, false
+                            f.getFD(), mode, start, size, false
                         );
                     }
                 }
