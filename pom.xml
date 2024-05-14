@@ -4,7 +4,7 @@
     <groupId>ru.odnoklassniki</groupId>
     <artifactId>one-nio</artifactId>
     <packaging>jar</packaging>
-    <version>1.7.1</version>
+    <version>1.7.2</version>
     <name>one-nio</name>
     <url>https://github.com/odnoklassniki/one-nio</url>
     <description>Unconventional Java I/O library</description>
@@ -150,6 +150,9 @@
                         <goals>
                             <goal>sign</goal>
                         </goals>
+                        <configuration>
+                            <keyname>${gpg.keyname}</keyname>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
