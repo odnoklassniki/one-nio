@@ -33,28 +33,48 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Available params for configure:
- * <p>
+ Available HTTP params for configure directly in ConnectionString url:
+
  * keepalive            | default true
+
  * bufferSize           | default 8000
+
  * timeout              | default 3000
+
  * readTimeout          | default 3000
+
  * connectTimeout       | default 1000
+
  * fifo                 | default false
+
  * jmx                  | default false
+
  * clientMinPoolSize    | default 0
+
  * clientMaxPoolSize    | default 5000
+
  * schedulingPolicy     | default OTHER     | @see SchedulingPolicy
+
  * tos                  | default 0         | @see Socket Type of Service
+
  * recvBuf              | default 0
+
  * sendBuf              | default 0
+
  * backlog              | default 128
+
  * selectors            | default 0
+
  * minWorkers           | default 0
+
  * maxWorkers           | default 0
+
  * queueTime            | default 0
+
  * closeSessions        | default false
+
  * threadPriority       | default Thread.NORM_PRIORITY
+
  * proxy
  */
 public class ConnectionString {

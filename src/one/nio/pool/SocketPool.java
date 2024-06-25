@@ -33,7 +33,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
 
     public SocketPool(ConnectionString conn) {
         super(conn.getIntParam("clientMinPoolSize", 0) > 0 ? 1 : 0,
-              conn.getIntParam("clientMaxPoolSize", 5000),
+              conn.getIntParam("clientMaxPoolSize", 10),
               conn.getIntParam("timeout", 3000));
 
         this.host = conn.getHost();
