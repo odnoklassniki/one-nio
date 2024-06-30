@@ -33,49 +33,29 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- Available HTTP params for configure directly in ConnectionString url:
-
- * keepalive            | default true
-
- * bufferSize           | default 8000
-
- * timeout              | default 3000
-
- * readTimeout          | default 3000
-
- * connectTimeout       | default 1000
-
- * fifo                 | default false
-
- * jmx                  | default false
-
- * clientMinPoolSize    | default 0
-
- * clientMaxPoolSize    | default 5000
-
- * schedulingPolicy     | default OTHER     | @see SchedulingPolicy
-
- * tos                  | default 0         | @see Socket Type of Service
-
- * recvBuf              | default 0
-
- * sendBuf              | default 0
-
- * backlog              | default 128
-
- * selectors            | default 0
-
- * minWorkers           | default 0
-
- * maxWorkers           | default 0
-
- * queueTime            | default 0
-
- * closeSessions        | default false
-
- * threadPriority       | default Thread.NORM_PRIORITY
-
- * proxy
+ * Available HTTP params for configure directly in ConnectionString url:
+ * <ul>
+ * <li>keepalive            {@code true}</li>
+ * <li>bufferSize           {@code 8000}</li>
+ * <li>timeout              {@code 3000}</li>
+ * <li>readTimeout          {@code 3000}</li>
+ * <li>connectTimeout       {@code 1000}</li>
+ * <li>fifo                 {@code false}</li>
+ * <li>jmx                  {@code false}</li>
+ * <li>clientMinPoolSize    {@code 0}</li>
+ * <li>clientMaxPoolSize    {@code 5000}</li>
+ * <li>schedulingPolicy     {@code OTHER}</li>
+ * <li>tos                  {@code 0}</li>
+ * <li>recvBuf              {@code 0}</li>
+ * <li>sendBuf              {@code 0}</li>
+ * <li>backlog              {@code 128}</li>
+ * <li>selectors            {@code 0}</li>
+ * <li>minWorkers           {@code 0}</li>
+ * <li>maxWorkers           {@code 0}</li>
+ * <li>queueTime            {@code 0}</li>
+ * <li>closeSessions        {@code false}</li>
+ * <li>threadPriority       {@code Thread.NORM_PRIORITY}</li>
+ * </ul>
  */
 public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
