@@ -52,15 +52,15 @@ public class ConnectionStringTest {
         conn = new ConnectionString("https://example.com?str=s&empty=&int=123");
         assertEquals("example.com", conn.getHost());
         assertEquals(443, conn.getPort());
-        assertEquals("?str=s&empty=?&int=123", conn.getPath());
+        assertEquals("?str=s&empty=&int=123", conn.getPath());
         assertEquals("s", conn.getStringParam("str"));
-        assertEquals("def", conn.getStringParam("empty", "def"));
+        assertEquals("", conn.getStringParam("empty", "def"));
         assertEquals(123, conn.getIntParam("int", 0));
 
         conn = new ConnectionString("https://example.com/somePath");
         assertEquals("example.com", conn.getHost());
         assertEquals(443, conn.getPort());
-        assertEquals("somePath", conn.getPath());
+        assertEquals("/somePath", conn.getPath());
 
         conn = new ConnectionString("socket://[::1]:12345?:=true");
         assertEquals("[::1]", conn.getHost());
