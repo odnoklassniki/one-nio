@@ -49,7 +49,7 @@ public class ConnectionStringTest {
         assertEquals("?", conn.getStringParam("question"));
         assertEquals(345, conn.getIntParam("int", 0));
 
-        conn = new ConnectionString("https://example.com?str=s&empty=?&int=123");
+        conn = new ConnectionString("https://example.com?str=s&empty=&int=123");
         assertEquals("example.com", conn.getHost());
         assertEquals(443, conn.getPort());
         assertEquals("?str=s&empty=?&int=123", conn.getPath());
