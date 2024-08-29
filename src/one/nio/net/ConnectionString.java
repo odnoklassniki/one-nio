@@ -32,6 +32,31 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Available HTTP params for configure directly in ConnectionString url:
+ * <ul>
+ * <li>keepalive            {@code true}</li>
+ * <li>bufferSize           {@code 8000}</li>
+ * <li>timeout              {@code 3000}</li>
+ * <li>readTimeout          {@code 3000}</li>
+ * <li>connectTimeout       {@code 1000}</li>
+ * <li>fifo                 {@code false}</li>
+ * <li>jmx                  {@code false}</li>
+ * <li>clientMinPoolSize    {@code 0}</li>
+ * <li>clientMaxPoolSize    {@code 5000}</li>
+ * <li>schedulingPolicy     {@code OTHER}</li>
+ * <li>tos                  {@code 0}</li>
+ * <li>recvBuf              {@code 0}</li>
+ * <li>sendBuf              {@code 0}</li>
+ * <li>backlog              {@code 128}</li>
+ * <li>selectors            {@code 0}</li>
+ * <li>minWorkers           {@code 0}</li>
+ * <li>maxWorkers           {@code 0}</li>
+ * <li>queueTime            {@code 0}</li>
+ * <li>closeSessions        {@code false}</li>
+ * <li>threadPriority       {@code Thread.NORM_PRIORITY}</li>
+ * </ul>
+ */
 public class ConnectionString {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
     private static final Map<String, Integer> WELL_KNOWN_PORTS = new HashMap<>();
