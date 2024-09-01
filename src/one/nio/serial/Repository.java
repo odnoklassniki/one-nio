@@ -21,8 +21,8 @@ import one.nio.mgt.Management;
 import one.nio.util.Base64;
 import one.nio.util.JavaInternals;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.nio.file.StandardOpenOption.*;
 
 public class Repository {
-    public static final Log log = LogFactory.getLog(Repository.class);
+    public static final Logger log = LoggerFactory.getLogger(Repository.class);
 
     static final byte[][] classLocks = new byte[64][0];
     static final ConcurrentHashMap<Class, Serializer> classMap = new ConcurrentHashMap<>(128);
@@ -339,7 +339,7 @@ public class Repository {
             }
 
             if (cls.isAnonymousClass()) {
-                log.warn("Trying to serialize anonymous class: " + cls.getName());
+                log.warn("Trying to serialize anonymous class: {}", cls.getName());
                 anonymousClasses.incrementAndGet();
             }
 
@@ -383,7 +383,7 @@ public class Repository {
                 }
                 serializer.generateUid();
             } catch (Throwable e) {
-                log.error("Failed to generate serialized for " + cls.getName());
+                log.error("Failed to generate serialized for {}", cls.getName());
                 throw e;
             }
 

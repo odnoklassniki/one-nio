@@ -16,8 +16,8 @@
 
 package one.nio.mgt;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.JMException;
 import java.io.OutputStream;
@@ -25,7 +25,7 @@ import java.io.PrintStream;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ThreadDumper {
-    private static final Log log = LogFactory.getLog(ThreadDumper.class);
+    private static final Logger log = LoggerFactory.getLogger(ThreadDumper.class);
     private static final AtomicLong dumpTime = new AtomicLong();
 
     public static void dump(OutputStream out) {
@@ -33,7 +33,7 @@ public class ThreadDumper {
         try {
             threadDump = DiagnosticCommand.execute("threadPrint");
         } catch (JMException e) {
-            log.warn("Failed to get threads dump: " + e);
+            log.warn("Failed to get threads dump", e);
             return;
         }
 

@@ -76,7 +76,7 @@ public class DeserializeStream extends DataStream {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         context = null;
     }
 

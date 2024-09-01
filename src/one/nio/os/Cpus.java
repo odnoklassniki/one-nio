@@ -18,8 +18,8 @@ package one.nio.os;
 
 import one.nio.util.Utf8;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,13 +27,13 @@ import java.nio.file.Paths;
 import java.util.BitSet;
 
 public class Cpus {
-    private static final Log log = LogFactory.getLog(Cpus.class);
+    private static final Logger log = LoggerFactory.getLogger(Cpus.class);
 
     public static final BitSet ONLINE = cpus("/sys/devices/system/cpu/online");
     public static final BitSet PRESENT = cpus("/sys/devices/system/cpu/present");
     public static final BitSet POSSIBLE = cpus("/sys/devices/system/cpu/possible");
     public static final int COUNT = POSSIBLE.cardinality();
-    
+
     private static BitSet cpus(String rangeFile) {
         try {
             byte[] bytes = Files.readAllBytes(Paths.get(rangeFile));
@@ -47,9 +47,7 @@ public class Cpus {
             }
             return cpus;
         } catch (IOException e) {
-            if (log.isDebugEnabled()) {
-                log.debug("Failed to read " + rangeFile, e);
-            }
+            log.debug("Failed to read {}", rangeFile, e);
             BitSet cpus = new BitSet();
             cpus.set(0, Runtime.getRuntime().availableProcessors());
             return cpus;

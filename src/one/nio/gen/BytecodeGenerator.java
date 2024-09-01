@@ -16,13 +16,9 @@
 
 package one.nio.gen;
 
-import one.nio.mgt.Management;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandleInfo;
@@ -34,11 +30,15 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static java.nio.file.StandardOpenOption.*;
+import one.nio.mgt.Management;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorMXBean, Opcodes {
-    private static final Log log = LogFactory.getLog(BytecodeGenerator.class);
+    private static final Logger log = LoggerFactory.getLogger(BytecodeGenerator.class);
 
     public static final BytecodeGenerator INSTANCE = new BytecodeGenerator();
 
@@ -92,7 +92,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         try {
             Files.write(Paths.get(dumpPath, className + ".class"), classData, WRITE, CREATE, TRUNCATE_EXISTING);
         } catch (IOException e) {
-            log.error("Could not dump " + className, e);
+            log.error("Could not dump {}", className, e);
         }
     }
 

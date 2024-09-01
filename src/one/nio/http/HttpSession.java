@@ -84,14 +84,10 @@ public class HttpSession extends Session {
             }
             fragmentLength = length;
         } catch (HttpException e) {
-            if (log.isDebugEnabled()) {
-                log.debug("Bad request", e);
-            }
+            log.debug("Bad request", e);
             sendError(Response.BAD_REQUEST, e.getMessage());
         } catch (BufferOverflowException e) {
-            if (log.isDebugEnabled()) {
-                log.debug("Request entity too large", e);
-            }
+            log.debug("Request entity too large", e);
             sendError(Response.REQUEST_ENTITY_TOO_LARGE, "");
         }
     }

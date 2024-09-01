@@ -18,11 +18,12 @@ package one.nio.server;
 
 import one.nio.net.Session;
 import one.nio.os.BatchThread;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CleanupThread extends BatchThread {
-    private static final Log log = LogFactory.getLog(CleanupThread.class);
+    private static final Logger log = LoggerFactory.getLogger(CleanupThread.class);
 
     private volatile SelectorThread[] selectors;
     private volatile long keepAlive;
@@ -95,9 +96,10 @@ public class CleanupThread extends BatchThread {
                     }
                 }
 
-                if (log.isInfoEnabled() && idleCount + staleCount > 0) {
-                    log.info(idleCount + " idle + " + staleCount + " stale sessions closed in " +
-                            (System.currentTimeMillis() - cleanTime) + " ms");
+                if (idleCount + staleCount > 0) {
+                    log.info("{} idle + {} stale sessions closed in {} ms",
+                        idleCount, staleCount, System.currentTimeMillis() - cleanTime
+                    );
                 }
             } catch (InterruptedException e) {
                 break;

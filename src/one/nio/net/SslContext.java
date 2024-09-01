@@ -19,8 +19,9 @@ package one.nio.net;
 import one.nio.os.NativeLibrary;
 import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLException;
 import java.io.File;
@@ -34,7 +35,7 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class SslContext {
-    private static final Log log = LogFactory.getLog(SslContext.class);
+    private static final Logger log = LoggerFactory.getLogger(SslContext.class);
 
     public static final int VERIFY_NONE = 0;               // client cert is not verified
     public static final int VERIFY_PEER = 1;               // client cert is verified, if provided
@@ -197,14 +198,14 @@ public abstract class SslContext {
             setPrivateKey(privateKeyFile);
         }
 
-        log.info("Certificates updated: " + new Date(maxLastModified));
+        log.info("Certificates updated: {}", new Date(maxLastModified));
         lastCertUpdate = maxLastModified;
     }
 
     void updateTicketKeys(String ticketDir, boolean force) throws IOException {
         File[] files = new File(ticketDir).listFiles();
         if (files == null || files.length == 0) {
-            log.warn("No ticket keys found in " + ticketDir);
+            log.warn("No ticket keys found in {}", ticketDir);
             return;
         }
 
@@ -224,7 +225,7 @@ public abstract class SslContext {
             }
             setTicketKeys(builder.trim());
 
-            log.info("Ticket keys updated: " + new Date(lastModified) + ", key count = " + files.length);
+            log.info("Ticket keys updated: {}, key count = {}", new Date(lastModified), files.length);
             lastTicketsUpdate = lastModified;
         }
     }
@@ -234,7 +235,7 @@ public abstract class SslContext {
         if (force || lastModified > lastOCSPUpdate) {
             setOCSP(Files.readAllBytes(Paths.get(ocspFile)));
 
-            log.info("OCSP updated: " + new Date(lastModified));
+            log.info("OCSP updated: {}", new Date(lastModified));
             lastOCSPUpdate = lastModified;
         }
     }

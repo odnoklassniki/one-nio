@@ -66,9 +66,7 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
     }
 
     public Response invoke(Request request) throws ServiceUnavailableException {
-        if (log.isTraceEnabled()) {
-            log.trace(request.toString());
-        }
+        log.trace("{}", request);
 
         final int retries = this.retries;
         for (int i = 0; i < retries; i++) {
@@ -83,9 +81,9 @@ public class HttpCluster extends WeightCluster<HttpProvider> {
                 }
                 if ((e instanceof SocketTimeoutException || e.getCause() instanceof SocketTimeoutException)
                         && !(log.isTraceEnabled() || logTimeouts)) {
-                    log.debug(provider + " timed out");
+                    log.debug("{} timed out", provider);
                 } else {
-                    log.warn(provider + " invocation failed " + request.getURI(), e);
+                    log.warn("{} invocation failed {}", provider, request.getURI(), e);
                 }
             }
         }

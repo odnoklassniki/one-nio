@@ -1,3 +1,7 @@
+1.7.0
+ * Switch to slf4j-api for logging (#74)
+ * Support new FileChannelImpl.map0() contract from JDK 19 (#75)
+
 1.6.1
  * openssl3 support
  * BigDecimal deserialization

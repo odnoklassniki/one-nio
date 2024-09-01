@@ -63,6 +63,14 @@ public final class JavaInternals {
         return 0;
     }
 
+    public static Class<?> getClass(String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+    }
+
     public static Field getField(Class<?> cls, String name) {
         Field f = findField(cls, name);
         if (f != null) setAccessible(f);
@@ -97,6 +105,12 @@ public final class JavaInternals {
 
     public static Method getMethod(Class<?> cls, String name, Class<?>... params) {
         Method m = findMethod(cls, name, params);
+        if (m != null) setAccessible(m);
+        return m;
+    }
+
+    public static Method getMethodRecursively(Class<?> cls, String name, Class<?>... params) {
+        Method m = findMethodRecursively(cls, name, params);
         if (m != null) setAccessible(m);
         return m;
     }

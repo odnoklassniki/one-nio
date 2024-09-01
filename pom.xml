@@ -4,7 +4,7 @@
     <groupId>ru.odnoklassniki</groupId>
     <artifactId>one-nio</artifactId>
     <packaging>jar</packaging>
-    <version>1.6.1</version>
+    <version>1.7.3</version>
     <name>one-nio</name>
     <url>https://github.com/odnoklassniki/one-nio</url>
     <description>Unconventional Java I/O library</description>
@@ -12,7 +12,7 @@
     <licenses>
         <license>
             <name>Apache License Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -41,28 +41,9 @@
             <version>9.2</version>
         </dependency>
         <dependency>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-            <version>1.2</version>
-        </dependency>
-        <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-            <version>1.2.17</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>javax.jms</groupId>
-                    <artifactId>jms</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jdmk</groupId>
-                    <artifactId>jmxtools</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jmx</groupId>
-                    <artifactId>jmxri</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.36</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -169,6 +150,9 @@
                         <goals>
                             <goal>sign</goal>
                         </goals>
+                        <configuration>
+                            <keyname>${gpg.keyname}</keyname>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
