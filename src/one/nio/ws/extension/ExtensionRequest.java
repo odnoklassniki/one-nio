@@ -16,6 +16,7 @@
 
 package one.nio.ws.extension;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,6 +41,6 @@ public class ExtensionRequest {
     }
 
     public Map<String, String> getParameters() {
-        return parameters;
+        return Collections.unmodifiableMap(parameters);
     }
 }

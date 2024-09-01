@@ -18,8 +18,7 @@ package one.nio.ws.message;
 
 import one.nio.ws.frame.Opcode;
 
-import static one.nio.util.JavaInternals.byteArrayOffset;
-import static one.nio.util.JavaInternals.unsafe;
+import one.nio.util.JavaInternals;
 
 /**
  * @author <a href="mailto:vadim.yelisseyev@gmail.com">Vadim Yelisseyev</a>
@@ -42,7 +41,7 @@ public class CloseMessage extends Message<Short> {
     public static final short TLS_HANDSHAKE_FAILURE = 1015;
 
     public CloseMessage(byte[] payload) {
-        this(payload.length == 0 ? null : Short.reverseBytes(unsafe.getShort(payload, byteArrayOffset)));
+        this(payload.length == 0 ? null : Short.reverseBytes(JavaInternals.unsafe.getShort(payload, JavaInternals.byteArrayOffset)));
     }
 
     public CloseMessage(Short code) {

@@ -112,16 +112,24 @@ public class WebSocketSession extends HttpSession {
     }
 
     protected void handleMessage(WebSocketSession session, Message<?> message) throws IOException {
-        if (message instanceof PingMessage) {
-            server.handleMessage(session, (PingMessage) message);
-        } else if (message instanceof PongMessage) {
-            server.handleMessage(session, (PongMessage) message);
-        } else if (message instanceof TextMessage) {
-            server.handleMessage(session, (TextMessage) message);
-        } else if (message instanceof BinaryMessage) {
-            server.handleMessage(session, (BinaryMessage) message);
-        } else if (message instanceof CloseMessage) {
-            server.handleMessage(session, (CloseMessage) message);
+        switch (message.opcode()) {
+            case PING:
+                server.handleMessage(session, (PingMessage) message);
+                break;
+            case PONG:
+                server.handleMessage(session, (PongMessage) message);
+                break;
+            case TEXT:
+                server.handleMessage(session, (TextMessage) message);
+                break;
+            case BINARY:
+                server.handleMessage(session, (BinaryMessage) message);
+                break;
+            case CLOSE:
+                server.handleMessage(session, (CloseMessage) message);
+                break;
+            default:
+                throw new IllegalArgumentException("unexpected message with opcode: " + message.opcode());
         }
     }
 

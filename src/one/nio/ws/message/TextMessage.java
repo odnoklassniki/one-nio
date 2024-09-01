@@ -29,10 +29,6 @@ public class TextMessage extends Message<String> {
         super(Opcode.TEXT, payload);
     }
 
-    public TextMessage(CharSequence payload) {
-        this(payload.toString());
-    }
-
     public TextMessage(byte[] payload) {
         this(new String(payload, StandardCharsets.UTF_8));
     }

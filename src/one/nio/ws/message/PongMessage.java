@@ -26,7 +26,7 @@ public class PongMessage extends BinaryMessage {
     public static final PongMessage EMPTY = new PongMessage(Response.EMPTY);
 
     public PongMessage(byte[] payload) {
-        super(Opcode.PING, payload);
+        super(Opcode.PONG, payload);
     }
 }
 

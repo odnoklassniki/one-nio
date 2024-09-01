@@ -17,6 +17,7 @@
 package one.nio.ws.message;
 
 import one.nio.util.Hex;
+import one.nio.util.SimpleName;
 import one.nio.ws.frame.Opcode;
 
 /**
@@ -39,6 +40,6 @@ public class BinaryMessage extends Message<byte[]> {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + "<" + Hex.toHex(payload) + ">";
+        return SimpleName.of(getClass()) + "<" + Hex.toHex(payload) + ">";
     }
 }

@@ -86,19 +86,20 @@ public class Frame {
     }
 
     public void unmask() {
-        if (mask != null) {
-            final ByteBuffer buffer = ByteBuffer.wrap(payload);
-            final int intMask = ByteBuffer.wrap(mask).getInt();
-            while (buffer.remaining() >= 4) {
-                int pos = buffer.position();
-                buffer.putInt(pos, buffer.getInt() ^ intMask);
-            }
-            while (buffer.hasRemaining()) {
-                int pos = buffer.position();
-                buffer.put(pos, (byte) (buffer.get() ^ mask[pos % 4]));
-            }
-            this.payload = buffer.array();
-            this.mask = null;
+        if (mask == null) {
+            return;
         }
+        final ByteBuffer buffer = ByteBuffer.wrap(payload);
+        final int intMask = ByteBuffer.wrap(mask).getInt();
+        while (buffer.remaining() >= 4) {
+            int pos = buffer.position();
+            buffer.putInt(pos, buffer.getInt() ^ intMask);
+        }
+        while (buffer.hasRemaining()) {
+            int pos = buffer.position();
+            buffer.put(pos, (byte) (buffer.get() ^ mask[pos % 4]));
+        }
+        this.payload = buffer.array();
+        this.mask = null;
     }
 }
