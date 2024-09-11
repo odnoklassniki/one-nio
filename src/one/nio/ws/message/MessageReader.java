@@ -51,7 +51,7 @@ public class MessageReader {
     public Message<?> read() throws IOException {
         final Frame frame = reader.read();
         if (frame == null) {
-            // not all frame data was transformInput
+            // not all frame data was read from socket
             return null;
         }
         if (frame.isControl()) {
@@ -62,15 +62,19 @@ public class MessageReader {
         }
         if (!frame.isFin()) {
             // not finished fragmented frame
+            // append it to buffer and wait for next frames
             appendFrame(frame);
             return null;
         }
         if (buffer != null) {
+            // buffer is not null, and this is the frame with fin=true
+            // so collect all data from buffer to the resulting message
             appendFrame(frame);
             Message<?> message = createMessage(buffer.getOpcode(), buffer.getPayload());
             buffer = null;
             return message;
         }
+        // just a simple message consisting of one fragment
         return createMessage(frame.getOpcode(), getPayload(frame));
     }
 
