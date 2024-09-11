@@ -17,6 +17,7 @@
 package one.nio.ws.message;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,7 +92,7 @@ public class MessageReader {
             case BINARY:
                 return new BinaryMessage(payload);
             case TEXT:
-                return new TextMessage(payload);
+                return new TextMessage(new String(payload, StandardCharsets.UTF_8));
         }
         throw new IllegalArgumentException("Unsupported opcode: " + opcode);
     }

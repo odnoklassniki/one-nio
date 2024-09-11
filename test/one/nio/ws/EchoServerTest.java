@@ -1,6 +1,7 @@
 package one.nio.ws;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 import one.nio.rpc.echo.EchoServer;
@@ -44,7 +45,7 @@ public class EchoServerTest {
 
         @Override
         public void handleMessage(WebSocketSession session, TextMessage message) throws IOException {
-            session.sendMessage(new TextMessage(message.payload()));
+            session.sendMessage(new TextMessage(new String(message.payload(), StandardCharsets.UTF_8)));
         }
     }
 }

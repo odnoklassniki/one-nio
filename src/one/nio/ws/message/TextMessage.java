@@ -29,10 +29,6 @@ public class TextMessage extends Message<String> {
         super(Opcode.TEXT, payload);
     }
 
-    public TextMessage(byte[] payload) {
-        this(new String(payload, StandardCharsets.UTF_8));
-    }
-
     @Override
     public byte[] payload() {
         return payload.getBytes(StandardCharsets.UTF_8);
