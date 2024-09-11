@@ -136,6 +136,7 @@ public class WebSocketSession extends HttpSession {
     @Override
     public void handleException(Throwable e) {
         if (e instanceof WebSocketException) {
+            log.error("Cannot process session from {}", getRemoteHost(), e);
             close(((WebSocketException) e).code());
             return;
         }
