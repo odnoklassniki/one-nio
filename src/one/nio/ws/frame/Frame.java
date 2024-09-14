@@ -99,7 +99,7 @@ public class Frame {
             int pos = buffer.position();
             buffer.put(pos, (byte) (buffer.get() ^ mask[pos % 4]));
         }
-        this.payload = buffer.array();
+        setPayload(buffer.array());
         this.mask = null;
     }
 }
