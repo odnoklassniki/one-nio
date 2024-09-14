@@ -37,7 +37,7 @@ public class PerMessageDeflate implements Extension {
     // according to rfc7692 4 octets of 0x00 0x00 0xff 0xff must be at the tail end of the payload of the message
     // https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2
     private static final byte[] EOM_BYTES = new byte[] {0, 0, -1, -1};
-    // the deflate extension requires the RSV1 bit, so RSV1 is 4
+    // the deflate extension requires the RSV1 bit, so RSV1 is 4 (0b100)
     private static final int RSV_BITMASK = 0b100;
 
     private static final int INPUT_BUFFER_SIZE = Integer.getInteger("one.nio.ws.permessage-deflate.INPUT_BUFFER_SIZE", 2048);
