@@ -27,8 +27,6 @@ import one.nio.http.HttpServerConfig;
  */
 public class WebSocketServerConfig extends HttpServerConfig {
     public String websocketBaseUri = "/";
-    public int maxFramePayloadLength = 65536;
-    public int maxMessagePayloadLength = 16 * 1024 * 1024;
     public Set<String> supportedProtocols = Collections.emptySet();
 
     public boolean isWebSocketURI(String uri) {

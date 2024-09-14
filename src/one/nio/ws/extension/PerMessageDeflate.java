@@ -39,17 +39,20 @@ public class PerMessageDeflate implements Extension {
     private static final byte[] EOM_BYTES = new byte[] {0, 0, -1, -1};
     private static final int RSV_BITMASK = 0b100;
 
+    private static final int INPUT_BUFFER_SIZE = Integer.getInteger("one.nio.ws.permessage-deflate.INPUT_BUFFER_SIZE", 2048);
+    private static final int OUTPUT_BUFFER_SIZE = Integer.getInteger("one.nio.ws.permessage-deflate.OUTPUT_BUFFER_SIZE", 2048);
+
     public static final String NAME = "permessage-deflate";
 
     private final boolean clientContextTakeover;
     private final boolean serverContextTakeover;
 
     private final Inflater inflater = new Inflater(true);
-    private final byte[] inputBuffer = new byte[2048];
+    private final byte[] inputBuffer = new byte[INPUT_BUFFER_SIZE];
     private boolean skipDecompression = false;
 
     private final Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, true);
-    private final byte[] outputBuffer = new byte[2048];
+    private final byte[] outputBuffer = new byte[OUTPUT_BUFFER_SIZE];
 
     public static PerMessageDeflate negotiate(Map<String, String> parameters) {
         boolean clientContextTakeover = true;

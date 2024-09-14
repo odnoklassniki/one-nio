@@ -34,15 +34,14 @@ public class FrameReader {
 
     private final Session session;
     private final byte[] header;
-    private final int maxFramePayloadLength;
+    private final int maxFramePayloadLength = Integer.getInteger("one.nio.ws.MAX_FRAME_PAYLOAD_LENGTH", 64 * 1024);
 
     private Frame frame;
     private int ptr;
 
-    public FrameReader(Session session, int maxFramePayloadLength) {
+    public FrameReader(Session session) {
         this.session = session;
         this.header = new byte[10];
-        this.maxFramePayloadLength = maxFramePayloadLength;
     }
 
     public Frame read() throws IOException {

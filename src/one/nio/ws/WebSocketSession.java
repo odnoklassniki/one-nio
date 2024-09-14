@@ -93,7 +93,7 @@ public class WebSocketSession extends HttpSession {
         try {
             validateRequest(request);
             Response response = createResponse(request);
-            reader = new MessageReader(this, extensions, config.maxFramePayloadLength, config.maxMessagePayloadLength);
+            reader = new MessageReader(this, extensions);
             writer = new MessageWriter(this, extensions);
             sendResponse(response);
         } catch (VersionException e) {

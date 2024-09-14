@@ -35,17 +35,13 @@ import one.nio.ws.frame.Opcode;
 public class MessageReader {
     private final FrameReader reader;
     private final List<Extension> extensions;
-    private final int maxMessagePayloadLength;
+    private final int maxMessagePayloadLength = Integer.getInteger("one.nio.ws.MAX_MESSAGE_PAYLOAD_LENGTH", 16 * 1024 * 1024);
 
     private PayloadBuffer buffer;
 
-    public MessageReader(Session session,
-                         List<Extension> extensions,
-                         int maxFramePayloadLength,
-                         int maxMessagePayloadLength) {
-        this.reader = new FrameReader(session, maxFramePayloadLength);
+    public MessageReader(Session session, List<Extension> extensions) {
+        this.reader = new FrameReader(session);
         this.extensions = extensions;
-        this.maxMessagePayloadLength = maxMessagePayloadLength;
     }
 
     public Message<?> read() throws IOException {
