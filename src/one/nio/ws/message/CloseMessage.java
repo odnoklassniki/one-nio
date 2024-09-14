@@ -50,9 +50,9 @@ public class CloseMessage extends Message<Short> {
 
     @Override
     public byte[] payload() {
-        byte code = payload.byteValue();
-        return new byte[]{
-                (byte) (code >>> 8), code
+        return new byte[] {
+                (byte) (payload & 0xff),
+                (byte) ((payload >> 8) & 0xff)
         };
     }
 
