@@ -34,8 +34,10 @@ public class PerMessageDeflate implements Extension {
     private static final String SERVER_NO_CONTEXT_TAKEOVER = "server_no_context_takeover";
     private static final String CLIENT_NO_CONTEXT_TAKEOVER = "client_no_context_takeover";
 
-    private static final int RSV_BITMASK = 0b100;
+    // according to rfc7692 4 octets of 0x00 0x00 0xff 0xff must be at the tail end of the payload of the message
+    // https://datatracker.ietf.org/doc/html/rfc7692#section-7.2.2
     private static final byte[] EOM_BYTES = new byte[] {0, 0, -1, -1};
+    private static final int RSV_BITMASK = 0b100;
 
     public static final String NAME = "permessage-deflate";
 
@@ -118,14 +120,13 @@ public class PerMessageDeflate implements Extension {
     @Override
     public void transformOutput(Frame frame) throws IOException {
         if (frame.isControl()) {
-            // Control frames are never compressed and may appear in the middle of fragmented frames.
-            // Pass them straight through.
+            // Control frames are never compressed and may appear in the middle of fragmented frames
+            // Pass them straight through
             return;
         }
 
         if (frame.getPayloadLength() == 0) {
-            // Zero length messages can't be compressed so pass them
-            // straight through.
+            // Zero length messages can't be compressed so pass them straight through
             return;
         }
 
