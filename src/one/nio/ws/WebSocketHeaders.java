@@ -51,11 +51,11 @@ public class WebSocketHeaders {
                 connectionHeader != null && connectionHeader.toLowerCase().contains("upgrade");
     }
 
-    public static String createVersionHeader(int version) {
+    public static String createVersionHeader(String version) {
         return VERSION + version;
     }
 
-    public static String createAcceptHeader(Request request){
+    public static String createAcceptHeader(Request request) {
         return ACCEPT + generateHash(request);
     }
 

@@ -44,6 +44,8 @@ import one.nio.ws.message.TextMessage;
  * @author <a href="mailto:vadim.yelisseyev@gmail.com">Vadim Yelisseyev</a>
  */
 public class WebSocketSession extends HttpSession {
+    public final static String VERSION_13 = "13";
+
     private final WebSocketServer server;
     private final WebSocketServerConfig config;
     private final List<Extension> extensions;
@@ -88,20 +90,21 @@ public class WebSocketSession extends HttpSession {
     }
 
     public void handshake(Request request) throws IOException {
-        final String version = request.getHeader(WebSocketHeaders.VERSION);
-        if (!"13".equals(version)) {
-            throw new VersionException(version);
+        try {
+            validateRequest(request);
+            Response response = createResponse(request);
+            reader = new MessageReader(this, extensions, config.maxFramePayloadLength, config.maxMessagePayloadLength);
+            writer = new MessageWriter(this, extensions);
+            sendResponse(response);
+        } catch (VersionException e) {
+            log.debug("Unsupported version", e);
+            Response response = new Response(Response.UPGRADE_REQUIRED, Response.EMPTY);
+            response.addHeader(WebSocketHeaders.createVersionHeader(VERSION_13));
+            sendResponse(response);
+        } catch (HandshakeException e) {
+            log.debug("Handshake error", e);
+            sendError(Response.BAD_REQUEST, e.getMessage());
         }
-        if (request.getMethod() != Request.METHOD_GET) {
-            throw new HandshakeException("only GET method supported");
-        }
-        if (request.getHeader(WebSocketHeaders.KEY) == null) {
-            throw new HandshakeException("missing websocket key");
-        }
-        if (!WebSocketHeaders.isUpgradableRequest(request)) {
-            throw new HandshakeException("missing upgrade header");
-        }
-        sendHandshakeResponse(request);
     }
 
     public void sendMessage(Message<?> message) throws IOException {
@@ -162,31 +165,30 @@ public class WebSocketSession extends HttpSession {
         }
     }
 
-    protected void sendHandshakeResponse(Request request) throws IOException {
-        try {
-            final Response response = createResponse(request);
-            processExtensions(request, response);
-            processProtocol(request, response);
-            reader = new MessageReader(this, extensions, config.maxFramePayloadLength, config.maxMessagePayloadLength);
-            writer = new MessageWriter(this, extensions);
-            sendResponse(response);
-        } catch (HandshakeException e) {
-            sendError(Response.BAD_REQUEST, e.getMessage());
+    protected void validateRequest(Request request) {
+        final String version = request.getHeader(WebSocketHeaders.VERSION);
+        if (!VERSION_13.equals(version)) {
+            throw new VersionException(version);
+        }
+        if (request.getMethod() != Request.METHOD_GET) {
+            throw new HandshakeException("only GET method supported");
+        }
+        if (request.getHeader(WebSocketHeaders.KEY) == null) {
+            throw new HandshakeException("missing websocket key");
+        }
+        if (!WebSocketHeaders.isUpgradableRequest(request)) {
+            throw new HandshakeException("missing upgrade header");
         }
     }
 
     protected Response createResponse(Request request) {
-        try {
-            Response response = new Response(Response.SWITCHING_PROTOCOLS, Response.EMPTY);
-            response.addHeader("Upgrade: websocket");
-            response.addHeader("Connection: Upgrade");
-            response.addHeader(WebSocketHeaders.createAcceptHeader(request));
-            return response;
-        } catch (VersionException e) {
-            Response response = new Response("426 Upgrade Required", Response.EMPTY);
-            response.addHeader(WebSocketHeaders.createVersionHeader(13));
-            return response;
-        }
+        Response response = new Response(Response.SWITCHING_PROTOCOLS, Response.EMPTY);
+        response.addHeader("Upgrade: websocket");
+        response.addHeader("Connection: Upgrade");
+        response.addHeader(WebSocketHeaders.createAcceptHeader(request));
+        processExtensions(request, response);
+        processProtocol(request, response);
+        return response;
     }
 
     protected void processProtocol(Request request, Response response) {
