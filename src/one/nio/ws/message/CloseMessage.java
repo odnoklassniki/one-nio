@@ -18,7 +18,8 @@ package one.nio.ws.message;
 
 import one.nio.ws.frame.Opcode;
 
-import one.nio.util.JavaInternals;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * @author <a href="mailto:vadim.yelisseyev@gmail.com">Vadim Yelisseyev</a>
@@ -41,7 +42,7 @@ public class CloseMessage extends Message<Short> {
     public static final short TLS_HANDSHAKE_FAILURE = 1015;
 
     public CloseMessage(byte[] payload) {
-        this(payload.length == 0 ? null : Short.reverseBytes(JavaInternals.unsafe.getShort(payload, JavaInternals.byteArrayOffset)));
+        this(payload.length == 0 ? null : ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN).getShort());
     }
 
     public CloseMessage(Short code) {
