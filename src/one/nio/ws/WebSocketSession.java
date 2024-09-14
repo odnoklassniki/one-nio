@@ -158,11 +158,8 @@ public class WebSocketSession extends HttpSession {
 
     @Override
     public void close() {
-        try {
-            extensions.forEach(Extension::close);
-        } finally {
-            super.close();
-        }
+        closeExtensions();
+        super.close();
     }
 
     protected void validateRequest(Request request) {
@@ -228,5 +225,15 @@ public class WebSocketSession extends HttpSession {
             return PerMessageDeflate.negotiate(request.getParameters());
         }
         return null;
+    }
+
+    private void closeExtensions() {
+        for (Extension extension : extensions) {
+            try {
+                extension.close();
+            } catch (Exception e) {
+                log.warn("error while closing extension", e);
+            }
+        }
     }
 }
