@@ -31,10 +31,13 @@ public class AcceptorConfig {
     public int sendBuf;
     public int tos;
     public int backlog = 128;
+    @Converter(method = "size")
+    public int notsentLowat;
     public boolean keepAlive = true;
     public boolean noDelay = true;
     public boolean tcpFastOpen = true;
     public boolean deferAccept;
     public boolean reusePort;
+    public boolean thinLto;
     public SslConfig ssl;
 }

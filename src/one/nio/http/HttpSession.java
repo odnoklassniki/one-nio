@@ -19,6 +19,7 @@ package one.nio.http;
 import one.nio.net.Session;
 import one.nio.net.Socket;
 import one.nio.net.SocketClosedException;
+import one.nio.net.SslOption;
 import one.nio.util.Utf8;
 
 import java.io.IOException;
@@ -93,8 +94,10 @@ public class HttpSession extends Session {
     }
 
     protected void handleSocketClosed() {
-        // Unsubscribe from read events
-        listen(queueHead == null ? 0 : WRITEABLE);
+        if (selector != null) {
+            // Unsubscribe from read events
+            listen(queueHead == null ? 0 : WRITEABLE);
+        }
 
         if (handling == null) {
             scheduleClose();
@@ -176,6 +179,12 @@ public class HttpSession extends Session {
 
             if (parsing == null) {
                 parsing = parseRequest(buffer, lineStart, lineLength);
+                if (isSsl()) {
+                    boolean earlyDataAccepted = socket.getSslOption(SslOption.SESSION_EARLYDATA_ACCEPTED);
+                    boolean handshakeDone = socket.getSslOption(SslOption.SESSION_HANDSHAKE_DONE);
+                    parsing.setEarlyData(earlyDataAccepted && !handshakeDone);
+                }
+
             } else if (lineLength > 0) {
                 if (parsing.getHeaderCount() < MAX_HEADERS) {
                     parsing.addHeader(Utf8.read(buffer, lineStart, lineLength));

@@ -16,11 +16,11 @@
 
 package one.nio.http;
 
+import one.nio.net.SslClientContextFactory;
 import one.nio.net.ConnectionString;
 import one.nio.net.HttpProxy;
 import one.nio.net.Socket;
 import one.nio.net.SocketClosedException;
-import one.nio.net.SslContext;
 import one.nio.pool.PoolException;
 import one.nio.pool.SocketPool;
 import one.nio.util.Utf8;
@@ -28,10 +28,12 @@ import one.nio.util.Utf8;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 public class HttpClient extends SocketPool {
@@ -55,7 +57,7 @@ public class HttpClient extends SocketPool {
     protected void setProperties(ConnectionString conn) {
         boolean https = "https".equals(conn.getProtocol());
         if (https) {
-            sslContext = SslContext.getDefault();
+            sslContext = SslClientContextFactory.create();
         }
         if (port == 0) {
             port = https ? 443 : 80;
@@ -117,6 +119,11 @@ public class HttpClient extends SocketPool {
     public Response get(String uri, String... headers)
             throws InterruptedException, PoolException, IOException, HttpException {
         return invoke(createRequest(Request.METHOD_GET, uri, headers));
+    }
+
+    public EventSourceResponse openEvents(String uri, String... headers)
+                    throws InterruptedException, PoolException, IOException, HttpException {
+        return openEvents( createRequest( Request.METHOD_GET, uri, headers ), readTimeout );
     }
 
     public Response delete(String uri, String... headers)
@@ -189,6 +196,51 @@ public class HttpClient extends SocketPool {
         return invoke(createRequest(Request.METHOD_CONNECT, uri, headers));
     }
 
+    @SuppressWarnings ( "resource")
+    public EventSourceResponse openEvents( Request request, int timeout ) throws InterruptedException, PoolException, IOException, HttpException
+    {
+        request.addHeader( "Accept: text/event-stream" );
+
+        int method = request.getMethod();
+        byte[] rawRequest = request.toBytes();
+        ServerSentEventsReader sseReader;
+
+        Socket socket = borrowObject();
+        boolean open = false;
+
+        try {
+            try {
+                socket.setTimeout( timeout == 0 ? readTimeout : timeout );
+                socket.writeFully( rawRequest, 0, rawRequest.length );
+                sseReader = new ServerSentEventsReader( socket, bufferSize );
+            } catch (SocketTimeoutException e) {
+                throw e;
+            } catch (IOException e) {
+                // Stale connection? Retry on a fresh socket
+                destroyObject(socket);
+                socket = createObject();
+                socket.setTimeout( timeout == 0 ? readTimeout : timeout );
+                socket.writeFully(rawRequest, 0, rawRequest.length);
+                sseReader = new ServerSentEventsReader( socket, bufferSize );
+            }
+
+            EventSourceResponse response = sseReader.readResponse(method);
+            open = true;
+            return response;
+        } finally {
+            if (!open) {
+                invalidateObject(socket);
+            }
+        }
+    }
+
+    public EventSourceResponse reopenEvents( Request request, String lastId, int timeout ) throws InterruptedException, PoolException, IOException, HttpException
+    {
+        request.addHeader( "Last-Event-ID: " + lastId );
+
+        return openEvents( request, timeout );
+    }
+
     public Request createRequest(int method, String uri, String... headers) {
         Request request = new Request(method, uri, true);
         for (String header : permanentHeaders) {
@@ -213,16 +265,30 @@ public class HttpClient extends SocketPool {
         }
 
         Response readResponse(int method) throws IOException, HttpException {
+            Response response = new Response( readResultCode() );
+            readResponseHeaders( response );
+            readResponseBody( method, response );
+            return response;
+        }
+
+        String readResultCode() throws IOException, HttpException
+        {
             String responseHeader = readLine();
             if (responseHeader.length() <= 9) {
                 throw new HttpException("Invalid response header: " + responseHeader);
             }
+            return responseHeader.substring(9);
+        }
 
-            Response response = new Response(responseHeader.substring(9));
+        void readResponseHeaders(Response response) throws IOException, HttpException
+        {
             for (String header; !(header = readLine()).isEmpty(); ) {
                 response.addHeader(header);
             }
+        }
 
+        void readResponseBody( int method, Response response ) throws IOException, HttpException
+        {
             if (method != Request.METHOD_HEAD && mayHaveBody(response.getStatus())) {
                 if ("chunked".equalsIgnoreCase(response.getHeader("Transfer-Encoding:"))) {
                     response.setBody(readChunkedBody());
@@ -238,8 +304,6 @@ public class HttpClient extends SocketPool {
                     }
                 }
             }
-
-            return response;
         }
 
         String readLine() throws IOException, HttpException {
@@ -343,6 +407,345 @@ public class HttpClient extends SocketPool {
 
         private static boolean mayHaveBody(int status) {
             return status >= 200 && status != 204 && status != 304;
+        }
+    }
+
+    class ChunkedLineReader extends ResponseReader implements Iterator<String>, Closeable {
+
+        private byte[] ch;
+        private int chPos, chLen;
+
+        private boolean hasNext;
+
+
+        ChunkedLineReader( Socket socket, int bufferSize ) throws IOException
+        {
+            super( socket, bufferSize );
+            this.ch = buf;
+            this.chPos = 0;
+            this.chLen = 0;
+            this.hasNext = true;
+        }
+
+        private boolean nextChunk() throws IOException, HttpException {
+
+            // the very first chunk header is written without empty line at the start, like:
+            //      999\n\r
+            // all subsequent chunk headers start with empty line, like:
+            //      \n\r999\n\r
+            String l = readLine();
+            int chunkSize = Integer.parseInt( l.isEmpty() ? readLine() : l, 16 );
+            if (chunkSize == 0) {
+                readLine();
+                this.chPos = 0;
+                this.chLen = 0;
+                this.hasNext = false;
+                return false;
+            }
+
+            if ( chunkSize > ch.length ) {
+                // initially ch points to buf and reallocates to separate only if chunk size is greater than buf
+                ch = new byte[ chunkSizeFor( chunkSize ) ];
+            }
+
+            int contentBytes = length - pos;
+            if (contentBytes < chunkSize) {
+                System.arraycopy(buf, pos, ch, 0, contentBytes);
+                socket.readFully(ch, contentBytes, chunkSize - contentBytes);
+                pos = 0;
+                length = 0;
+                chPos = 0;
+            } else {
+                if ( ch != buf ) {
+                    System.arraycopy(buf, pos, ch, 0, chunkSize);
+                    chPos = 0;
+                } else {
+                    chPos = pos;
+                }
+                pos += chunkSize;
+            }
+            chLen = chunkSize;
+
+            return true;
+
+        }
+
+        private int chunkSizeFor( int cap )
+        {
+            int n = -1 >>> Integer.numberOfLeadingZeros( cap - 1 );
+            return n + 1;
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            return hasNext;
+        }
+
+        @Override
+        public String next()
+        {
+            try {
+                return readChunkedLine();
+            } catch ( IOException | HttpException e ) {
+                log.debug("Event stream is closed by server");
+                close();
+            }
+
+            return null;
+        }
+
+        private String readChunkedLine() throws IOException, HttpException {
+            // whole line is found within current chunk
+            int end = findLineEnd( ch, chPos, chLen );
+            if ( end >= 0 ) {
+                int lineLen = end - chPos;
+                String line = Utf8.read( ch, chPos, lineLen );
+                lineLen++; // skip over \n
+                chLen -= lineLen;
+                chPos += lineLen;
+                return line;
+            }
+
+            ArrayList<byte[]> chunks = new ArrayList<>();
+            int lineLen = 0;
+
+            do {
+                chunks.add(Arrays.copyOfRange(ch, this.chPos, this.chPos + this.chLen));
+                lineLen += this.chLen;
+                this.ch = this.buf;
+                this.chPos = 0;
+                this.chLen = 0;
+
+                if ( !nextChunk() ) {
+                    // end of stream detected
+                    end = 0;
+                    break;
+                }
+
+                end = findLineEnd( ch, chPos, chLen );
+            } while ( end < 0 );
+
+            lineLen += Math.max( end - chPos, 0 );
+            if ( lineLen == 0 )
+                return "";
+
+            byte[] lineBytes = new byte[ lineLen ];
+            int linePos = 0;
+            for ( byte[] b : chunks ) {
+                System.arraycopy( b, 0, lineBytes, linePos, b.length );
+                linePos += b.length;
+            }
+
+            // ch has last piece of line, if end > 0 || lineLen > linePos
+            if ( end > 0 ) {
+                System.arraycopy( ch, this.chPos, lineBytes, linePos, end - this.chPos );
+                linePos += end - this.chPos;
+                chLen -= end - chPos + 1;
+                chPos = end + 1; // skip over \n
+            }
+
+            assert linePos == lineLen;
+
+            String line = Utf8.read( lineBytes, 0, lineBytes.length );
+            return line;
+        }
+
+        private int findLineEnd( byte[] b, int start, int len ) {
+            int end = start + len;
+            for ( ; start < end && b[start] != '\n'; start++ ) ;
+
+            return start >= end ? -1 : start ;
+        }
+
+        @Override
+        public void close()
+        {
+            if ( socket == null )
+                return;
+
+            invalidateObject(socket);
+            this.hasNext = false;
+            this.socket = null;
+        }
+
+    }
+
+    class ServerSentEventsReader extends ChunkedLineReader implements EventSource<String> {
+
+        private boolean keepAlive;
+
+        ServerSentEventsReader( Socket socket, int bufferSize ) throws IOException
+        {
+            super( socket, bufferSize );
+        }
+
+        EventSourceResponse readResponse(int method) throws IOException, HttpException {
+            EventSourceResponse response = new EventSourceResponse( readResultCode() );
+            readResponseHeaders( response );
+
+            if ( response.getHeader( "Content-Type: text/event-stream" ) == null ) {
+                try {
+                    readResponseBody( method, response );
+                    keepAlive = !"close".equalsIgnoreCase(response.getHeader("Connection:"));
+                    return response;
+                } finally {
+                    close();
+                }
+            }
+
+            if ( !"chunked".equalsIgnoreCase( response.getHeader( "Transfer-Encoding:" ) ) ) {
+                throw new UnsupportedOperationException( "Only chunked transfer encoding is supported for text/event-stream" );
+            }
+
+            response.setEventSource( this );
+
+            return response;
+        }
+
+        @Override
+        public Event<String> poll( )
+        {
+            if ( !hasNext() )
+                return null;
+
+            String line = next();
+            return line == null || line.isEmpty() ? null : readEvent( line );
+
+        }
+
+        private EventImpl readEvent( String line )
+        {
+            EventImpl eimpl = new EventImpl();
+
+            StringBuilder databuf = new StringBuilder( line.length() );
+            String field=":"; // impossible value
+            try {
+                do {
+                    int cpos = line.indexOf( ':' );
+                    String f;
+                    if ( cpos == 0 ) {
+                        // comment. sometimes used alone as keep alive messages
+                        f="";
+                        cpos++;
+                    } else if ( cpos < 0 ) {
+                        // no colon - whole line is field name as per spec
+                        f = line;
+                        cpos = line.length();
+                    } else {
+                        // field name separated from data by colon with optional
+                        // single space char after colon, like field-name: data
+                        f = line.substring( 0, cpos );
+                        cpos++;
+                        if ( cpos < line.length() && line.charAt( cpos )==' ')
+                            cpos++;
+                    }
+
+                    if ( !field.equals( f ) ) {
+
+                        eimpl.with( field, databuf );
+
+                        field = f;
+                        databuf.setLength( 0 );
+                    } else {
+                        // multiple lines of the same field name concatenate data with newline
+                        // a:b
+                        // a:c
+                        // a="b\nc"
+                        databuf.append('\n');
+                    }
+
+                    databuf.append( line, cpos, line.length() );
+
+                    line = next();
+                    if (line == null) {
+                        // EOF
+                        return null;
+                    }
+                } while ( !line.isEmpty() );
+
+                if ( databuf.length() > 0 )
+                    eimpl.with( field, databuf );
+
+            } catch ( RuntimeException e ) {
+                log.error( "Cannot parse line: {}", line, e );
+                throw e;
+            }
+
+            log.debug( "Read event from stream: {}", eimpl );
+
+            return eimpl;
+        }
+
+        @Override
+        public void close()
+        {
+            if ( socket != null && keepAlive) {
+                returnObject(socket);
+                socket = null;
+            } else {
+                super.close();
+            }
+        }
+
+    }
+
+    static class EventImpl implements EventSource.Event<String> {
+
+        private String id, name, data, comment;
+
+        @Override
+        public String name()
+        {
+            return name;
+        }
+
+        @Override
+        public String id()
+        {
+            return id;
+        }
+
+        @Override
+        public String data()
+        {
+            return data;
+        }
+
+        @Override
+        public String comment()
+        {
+            return comment;
+        }
+
+        boolean with( String field, StringBuilder databuf ) {
+            switch ( field ) {
+            case "id":
+                id = databuf.toString();
+                break;
+            case "event":
+                name = databuf.toString();
+                break;
+            case "data":
+                data = databuf.toString();
+                break;
+            case "":
+                comment = databuf.toString();
+                break;
+            default:
+                return false;
+            }
+            return true;
+        }
+
+        public boolean isEmpty() {
+            return id == null && name == null && data == null;
+        }
+
+        @Override
+        public String toString()
+        {
+            return isEmpty() ? "empty" : name + ":" + id;
         }
     }
 }

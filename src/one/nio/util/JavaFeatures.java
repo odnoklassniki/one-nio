@@ -56,7 +56,10 @@ public class JavaFeatures {
     }
 
     /**
-     * Calls Class.isRecord() since Java 14 preview; returns false otherwise
+     * Calls Class.isRecord() since Java 14 preview
+     *
+     * @param cls a class object
+     * @return the result of the Class.isRecord() method invoked. It is always false, if the version of the JVM Runtime is less than 14
      */
     public static boolean isRecord(Class<?> cls) {
         if (isRecord != null) {

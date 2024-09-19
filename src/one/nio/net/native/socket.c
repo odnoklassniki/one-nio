@@ -56,6 +56,9 @@ static pthread_t* fd_table;
 #define TCP_FASTOPEN 23
 #endif
 
+#ifndef TCP_NOTSENT_LOWAT
+#define TCP_NOTSENT_LOWAT 25
+#endif
 
 static socklen_t sockaddr_from_java(JNIEnv* env, jobject address, jint port, struct sockaddr_storage* sa) {
     // AF_UNIX
@@ -96,7 +99,7 @@ static socklen_t sockaddr_from_java(JNIEnv* env, jobject address, jint port, str
     }
 }
 
-static jobject sockaddr_to_java(JNIEnv* env, struct sockaddr_storage* sa, socklen_t len) {
+jobject sockaddr_to_java(JNIEnv* env, struct sockaddr_storage* sa, socklen_t len) {
     if (sa->ss_family == AF_INET) {
         struct sockaddr_in* sin = (struct sockaddr_in*)sa;
         int ip = ntohl(sin->sin_addr.s_addr);
@@ -252,6 +255,9 @@ Java_one_nio_net_NativeSocket_accept0(JNIEnv* env, jobject self, jboolean nonblo
         end_blocking_call(fd_lock);
 
         if (result == -1) {
+            if (errno == EWOULDBLOCK) {
+                return -1;
+            }
             throw_io_exception(env);
         }
         return result;
@@ -880,6 +886,31 @@ JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSocket_getTos(JNIEnv* env, jobject self) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     return get_int_socket_opt(fd, IPPROTO_IP, IP_TOS);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_setNotsentLowat(JNIEnv* env, jobject self, jint lowat) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    setsockopt(fd, SOL_TCP, TCP_NOTSENT_LOWAT, &lowat, sizeof(lowat));
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_net_NativeSocket_getNotsentLowat(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_int_socket_opt(fd, SOL_TCP, TCP_NOTSENT_LOWAT);
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSocket_setThinLinearTimeouts(JNIEnv* env, jobject self, jboolean thinLto) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    int value = (int) thinLto;
+    setsockopt(fd, SOL_TCP, TCP_THIN_LINEAR_TIMEOUTS, &value, sizeof(value));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_getThinLinearTimeouts(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    return get_bool_socket_opt(fd, SOL_TCP, TCP_THIN_LINEAR_TIMEOUTS);
 }
 
 JNIEXPORT jbyteArray JNICALL

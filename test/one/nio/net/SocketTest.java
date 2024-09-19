@@ -26,7 +26,7 @@ import static org.junit.Assert.*;
 public class SocketTest {
 
     private static void testIPv4() throws IOException {
-        Socket s = Socket.create();
+        Socket s = Socket.createClientSocket();
         s.setTimeout(3000);
 
         s.connect("google.com", 80);
@@ -35,7 +35,7 @@ public class SocketTest {
     }
 
     private static void testIPv6() throws IOException {
-        Socket s = Socket.create();
+        Socket s = Socket.createClientSocket();
         s.setTimeout(3000);
 
         s.connect("2a00:1450:4010:c07::71", 80);
@@ -128,6 +128,14 @@ public class SocketTest {
                 assertEquals(0, socket.getTos());
                 socket.setTos(96);
                 assertEquals(96, socket.getTos());
+            }
+
+            if (socket instanceof NativeSocket) {
+                socket.setNotsentLowat(67890);
+                assertEquals(67890, socket.getNotsentLowat());
+
+                socket.setThinLinearTimeouts(true);
+                assertTrue(socket.getThinLinearTimeouts());
             }
         } catch (Exception e) {
             throw e;

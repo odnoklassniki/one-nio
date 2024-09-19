@@ -16,6 +16,8 @@
 
 package one.nio.server;
 
+import java.util.Locale;
+
 import one.nio.config.Config;
 import one.nio.config.Converter;
 import one.nio.net.ConnectionString;
@@ -24,7 +26,11 @@ import one.nio.os.SchedulingPolicy;
 
 @Config
 public class ServerConfig {
+
+    public static String DEFAULT_SELECTOR_THREAD_NAME_FORMAT = "NIO Selector #%d";
+
     public AcceptorConfig[] acceptors;
+    public boolean multiAcceptor;
     public int selectors;
     public boolean affinity;
     public int minWorkers;
@@ -36,6 +42,10 @@ public class ServerConfig {
     public int threadPriority = Thread.NORM_PRIORITY;
     public SchedulingPolicy schedulingPolicy;
     public boolean closeSessions;
+    public boolean pinAcceptors;
+
+    @Converter(value = ServerConfig.class, method = "threadNameFormat")
+    public String selectorThreadNameFormat = DEFAULT_SELECTOR_THREAD_NAME_FORMAT;
 
     public ServerConfig() {
     }
@@ -60,6 +70,8 @@ public class ServerConfig {
         this.threadPriority = conn.getIntParam("threadPriority", Thread.NORM_PRIORITY);
         this.schedulingPolicy = SchedulingPolicy.valueOf(conn.getStringParam("schedulingPolicy", "OTHER"));
         this.closeSessions = conn.getBooleanParam("closeSessions", false);
+        this.keepAlive = conn.getIntParam("keepAlive", 0);
+        this.selectorThreadNameFormat = threadNameFormat(conn.getStringParam("selectorThreadNameFormat", DEFAULT_SELECTOR_THREAD_NAME_FORMAT));
     }
 
     // Do not use for new servers! Use ConfigParser instead
@@ -70,5 +82,16 @@ public class ServerConfig {
     // Do not use for new servers! Use ConfigParser instead
     public static ServerConfig from(ConnectionString conn) {
         return new ServerConfig(conn);
+    }
+
+    public String formatSelectorThreadName(int threadNumber) {
+        return String.format(Locale.ROOT, selectorThreadNameFormat, threadNumber);
+    }
+
+    public static String threadNameFormat(String s) {
+        // validate pattern
+        String.format(Locale.ROOT, s, 0);
+
+        return s;
     }
 }

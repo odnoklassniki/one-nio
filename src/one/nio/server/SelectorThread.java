@@ -34,8 +34,8 @@ public final class SelectorThread extends PayloadThread {
     long sessions;
     int maxReady;
 
-    public SelectorThread(int num, int dedicatedCpu, SchedulingPolicy schedulingPolicy) throws IOException {
-        super("NIO Selector #" + num);
+    public SelectorThread(int num, int dedicatedCpu, SchedulingPolicy schedulingPolicy, String name) throws IOException {
+        super(name);
         this.selector = Selector.create();
         this.dedicatedCpu = dedicatedCpu;
         setSchedulingPolicy(schedulingPolicy);

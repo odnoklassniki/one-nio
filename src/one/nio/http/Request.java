@@ -113,6 +113,16 @@ public class Request {
         return http11;
     }
 
+    void setEarlyData(boolean earlyData) {
+        if (earlyData) {
+            addHeader("Early-Data: 1");
+        }
+    }
+
+    public boolean isEarlyData() {
+        return "1".equals(getHeader("Early-Data:"));
+    }
+
     public String getPath() {
         return params >= 0 ? uri.substring(0, params) : uri;
     }
@@ -258,6 +268,43 @@ public class Request {
         for (int i = 0; i < headerCount; i++) {
             if (headers[i].regionMatches(true, 0, prefix, 0, keyLength)) {
                 suffixConsumer.accept(trim(headers[i], keyLength));
+            }
+        }
+    }
+
+    /**
+     * Returns trimmed header value after ':' delimiter
+     *
+     * @param key header name without ':'
+     * @return trimmed value after key:
+     */
+    public String getHeaderValue(String key) {
+        int keyLength = key.length();
+        for (int i = 0; i < headerCount; i++) {
+            String header = headers[i];
+            if (header.length() > keyLength
+                    && header.charAt(keyLength) == ':'
+                    && header.regionMatches(true, 0, key, 0, keyLength)) {
+                return trim(header, keyLength + 1);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Consume trimmed header value after ':' delimiter
+
+     * @param key header name without ':'
+     * @param suffixConsumer a function for processing the header value
+     */
+    public void consumeHeaderValues(String key, Consumer<String> suffixConsumer) {
+        int keyLength = key.length();
+        for (int i = 0; i < headerCount; i++) {
+            String header = headers[i];
+            if (header.length() > keyLength
+                    && header.charAt(keyLength) == ':'
+                    && header.regionMatches(true, 0, key, 0, keyLength)) {
+                suffixConsumer.accept(trim(header, keyLength + 1));
             }
         }
     }

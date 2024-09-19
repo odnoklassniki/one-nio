@@ -133,7 +133,7 @@ public class LZ4 {
         }
 
         if (result < 0) {
-            throw new IllegalArgumentException("Malformed input");
+            throw new IllegalArgumentException("Malformed input or destination buffer overflow");
         }
         return result;
     }
@@ -147,7 +147,7 @@ public class LZ4 {
         }
 
         if (result < 0) {
-            throw new IllegalArgumentException("Malformed input");
+            throw new IllegalArgumentException("Malformed input or destination buffer overflow");
         }
 
         src.position(src.limit());
@@ -541,13 +541,15 @@ public class LZ4 {
                     s = unsafe.getByte(src, ip++) & 0xff;
                     length += s;
                 } while (ip < srcEnd - RUN_MASK && s == 255);
-                if (length < 0) return -1;  // Error: overflow
+                if (length < 0)
+                    return -1;  // Error: overflow
             }
 
             // Copy literals
             long cpy = op + length;
             if (cpy > dstEnd - MFLIMIT || ip + length > srcEnd - (2 + 1 + LASTLITERALS)) {
-                if (ip + length != srcEnd || cpy > dstEnd) return -1;  // Error: input must be consumed
+                if (ip + length != srcEnd || cpy > dstEnd)
+                    return -1;  // Error: input must be consumed
                 unsafe.copyMemory(src, ip, dst, op, length);
                 op += length;
                 return (int) (op - dstOffset);
@@ -559,18 +561,21 @@ public class LZ4 {
             // Get offset
             long match = cpy - (unsafe.getShort(src, ip) & 0xffff);
             ip += 2;
-            if (match < dstOffset) return -1;  // Error: offset outside destination buffer
+            if (match < dstOffset)
+                return -1;  // Error: offset outside destination buffer
 
             // Get matchlength
             length = token & ML_MASK;
             if (length == ML_MASK) {
                 int s;
                 do {
-                    if (ip > srcEnd - LASTLITERALS) return -1;
+                    if (ip > srcEnd - LASTLITERALS)
+                        return -1;
                     s = unsafe.getByte(src, ip++) & 0xff;
                     length += s;
                 } while (s == 255);
-                if (length < 0) return -1;  // Error: overflow
+                if (length < 0)
+                    return -1;  // Error: overflow
             }
             length += MINMATCH;
 
@@ -593,7 +598,8 @@ public class LZ4 {
             }
 
             if (cpy > dstEnd - 12) {
-                if (cpy > dstEnd - LASTLITERALS) return -1;  // Error: last LASTLITERALS bytes must be literals
+                if (cpy > dstEnd - LASTLITERALS)
+                    return -1;  // Error: last LASTLITERALS bytes must be literals
                 if (op < dstEnd - 8) {
                     wildCopy(dst, match, dst, op, dstEnd - 8);
                     match += (dstEnd - 8) - op;

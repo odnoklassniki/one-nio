@@ -17,6 +17,7 @@
 package one.nio.pool;
 
 import one.nio.mgt.Management;
+import one.nio.net.SslClientContextFactory;
 import one.nio.net.ConnectionString;
 import one.nio.net.Proxy;
 import one.nio.net.Socket;
@@ -28,6 +29,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected int readTimeout;
     protected int connectTimeout;
     protected int tos;
+    protected boolean thinLto;
     protected SslContext sslContext;
     protected Proxy proxy;
 
@@ -42,6 +44,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
         this.connectTimeout = conn.getIntParam("connectTimeout", 1000);
         this.tos = conn.getIntParam("tos", 0);
         this.fifo = conn.getBooleanParam("fifo", false);
+        this.thinLto = conn.getBooleanParam("thinLto", false);
 
         setProperties(conn);
         initialize();
@@ -53,7 +56,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
 
     protected void setProperties(ConnectionString conn) {
         if ("ssl".equals(conn.getProtocol())) {
-            sslContext = SslContext.getDefault();
+            sslContext = SslClientContextFactory.create();
         }
     }
 
@@ -152,12 +155,16 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     public Socket createObject() throws PoolException {
         Socket socket = null;
         try {
-            socket = Socket.create();
+            socket = Socket.createClientSocket(sslContext);
             socket.setKeepAlive(true);
             socket.setNoDelay(true);
 
             if (tos != 0) {
                 socket.setTos(tos);
+            }
+
+            if (thinLto) {
+                socket.setThinLinearTimeouts(true);
             }
 
             socket.setTimeout(connectTimeout);

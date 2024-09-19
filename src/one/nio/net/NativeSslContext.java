@@ -16,22 +16,58 @@
 
 package one.nio.net;
 
-import one.nio.mgt.Management;
-import one.nio.util.ByteArrayBuilder;
-import one.nio.util.Utf8;
-
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.util.ServiceConfigurationError;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.net.ssl.SSLException;
+
+import one.nio.mgt.Management;
+import one.nio.util.ByteArrayBuilder;
+import one.nio.util.Utf8;
+
 class NativeSslContext extends SslContext {
     private static final AtomicInteger counter = new AtomicInteger();
 
+
+    private static class CompressionAlgorithms {
+        // Possible compression values from RFC8879 (Refer to openssl/tls1.h)
+        public static int ZLIB =    1;
+        public static int BROTLI =  2;
+        public static int ZSTD =    3;
+    }
+
+    private static class SslOption {
+        public static long ENABLE_KTLS =            1L << 3;
+        public static long NO_COMPRESSION =         1L << 17;
+        public static long NO_SSLv2 =               0;  // as of OpenSSL 1.0.2g the SSL_OP_NO_SSLv2 option is set by default.
+        public static long NO_ANTI_REPLAY =         1L << 24;
+        public static long NO_SSLv3 =               1L << 25;
+        public static long NO_TLSv1 =               1L << 26;
+        public static long NO_TLSv1_2 =             1L << 27;
+        public static long NO_TLSv1_1 =             1L << 28;
+        public static long NO_TLSv1_3 =             1L << 29;
+        public static long NO_TX_CERT_COMPRESSION = 1L << 32;
+    }
+
+    private static class CacheMode {
+        public static int NONE =     0;
+        public static int INTERNAL = 1;
+        public static int EXTERNAL = 2;
+    }
+
+    private static final long ALL_DISABLED = SslOption.NO_COMPRESSION
+                                    | SslOption.NO_SSLv2
+                                    | SslOption.NO_SSLv3
+                                    | SslOption.NO_TLSv1
+                                    | SslOption.NO_TLSv1_1
+                                    | SslOption.NO_TLSv1_2
+                                    | SslOption.NO_TLSv1_3;
     final int id;
     long ctx;
     NativeSslContext[] subcontexts;
+
 
     NativeSslContext() throws SSLException {
         this.id = counter.incrementAndGet();
@@ -93,32 +129,68 @@ class NativeSslContext extends SslContext {
             String protocol = st.nextToken();
             switch (protocol) {
                 case "compression":
-                    enabled |= 0x00020000;
+                    enabled |= SslOption.NO_COMPRESSION;
                     break;
                 case "sslv2":
-                    enabled |= 0x01000000;
+                    enabled |= SslOption.NO_SSLv2;
                     break;
                 case "sslv3":
-                    enabled |= 0x02000000;
+                    enabled |= SslOption.NO_SSLv3;
                     break;
                 case "tlsv1":
-                    enabled |= 0x04000000;
+                    enabled |= SslOption.NO_TLSv1;
                     break;
                 case "tlsv1.1":
-                    enabled |= 0x10000000;
+                    enabled |= SslOption.NO_TLSv1_1;
                     break;
                 case "tlsv1.2":
-                    enabled |= 0x08000000;
+                    enabled |= SslOption.NO_TLSv1_2;
                     break;
                 case "tlsv1.3":
-                    enabled |= 0x20000000;
+                    enabled |= SslOption.NO_TLSv1_3;
                     break;
             }
         }
 
-        int all = 0x00020000 + 0x01000000 + 0x02000000 + 0x04000000 + 0x08000000 + 0x10000000 + 0x20000000;
         clearOptions(enabled);
-        setOptions(all - enabled);
+        setOptions(ALL_DISABLED & ~enabled);
+    }
+
+    @Override
+    public void setKernelTlsEnabled(boolean kernelTlsEnabled) throws SSLException {
+        if (kernelTlsEnabled) {
+            setOptions(SslOption.ENABLE_KTLS);
+        } else {
+            clearOptions(SslOption.ENABLE_KTLS);
+        }
+    }
+
+    @Override
+    public void setAntiReplayEnabled(boolean antiReplayEnabled) throws SSLException {
+        if (antiReplayEnabled) {
+            clearOptions(SslOption.NO_ANTI_REPLAY);
+        } else {
+            setOptions(SslOption.NO_ANTI_REPLAY);
+        }
+    }
+
+    @Override
+    public void setSessionCache(String mode, int size) throws SSLException {
+        switch (mode) {
+            case "none":
+                setCacheMode(CacheMode.NONE);
+                break;
+            case "internal":
+                setCacheMode(CacheMode.INTERNAL);
+                setInternalCacheSize(size);
+                break;
+            case "external":
+                setCacheMode(CacheMode.EXTERNAL);
+                SslSessionCache.Singleton.setCapacity(size);
+                break;
+            default:
+                throw new SSLException("Unsupported session cache mode: " + mode);
+        }
     }
 
     @Override
@@ -126,6 +198,15 @@ class NativeSslContext extends SslContext {
 
     @Override
     public native void setCiphers(String ciphers) throws SSLException;
+
+    /**
+     * Sets the curve used for ECDH temporary keys used during key exchange.
+     * Use <code>openssl ecparam -list_curves</code> to get list of supported curves.
+     * @param curve short name of the curve, if null - all curves built into the OpenSSL library will be allowed
+     * @throws SSLException
+     */
+    @Override
+    public native void setCurve(String curve) throws SSLException;
 
     @Override
     public native void setCertificate(String certFile) throws SSLException;
@@ -146,9 +227,6 @@ class NativeSslContext extends SslContext {
     public native void setTicketKeys(byte[] keys) throws SSLException;
 
     @Override
-    public native void setCacheSize(int size) throws SSLException;
-
-    @Override
     public native void setTimeout(long timeout) throws SSLException;
 
     @Override
@@ -156,6 +234,9 @@ class NativeSslContext extends SslContext {
 
     @Override
     public native void setOCSP(byte[] response) throws SSLException;
+
+    @Override
+    public native void setMaxEarlyData(int size) throws SSLException;
 
     @Override
     public void setApplicationProtocols(String[] protocols) throws SSLException {
@@ -194,13 +275,49 @@ class NativeSslContext extends SslContext {
         setSNI0(names.toBytes(), contexts);
     }
 
+    @Override
+    public void setCompressionAlgorithms(String[] compressionAlgorithms) throws SSLException {
+        if (compressionAlgorithms == null || compressionAlgorithms.length == 0) {
+            setOptions(SslOption.NO_TX_CERT_COMPRESSION);
+            return;
+        }
+
+        int[] algorithms = new int[compressionAlgorithms.length];
+        for (int i = 0; i < compressionAlgorithms.length; i++) {
+            String algorithm = compressionAlgorithms[i];
+            switch (algorithm) {
+                case "zlib":
+                    algorithms[i] = CompressionAlgorithms.ZLIB;
+                    break;
+                case "brotli":
+                    algorithms[i] = CompressionAlgorithms.BROTLI;
+                    break;
+                case "zstd":
+                    algorithms[i] = CompressionAlgorithms.ZSTD;
+                    break;
+                default:
+                    throw new SSLException("Unsupported cert compression algorithm: " + algorithm);
+            }
+        }
+        clearOptions(SslOption.NO_TX_CERT_COMPRESSION);
+        setCompressionAlgorithms0(algorithms);
+    }
+
+    private native void setCompressionAlgorithms0(int[] algorithms) throws SSLException;
+
     private native void setSNI0(byte[] names, long[] contexts) throws SSLException;
 
-    private native void setOptions(int options);
-    private native void clearOptions(int options);
+    @Override
+    public native void setKeylog(boolean keylog);
+
+    private native void setOptions(long options);
+    private native void clearOptions(long options);
 
     private native long getSessionCounter(int key);
     private native long[] getSessionCounters(int keysBitmap);
+
+    private native void setInternalCacheSize(int size) throws SSLException;
+    private native void setCacheMode(int mode) throws SSLException;
 
     private static native void init();
     private static native long ctxNew() throws SSLException;

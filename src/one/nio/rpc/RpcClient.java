@@ -36,8 +36,16 @@ import java.net.SocketTimeoutException;
 public class RpcClient extends SocketPool implements InvocationHandler {
     protected static final byte[][] uidLocks = new byte[64][0];
 
+    private final StackTraceElement remoteMarkerElement;
+
     public RpcClient(ConnectionString conn) {
         super(conn);
+
+        this.remoteMarkerElement = new StackTraceElement(
+                "<<remote>>", // pseudo class name
+                "remoteCall",
+                this.name(), // pseudo file name, will contain host and port
+                -1);
     }
 
     public Object invoke(Object request) throws Exception {
@@ -72,9 +80,32 @@ public class RpcClient extends SocketPool implements InvocationHandler {
                 provideSerializer(Repository.requestSerializer(uid));
                 rawResponse = invokeRaw(request, readTimeout);
             } else {
-                throw (Exception) response;
+                Exception exception = (Exception) response;
+                addLocalStack(exception, request);
+                throw exception;
             }
         }
+    }
+
+    private void addLocalStack(Throwable e, Object remoteRequest) {
+        StackTraceElement[] remoteStackTrace = e.getStackTrace();
+        StackTraceElement[] localStackTrace = new Exception().getStackTrace();
+
+        if (remoteStackTrace == null || localStackTrace == null) {
+            return;
+        }
+        StackTraceElement[] newStackTrace = new StackTraceElement[remoteStackTrace.length + localStackTrace.length];
+
+        System.arraycopy(remoteStackTrace, 0, newStackTrace, 0, remoteStackTrace.length);
+        newStackTrace[remoteStackTrace.length] = remoteMarkerElement;
+
+        System.arraycopy(localStackTrace,
+                1,  // starting from 1 to skip 'addLocalStack' line in stack trace
+                newStackTrace,
+                remoteStackTrace.length + 1,
+                localStackTrace.length - 1);
+
+        e.setStackTrace(newStackTrace);
     }
 
     @Override

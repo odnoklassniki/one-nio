@@ -69,7 +69,36 @@ public class BpfProg extends BpfObj {
         return Bpf.progGetMapIds(fd());
     }
 
+    public void testRun(TestRunContext context) throws IOException {
+        assert context.ctxIn == null || context.lenCtxIn <= context.ctxIn.length;
+        assert context.dataIn == null || context.lenDataIn <= context.dataIn.length;
+        
+        Bpf.progTestRun(fd(), context.dataIn, context.lenDataIn, context.dataOut, context.ctxIn, context.lenCtxIn, context.ctxOut, context.retvals);
+    }
+
     public static Iterable<Integer> getAllIds() {
         return () -> new IdsIterator(Bpf.OBJ_PROG);
+    }
+    
+    public static class TestRunContext {
+        public byte[] dataIn;
+        public int lenDataIn;
+        public byte[] ctxIn;
+        public int lenCtxIn;
+        public byte[] dataOut;
+        public byte[] ctxOut;
+        int[] retvals = new int[4];
+        public int lenDataOut() {
+            return retvals[0];
+        }
+        public int lenCtxOut() {
+            return retvals[1];
+        }
+        public int duration() {
+            return retvals[2];
+        }
+        public int result() {
+            return retvals[3];
+        }
     }
 }

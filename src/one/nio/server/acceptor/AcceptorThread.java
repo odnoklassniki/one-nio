@@ -14,19 +14,24 @@
  * limitations under the License.
  */
 
-package one.nio.server;
+package one.nio.server.acceptor;
+
+import java.io.IOException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import one.nio.net.Session;
 import one.nio.net.Socket;
-import one.nio.net.SslContext;
-
-import java.io.IOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import one.nio.server.AcceptorConfig;
+import one.nio.server.RejectedSessionException;
+import one.nio.server.Server;
 
 final class AcceptorThread extends Thread {
     private static final Logger log = LoggerFactory.getLogger(AcceptorThread.class);
 
+    final DefaultAcceptorGroup group;
+    final int num;
     final String address;
     final int port;
     final int backlog;
@@ -36,53 +41,22 @@ final class AcceptorThread extends Thread {
     volatile long acceptedSessions;
     volatile long rejectedSessions;
 
-    AcceptorThread(Server server, AcceptorConfig config, int num) throws IOException {
+    AcceptorThread(Server server, AcceptorConfig config, DefaultAcceptorGroup group, int num) throws IOException {
         super("NIO Acceptor " + config.address + ":" + config.port + " #" + num);
+        this.group = group;
+        this.num = num;
         this.address = config.address;
         this.port = config.port;
         this.backlog = config.backlog;
         this.server = server;
 
-        Socket serverSocket = Socket.createServerSocket();
-        if (config.ssl != null) {
-            SslContext sslContext = SslContext.create();
-            sslContext.configure(config.ssl);
-            serverSocket = serverSocket.sslWrap(sslContext);
-        }
-        this.serverSocket = serverSocket;
-
-        if (config.recvBuf != 0) serverSocket.setRecvBuffer(config.recvBuf);
-        if (config.sendBuf != 0) serverSocket.setSendBuffer(config.sendBuf);
-        if (config.tos != 0) serverSocket.setTos(config.tos);
-        if (config.deferAccept) serverSocket.setDeferAccept(true);
-
-        serverSocket.setKeepAlive(config.keepAlive);
-        serverSocket.setNoDelay(config.noDelay);
-        serverSocket.setTcpFastOpen(config.tcpFastOpen);
-        serverSocket.setReuseAddr(true, config.reusePort);
+        Socket serverSocket = AcceptorSupport.createServerSocket(config);
         serverSocket.bind(address, port, backlog);
+        this.serverSocket = serverSocket;
     }
 
     void reconfigure(AcceptorConfig config) throws IOException {
-        if (config.recvBuf != 0) {
-            serverSocket.setRecvBuffer(config.recvBuf);
-        }
-        if (config.sendBuf != 0) {
-            serverSocket.setSendBuffer(config.sendBuf);
-        }
-        if (config.tos != 0) {
-            serverSocket.setTos(config.tos);
-        }
-        serverSocket.setDeferAccept(config.deferAccept);
-        serverSocket.setKeepAlive(config.keepAlive);
-        serverSocket.setNoDelay(config.noDelay);
-        serverSocket.setTcpFastOpen(config.tcpFastOpen);
-        serverSocket.setReuseAddr(true, config.reusePort);
-
-        SslContext sslContext = serverSocket.getSslContext();
-        if (sslContext != null && config.ssl != null) {
-            sslContext.configure(config.ssl);
-        }
+        AcceptorSupport.reconfigureSocket(serverSocket, config);
     }
 
     void shutdown() {
@@ -102,7 +76,7 @@ final class AcceptorThread extends Thread {
             log.error("Cannot start listening at {}", port, e);
             return;
         } finally {
-            server.startSync.countDown();
+            group.syncLatch.countDown();
         }
 
         while (serverSocket.isOpen()) {
@@ -110,12 +84,10 @@ final class AcceptorThread extends Thread {
             try {
                 socket = serverSocket.acceptNonBlocking();
                 Session session = server.createSession(socket);
-                server.register(session);
+                server.register(session, num, group.size());
                 acceptedSessions++;
             } catch (RejectedSessionException e) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Rejected session from {}", socket.getRemoteAddress(), e);
-                }
+                log.debug("Rejected session from {}", socket.getRemoteAddress(), e);
                 rejectedSessions++;
                 socket.close();
             } catch (Throwable e) {

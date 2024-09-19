@@ -47,7 +47,8 @@ public class OffheapBitSet implements Closeable {
     }
 
     /**
-     * returns the number of 64 bit words it would take to hold numBits
+     * @param numBits a number of bits to hold
+     * @return the number of 64 bit words it would take to hold numBits
      */
     public static long bits2words(long numBits) {
         return (((numBits - 1) >>> 6) + 1);
@@ -69,7 +70,9 @@ public class OffheapBitSet implements Closeable {
      * Returns true or false for the specified bit index. The index should be
      * less than the capacity.
      *
-     * @throws IndexOutOfBoundsException
+     * @param index the bit index
+     * @return the value of the bit with the specified index
+     * @throws IndexOutOfBoundsException if the index is out of range
      */
     public boolean get(long index) {
         return unsafeGet(checkBounds(index));
@@ -80,6 +83,9 @@ public class OffheapBitSet implements Closeable {
      * bounds. This allows to make it few ticks faster in exchange to seg fault
      * possibility. Use when going out of capacity is ensured by other means
      * outside of this method
+     *
+     * @param index a bit index
+     * @return the value of the bit with the specified index
      */
     public boolean unsafeGet(long index) {
         long word = index >> 6; // div 8 and round to long word
@@ -91,6 +97,9 @@ public class OffheapBitSet implements Closeable {
     /**
      * Sets the bit at the specified index. The index should be less than the
      * capacity.
+     *
+     * @param index a bit index
+     * @throws IndexOutOfBoundsException if the index is out of range
      */
     public void set(long index) {
         unsafeSet(checkBounds(index));
@@ -106,6 +115,8 @@ public class OffheapBitSet implements Closeable {
 
     /**
      * clears the bit. The index should be less than the capacity.
+     *
+     * @param index a bit index
      */
     public void clear(long index) {
         unsafeClear(checkBounds(index));

@@ -16,14 +16,6 @@
 
 package one.nio.net;
 
-import one.nio.os.NativeLibrary;
-import one.nio.util.ByteArrayBuilder;
-import one.nio.util.Utf8;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.net.ssl.SSLException;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -33,6 +25,15 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.net.ssl.SSLException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import one.nio.os.NativeLibrary;
+import one.nio.util.ByteArrayBuilder;
+import one.nio.util.Utf8;
 
 public abstract class SslContext {
     private static final Logger log = LoggerFactory.getLogger(SslContext.class);
@@ -84,6 +85,9 @@ public abstract class SslContext {
 
         setCiphers(config.ciphers != null ? config.ciphers : SslConfig.DEFAULT_CIPHERS);
 
+        // with null the curve will be auto-selected by openssl
+        setCurve(config.curve);
+
         if (changed(config.passphrase, currentConfig.passphrase)) {
             setPassphrase(Utf8.toBytes(getPassphrase(config.passphrase)));
         }
@@ -116,8 +120,18 @@ public abstract class SslContext {
         }
 
         setVerify(config.verifyMode);
-        setCacheSize(config.cacheSize != 0 ? config.cacheSize : SslConfig.DEFAULT_CACHE_SIZE);
+
+        setSessionCache(config.cacheMode, config.cacheSize != 0 ? config.cacheSize : SslConfig.DEFAULT_CACHE_SIZE);
+
         setTimeout(config.timeout != 0 ? config.timeout / 1000 : SslConfig.DEFAULT_TIMEOUT_SEC);
+
+        setMaxEarlyData(config.maxEarlyDataSize);
+
+        if (config.maxEarlyDataSize > 0) {
+            setAntiReplayEnabled(config.antiReplayEnabled);
+        }
+
+        setKernelTlsEnabled(config.kernelTlsEnabled);
 
         if (changed(config.sessionId, currentConfig.sessionId)) {
             setSessionId(Utf8.toBytes(config.sessionId));
@@ -136,6 +150,14 @@ public abstract class SslContext {
         if (config.sni != currentConfig.sni) {
             inherit(config, config.sni);
             setSNI(config.sni);
+        }
+
+        if (config.compressionAlgorithms != currentConfig.compressionAlgorithms) {
+            setCompressionAlgorithms(config.compressionAlgorithms);
+        }
+
+        if (config.keylog != currentConfig.keylog) {
+            setKeylog(config.keylog);
         }
 
         this.currentConfig = config;
@@ -285,16 +307,22 @@ public abstract class SslContext {
     public abstract void setRdrand(boolean rdrand) throws SSLException;
     public abstract void setProtocols(String protocols) throws SSLException;
     public abstract void setCiphers(String ciphers) throws SSLException;
+    public abstract void setCurve(String curve) throws SSLException;
     public abstract void setCertificate(String certFile) throws SSLException;
     public abstract void setPrivateKey(String privateKeyFile) throws SSLException;
     public abstract void setPassphrase(byte[] passphrase) throws SSLException;
     public abstract void setCA(String caFile) throws SSLException;
     public abstract void setVerify(int verifyMode) throws SSLException;
     public abstract void setTicketKeys(byte[] keys) throws SSLException;
-    public abstract void setCacheSize(int size) throws SSLException;
+    public abstract void setSessionCache(String mode, int size) throws SSLException;
     public abstract void setTimeout(long timeout) throws SSLException;
     public abstract void setSessionId(byte[] sessionId) throws SSLException;
     public abstract void setApplicationProtocols(String[] protocols) throws SSLException;
     public abstract void setOCSP(byte[] response) throws SSLException;
     public abstract void setSNI(SslConfig[] sni) throws IOException;
+    public abstract void setMaxEarlyData(int size) throws SSLException;
+    public abstract void setKernelTlsEnabled(boolean kernelTlsEnabled) throws SSLException;
+    public abstract void setCompressionAlgorithms(String[] algorithms) throws SSLException;
+    public abstract void setAntiReplayEnabled(boolean antiReplayEnabled) throws SSLException;
+    public abstract void setKeylog(boolean keylog);
 }

@@ -53,7 +53,7 @@ Java_one_nio_os_bpf_Bpf_progLoad(JNIEnv* env, jclass cls, jstring pathname, jint
         if (libbpf == NULL) {
             libbpf = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
             if (libbpf == NULL) {
-                throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so");
+                throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so or libbpf.so.0");
                 return -EINVAL;
             }
         }
@@ -223,6 +223,70 @@ Java_one_nio_os_bpf_Bpf_progGetMapIds(JNIEnv* env, jclass cls, int bpf_fd) {
         (*env)->SetIntArrayRegion(env, result, 0, num_maps, map_ids2);
     }
     return result;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyteArray data_in, jint len_data_in, jbyteArray data_out,
+                                    jbyteArray ctx_in, jint len_ctx_in, jbyteArray ctx_out, jintArray retvals /* data_size_out,ctx_size_out,duration,retval */) {
+
+	union bpf_attr attr;
+	int res;
+
+	memset(&attr, 0, sizeof(attr));
+	attr.test.prog_fd = prog_fd;
+
+	jbyte *b_ctx_in=NULL, *b_data_in=NULL, *b_ctx_out=NULL, *b_data_out=NULL;
+
+
+    if (ctx_in != NULL) {
+    	attr.test.ctx_size_in = len_ctx_in;
+    	b_ctx_in = (*env)->GetByteArrayElements(env, ctx_in, NULL);
+    	attr.test.ctx_in = ptr_to_u64(b_ctx_in);
+    }
+    if (data_in != NULL) {
+    	attr.test.data_size_in = len_data_in;
+    	b_data_in = (*env)->GetByteArrayElements(env, data_in, NULL);
+    	attr.test.data_in = ptr_to_u64(b_data_in);
+    }
+    if (ctx_out != NULL) {
+    	attr.test.ctx_size_out = (*env)->GetArrayLength(env, ctx_out);
+    	b_ctx_out = (*env)->GetByteArrayElements(env, ctx_out, NULL);
+    	attr.test.ctx_out = ptr_to_u64(b_ctx_out);
+    }
+    if (data_out != NULL) {
+    	attr.test.data_size_out = (*env)->GetArrayLength(env, data_out);
+    	b_data_out = (*env)->GetByteArrayElements(env, data_out, NULL);
+    	attr.test.data_out = ptr_to_u64(b_data_out);
+    }
+
+	res = sys_bpf(BPF_PROG_TEST_RUN, &attr, sizeof(attr));
+
+	if (retvals != NULL) {
+        const jint b_result[] = {
+            attr.test.data_size_out,
+            attr.test.ctx_size_out,
+            attr.test.duration,
+            attr.test.retval
+        };
+        (*env)->SetIntArrayRegion(env, retvals, 0, sizeof(b_result)/sizeof(int), b_result);
+	}
+
+    if (ctx_in != NULL) {
+        (*env)->ReleaseByteArrayElements(env, ctx_in, b_ctx_in, JNI_ABORT);
+    }
+    if (data_in != NULL) {
+        (*env)->ReleaseByteArrayElements(env, data_in, b_data_in, JNI_ABORT);
+    }
+    if (ctx_out != NULL) {
+        (*env)->ReleaseByteArrayElements(env, ctx_out, b_ctx_out, 0);
+    }
+    if (data_out != NULL) {
+        (*env)->ReleaseByteArrayElements(env, data_out, b_data_out, 0);
+    }
+
+    if (res < 0) {
+        throw_io_exception(env);
+    }
 }
 
 JNIEXPORT jint JNICALL

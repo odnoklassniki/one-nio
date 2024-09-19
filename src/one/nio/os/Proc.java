@@ -44,6 +44,10 @@ public final class Proc {
 
     /**
      * The same as above, but allows an arbitrary long mask
+     *
+     * @param pid an id of a thread. If pid is zero, then the calling thread is used
+     * @param mask a thread's CPU affinity mask
+     * @return 0 on success or errno on failure
      */
     public static native int setAffinity(int pid, long[] mask);
     public static native long[] getAffinity(int pid);
@@ -63,6 +67,7 @@ public final class Proc {
 
     /**
      * @param pid pid or tid. 0 for current thread
+     * @param policy one of the POSIX scheduling policies
      * @return 0 on success or errno on failure
      */
     public static native int sched_setscheduler(int pid, int policy);
@@ -90,6 +95,7 @@ public final class Proc {
      * setpriority() shall set the nice value to the highest supported value.
      * 
      * @param pid pid or tid. 0 for current thread
+     * @param value a nice value
      * @return 0 on success; otherwise, -1 shall be returned and errno set to indicate the error.
      */
     public static native int setpriority(int pid, int value);
