@@ -23,6 +23,9 @@ class NativeSslSocket extends NativeSocket {
     NativeSslContext context;
     long ssl;
 
+    private volatile boolean isEarlyDataAccepted = false;
+    private volatile boolean isHandshakeDone = false;
+
     NativeSslSocket(int fd, NativeSslContext context, boolean serverMode) throws IOException {
         super(fd);
         context.refresh();
@@ -41,12 +44,14 @@ class NativeSslSocket extends NativeSocket {
 
     @Override
     public NativeSocket accept() throws IOException {
-        return new NativeSslSocket(accept0(false), context, true);
+        int fd = accept0(false);
+        return fd >= 0 ? new NativeSslSocket(fd, context, true) : null;
     }
 
     @Override
     public NativeSocket acceptNonBlocking() throws IOException {
-        return new NativeSslSocket(accept0(true), context, true);
+        int fd = accept0(true);
+        return fd >= 0 ? new NativeSslSocket(fd, context, true) : null;
     }
 
     @Override
@@ -63,31 +68,29 @@ class NativeSslSocket extends NativeSocket {
     @SuppressWarnings("unchecked")
     public Object getSslOption(SslOption option) {
         switch (option.id) {
-            case 1:
+            case SslOption.PEER_CERTIFICATE_ID:
                 return sslPeerCertificate();
-            case 2:
+            case SslOption.PEER_CERTIFICATE_CHAIN_ID:
                 return sslPeerCertificateChain();
-            case 3:
+            case SslOption.PEER_SUBJECT_ID:
                 return sslCertName(0);
-            case 4:
+            case SslOption.PEER_ISSUER_ID:
                 return sslCertName(1);
-            case 5:
+            case SslOption.VERIFY_RESULT_ID:
                 return sslVerifyResult();
-            case 6:
+            case SslOption.SESSION_REUSED_ID:
                 return sslSessionReused();
-            case 7:
+            case SslOption.SESSION_TICKET_ID:
                 return sslSessionTicket();
-            case 8:
+            case SslOption.CURRENT_CIPHER_ID:
                 return sslCurrentCipher();
+            case SslOption.SESSION_EARLYDATA_ACCEPTED_ID:
+                return sslSessionEarlyDataAccepted();
+            case SslOption.SESSION_HANDSHAKE_DONE_ID:
+                return sslHandshakeDone();
         }
         return null;
     }
-
-    @Override
-    public long sendFile(RandomAccessFile file, long offset, long count) throws IOException {
-        throw new IOException("Cannot use sendFile with SSL");
-    }
-
     @Override
     public synchronized native void handshake() throws IOException;
 
@@ -108,6 +111,19 @@ class NativeSslSocket extends NativeSocket {
 
     @Override
     public synchronized native void readFully(byte[] data, int offset, int count) throws IOException;
+
+    @Override
+    synchronized native long sendFile0(int sourceFD, long offset, long count) throws IOException;
+
+    private boolean sslSessionEarlyDataAccepted() {
+        // the value is updated by native code during IO operations
+        return isEarlyDataAccepted;
+    }
+
+    private boolean sslHandshakeDone() {
+        // the value is updated by native code during IO operations
+        return isHandshakeDone;
+    }
 
     private synchronized native byte[] sslPeerCertificate();
     private synchronized native Object[] sslPeerCertificateChain();

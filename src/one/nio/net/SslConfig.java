@@ -25,6 +25,7 @@ import java.util.Properties;
 public class SslConfig {
     // Conservative ciphersuite according to https://wiki.mozilla.org/Security/Server_Side_TLS
     static final String DEFAULT_CIPHERS = "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA";
+    static final String DEFAULT_CACHE_MODE = "internal";
     static final int DEFAULT_CACHE_SIZE = 262144;
     static final long DEFAULT_TIMEOUT_SEC = 300;
     static final long DEFAULT_REFRESH_INTERVAL = 300_000;
@@ -33,6 +34,7 @@ public class SslConfig {
     public boolean rdrand;
     public String protocols;
     public String ciphers;
+    public String curve;
     public String[] certFile;
     public String[] privateKeyFile;
     public String passphrase;
@@ -40,7 +42,8 @@ public class SslConfig {
     public String ticketKeyFile;
     public String ticketDir;
     public int verifyMode;
-    public int cacheSize;
+    public String cacheMode = DEFAULT_CACHE_MODE; // "none", "internal", "external"
+    public int cacheSize = DEFAULT_CACHE_SIZE;
     @Converter(method = "longTime")
     public long timeout;
     @Converter(method = "longTime")
@@ -48,6 +51,11 @@ public class SslConfig {
     public String sessionId;
     public String[] applicationProtocols;
     public String ocspFile;
+    public String[] compressionAlgorithms;
+    public int maxEarlyDataSize = 0;  // zero value disables 0-RTT feature
+    public boolean kernelTlsEnabled = false;
+    public boolean antiReplayEnabled = true; // flag is relevant only if early-data used
+    public boolean keylog;
 
     // The following fields should not be updated by SslContext.inherit()
     String hostName;
@@ -57,6 +65,7 @@ public class SslConfig {
         SslConfig config = new SslConfig();
         config.protocols      = props.getProperty("one.nio.ssl.protocols");
         config.ciphers        = props.getProperty("one.nio.ssl.ciphers");
+        config.curve          = props.getProperty("one.nio.ssl.curve");
         config.certFile       = toArray(props.getProperty("one.nio.ssl.certFile"));
         config.privateKeyFile = toArray(props.getProperty("one.nio.ssl.privateKeyFile"));
         config.passphrase     = props.getProperty("one.nio.ssl.passphrase");

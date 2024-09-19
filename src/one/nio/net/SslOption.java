@@ -17,16 +17,29 @@
 package one.nio.net;
 
 public class SslOption<T> {
-    public static final SslOption<byte[]> PEER_CERTIFICATE = new SslOption<>(1, byte[].class);
-    public static final SslOption<Object[]> PEER_CERTIFICATE_CHAIN = new SslOption<>(2, Object[].class);
-    public static final SslOption<String> PEER_SUBJECT = new SslOption<>(3, String.class);
-    public static final SslOption<String> PEER_ISSUER = new SslOption<>(4, String.class);
-    public static final SslOption<String> VERIFY_RESULT = new SslOption<>(5, String.class);
+    static final int PEER_CERTIFICATE_ID = 1;
+    static final int PEER_CERTIFICATE_CHAIN_ID = 2;
+    static final int PEER_SUBJECT_ID = 3;
+    static final int PEER_ISSUER_ID = 4;
+    static final int VERIFY_RESULT_ID = 5;
+    static final int SESSION_REUSED_ID = 6;
+    static final int SESSION_TICKET_ID = 7;
+    static final int CURRENT_CIPHER_ID = 8;
+    static final int SESSION_EARLYDATA_ACCEPTED_ID = 9;
+    static final int SESSION_HANDSHAKE_DONE_ID = 10;
 
-    public static final SslOption<Boolean> SESSION_REUSED = new SslOption<>(6, Boolean.class);
-    public static final SslOption<Integer> SESSION_TICKET = new SslOption<>(7, Integer.class);
+    public static final SslOption<byte[]> PEER_CERTIFICATE = new SslOption<>(PEER_CERTIFICATE_ID, byte[].class);
+    public static final SslOption<Object[]> PEER_CERTIFICATE_CHAIN = new SslOption<>(PEER_CERTIFICATE_CHAIN_ID, Object[].class);
+    public static final SslOption<String> PEER_SUBJECT = new SslOption<>(PEER_SUBJECT_ID, String.class);
+    public static final SslOption<String> PEER_ISSUER = new SslOption<>(PEER_ISSUER_ID, String.class);
+    public static final SslOption<String> VERIFY_RESULT = new SslOption<>(VERIFY_RESULT_ID, String.class);
 
-    public static final SslOption<String> CURRENT_CIPHER = new SslOption<>(8, String.class);
+    public static final SslOption<Boolean> SESSION_REUSED = new SslOption<>(SESSION_REUSED_ID, Boolean.class);
+    public static final SslOption<Integer> SESSION_TICKET = new SslOption<>(SESSION_TICKET_ID, Integer.class);
+
+    public static final SslOption<String> CURRENT_CIPHER = new SslOption<>(CURRENT_CIPHER_ID, String.class);
+    public static final SslOption<Boolean> SESSION_EARLYDATA_ACCEPTED = new SslOption<>(SESSION_EARLYDATA_ACCEPTED_ID, Boolean.class);
+    public static final SslOption<Boolean> SESSION_HANDSHAKE_DONE = new SslOption<>(SESSION_HANDSHAKE_DONE_ID, Boolean.class);
 
     final int id;
     final Class<T> type;

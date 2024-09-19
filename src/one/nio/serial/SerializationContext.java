@@ -42,6 +42,7 @@ public class SerializationContext {
     }
 
     /**
+     * @param obj an object to put in the context
      * @return index for existing objects, -1-index for new
      */
     public int put(Object obj) {

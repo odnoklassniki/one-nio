@@ -28,7 +28,7 @@ public class ConfigParserTest {
             "keepAlive: 120s\n" +
             "maxWorkers: 1000\n" +
             "queueTime: 50MS\n" +
-            "\n" +
+            "selectorThreadNameFormat: push sel-r #%d\n" +
             "acceptors:\n" +
             " - port: 443\n" +
             "   backlog: 10000\n" +
@@ -68,6 +68,8 @@ public class ConfigParserTest {
         assertEquals(50, config.queueTime);
         assertEquals(0, config.minWorkers);
         assertEquals(0, config.selectors);
+        assertEquals("push sel-r #%d", config.selectorThreadNameFormat);
+        assertEquals("push sel-r #42", config.formatSelectorThreadName(42));
         assertEquals(false, config.affinity);
         assertEquals(Thread.NORM_PRIORITY, config.threadPriority);
 

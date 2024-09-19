@@ -61,6 +61,11 @@
         <defaultGoal>install</defaultGoal>
         <sourceDirectory>src</sourceDirectory>
         <testSourceDirectory>test</testSourceDirectory>
+        <testResources>
+            <testResource>
+                <directory>test_data</directory>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -85,7 +90,7 @@
                                 </pathconvert>
 
                                 <exec os="Linux" executable="gcc">
-                                    <arg line="-D_GNU_SOURCE -fPIC -shared -Wl,-soname,libonenio.so ${gcc.args}
+                                    <arg line="-D_GNU_SOURCE -fPIC -shared -Wl,-soname,libonenio.so ${gcc.args} --verbose
                                                -o ${build.dir}/native/libonenio.so
                                                -I ${java.home}/include -I ${java.home}/include/linux
                                                -I ${java.home}/../include -I ${java.home}/../include/linux

@@ -116,8 +116,18 @@ public class LongHashSet {
         unsafe.putOrderedLong(null, keys + (long) index * 8, value);
     }
 
+    /**
+     * This method is not atomic and must not be invoked concurrently with other modification methods (e.g., {@link LongHashSet#putKey} or {@link LongHashSet#removeKey})
+     */
     public void clear() {
+        int sizeBefore = size;
         unsafe.setMemory(keys, (long) capacity * 8, (byte) 0);
+        for (;;) {
+            int current = size;
+            if (unsafe.compareAndSwapInt(this, sizeOffset, current, Math.max(0, current - sizeBefore))) {
+                return;
+            }
+        }
     }
 
     protected void incrementSize() {

@@ -141,6 +141,10 @@ public abstract class Socket implements ByteChannel {
     public abstract int getSendBuffer();
     public abstract void setTos(int tos);
     public abstract int getTos();
+    public void setNotsentLowat(int lowat) {}
+    public int getNotsentLowat() {return 0;}
+    public void setThinLinearTimeouts(boolean thinLto) {}
+    public boolean getThinLinearTimeouts(){return false;}
     public abstract byte[] getOption(int level, int option);
     public abstract boolean setOption(int level, int option, byte[] value);
     public abstract InetSocketAddress getLocalAddress();
@@ -152,7 +156,9 @@ public abstract class Socket implements ByteChannel {
 
     public Socket acceptNonBlocking() throws IOException {
         Socket s = accept();
-        s.setBlocking(false);
+        if (s != null) {
+            s.setBlocking(false);
+        }
         return s;
     }
 
@@ -180,8 +186,23 @@ public abstract class Socket implements ByteChannel {
         return read(data, offset, count, 0);
     }
 
+    @Deprecated
     public static Socket create() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(0, SOCK_STREAM) : new JavaSocket();
+        return createClientSocket(null);
+    }
+
+    public static Socket createClientSocket() throws IOException {
+        return createClientSocket(null);
+    }
+
+    public static Socket createClientSocket(SslContext sslContext) throws IOException {
+        Socket socket;
+        if (NativeLibrary.IS_SUPPORTED) {
+            socket = new NativeSocket(0, SOCK_STREAM);
+        } else {
+            socket = sslContext == null ? new JavaSocket() : new JavaSslClientSocket((JavaSslClientContext) sslContext);
+        }
+        return socket;
     }
 
     public static Socket createServerSocket() throws IOException {
@@ -201,7 +222,7 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket connectInet(InetAddress address, int port) throws IOException {
-        Socket sock = create();
+        Socket sock = createClientSocket();
         sock.connect(address, port);
         return sock;
     }

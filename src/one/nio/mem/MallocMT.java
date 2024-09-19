@@ -69,6 +69,9 @@ public class MallocMT extends Malloc {
 
     /**
      * Deterministically get one of the segments by some {@code long} value
+     *
+     * @param n an index of the segment to return
+     * @return the {@link Malloc} instance for the specified segment
      */
     public Malloc segmentFor(long n) {
         return segments[(int) n & (segments.length - 1)];

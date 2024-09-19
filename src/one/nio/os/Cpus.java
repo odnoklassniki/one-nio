@@ -43,7 +43,7 @@ public class Cpus {
                 String[] s = range.split("-");
                 int from = Integer.parseInt(s[0]);
                 int to = s.length == 1 ? from : Integer.parseInt(s[1]);
-                cpus.set(from, to);
+                cpus.set(from, to + 1);
             }
             return cpus;
         } catch (IOException e) {

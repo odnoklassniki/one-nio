@@ -50,12 +50,14 @@ class NativeSocket extends Socket {
 
     @Override
     public NativeSocket accept() throws IOException {
-        return new NativeSocket(accept0(false));
+        int fd = accept0(false);
+        return fd >= 0 ? new NativeSocket(fd) : null;
     }
 
     @Override
     public NativeSocket acceptNonBlocking() throws IOException {
-        return new NativeSocket(accept0(true));
+        int fd = accept0(true);
+        return fd >= 0 ? new NativeSocket(fd) : null;
     }
 
     @Override
@@ -299,6 +301,18 @@ class NativeSocket extends Socket {
     public final native int getTos();
 
     @Override
+    public final native void setNotsentLowat(int lowat);
+
+    @Override
+    public final native int getNotsentLowat();
+
+    @Override
+    public final native void setThinLinearTimeouts(boolean thinLto);
+
+    @Override
+    public final native boolean getThinLinearTimeouts();
+
+    @Override
     public native byte[] getOption(int level, int option);
 
     @Override
@@ -315,7 +329,7 @@ class NativeSocket extends Socket {
     final native void connect0(Object address, int port) throws IOException;
     final native void bind0(Object address, int port) throws IOException;
     final native int accept0(boolean nonblock) throws IOException;
-    final native long sendFile0(int sourceFD, long offset, long count) throws IOException;
+    native long sendFile0(int sourceFD, long offset, long count) throws IOException;
     final native int sendTo0(byte[] data, int offset, int size, int flags, Object address, int port) throws IOException;
     final native int sendTo1(long buf, int size, int flags, Object address, int port) throws IOException;
     final native int recvFrom0(byte[] data, int offset, int maxSize, int flags, AddressHolder holder) throws IOException;

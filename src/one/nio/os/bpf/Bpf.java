@@ -43,6 +43,8 @@ public class Bpf {
 
     static native int[] progGetMapIds(int fd) throws IOException;
 
+    static native void progTestRun(int fd, byte[] dataIn, int lenDataIn, byte[] dataOut, byte[] ctxIn, int lenCtxIn, byte[] ctxOut, int[] retvals /* data_size_out,ctx_size_out,duration,retval */) throws IOException;
+
     static native int rawTracepointOpen(int progFd, String name) throws IOException;
 
     static native String mapGetInfo(int fd, int[] result /*type,id,key_size,value_size,max_entries,flags*/) throws IOException;

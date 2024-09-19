@@ -18,15 +18,22 @@ package one.nio.net;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.SocketOption;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+
+import one.nio.util.JavaInternals;
 
 final class JavaServerSocket extends SelectableJavaSocket {
+    private static final SocketOption<Boolean> SO_REUSEPORT_COMPAT = findReusePortOption();
+
     final ServerSocketChannel ch;
 
     JavaServerSocket() throws IOException {
@@ -49,7 +56,8 @@ final class JavaServerSocket extends SelectableJavaSocket {
 
     @Override
     public final JavaSocket accept() throws IOException {
-        return new JavaSocket(ch.accept());
+        SocketChannel accepted = ch.accept();
+        return accepted != null ? new JavaSocket(accepted) : null;
     }
 
     @Override
@@ -208,7 +216,9 @@ final class JavaServerSocket extends SelectableJavaSocket {
     public final void setReuseAddr(boolean reuseAddr, boolean reusePort) {
         try {
             ch.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
-            // todo: java 9+ SO_REUSEPORT
+            if (SO_REUSEPORT_COMPAT != null && ch.supportedOptions().contains(SO_REUSEPORT_COMPAT)) {
+                ch.setOption(SO_REUSEPORT_COMPAT, reusePort);
+            }
         } catch (IOException e) {
             // Ignore
         }
@@ -225,7 +235,13 @@ final class JavaServerSocket extends SelectableJavaSocket {
 
     @Override
     public boolean getReusePort() {
-        return false;
+        try {
+            return SO_REUSEPORT_COMPAT != null && ch.supportedOptions().contains(SO_REUSEPORT_COMPAT)
+                    ? ch.getOption(SO_REUSEPORT_COMPAT)
+                    : false;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     @Override
@@ -266,11 +282,12 @@ final class JavaServerSocket extends SelectableJavaSocket {
 
     @Override
     public final void setSendBuffer(int sendBuf) {
-        // Ignore
+        // See sun.nio.ch.ServerSocketChannelImpl.supportedOptions
     }
 
     @Override
     public int getSendBuffer() {
+        // See sun.nio.ch.ServerSocketChannelImpl.supportedOptions
         return 0;
     }
 
@@ -321,5 +338,16 @@ final class JavaServerSocket extends SelectableJavaSocket {
     @Override
     public SelectableChannel getSelectableChannel() {
         return ch;
+    }
+
+    private static SocketOption<Boolean> findReusePortOption() {
+        try {
+            Field reusePortField = JavaInternals.findField(StandardSocketOptions.class, "SO_REUSEPORT");
+            if (reusePortField != null) {
+                return (SocketOption<Boolean>) reusePortField.get(null);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 }

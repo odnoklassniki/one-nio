@@ -16,6 +16,14 @@
 
 package one.nio.rpc;
 
+import java.io.IOException;
+import java.io.NotSerializableException;
+import java.net.InetSocketAddress;
+import java.util.concurrent.RejectedExecutionException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import one.nio.http.Request;
 import one.nio.net.ProxyProtocol;
 import one.nio.net.Session;
@@ -30,11 +38,8 @@ import one.nio.serial.SerializeStream;
 import one.nio.serial.SerializerNotFoundException;
 import one.nio.util.Utf8;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.concurrent.RejectedExecutionException;
-
 public class RpcSession<S, M> extends Session {
+    protected static final Logger logSerialize = LoggerFactory.getLogger("one-serializer-logger");
     protected static final int BUFFER_SIZE = 8000;
     protected static final byte HTTP_REQUEST_UID = (byte) Repository.get(Request.class).uid();
 
@@ -198,10 +203,14 @@ public class RpcSession<S, M> extends Session {
         RpcPacket.checkWriteSize(responseSize);
         byte[] buffer = new byte[responseSize + 4];
 
-        DataStream ds = css.hasCycles() ? new SerializeStream(buffer, css.capacity()) : new DataStream(buffer);
-        ds.writeInt(responseSize);
-        ds.writeObject(response);
-
+        try {
+            DataStream ds = css.hasCycles() ? new SerializeStream(buffer, css.capacity()) : new DataStream(buffer);
+            ds.writeInt(responseSize);
+            ds.writeObject(response);
+        } catch (IOException | RuntimeException e) {
+            logSerialize.warn("Exception while serializing: {}", response, e);
+            return writeResponse(new NotSerializableException(e.getMessage()));
+        }
         super.write(buffer, 0, buffer.length);
         return responseSize;
     }

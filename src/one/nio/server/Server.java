@@ -16,21 +16,20 @@
 
 package one.nio.server;
 
-import one.nio.net.Selector;
-import one.nio.net.Session;
-import one.nio.net.Socket;
-import one.nio.mgt.Management;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.LongAdder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.LongAdder;
+import one.nio.mgt.Management;
+import one.nio.net.Selector;
+import one.nio.net.Session;
+import one.nio.net.Socket;
+import one.nio.server.acceptor.Acceptor;
+import one.nio.server.acceptor.AcceptorFactory;
 
 public class Server implements ServerMXBean {
     private static final Logger log = LoggerFactory.getLogger(Server.class);
@@ -42,34 +41,25 @@ public class Server implements ServerMXBean {
     private volatile QueueStats queueStats;
 
     protected final int port;
-    protected final CountDownLatch startSync;
-    protected volatile AcceptorThread[] acceptors;
+
+    protected volatile Acceptor acceptor;
+
     protected volatile SelectorThread[] selectors;
     protected boolean useWorkers;
     protected final WorkerPool workers;
     protected final CleanupThread cleanup;
     protected boolean closeSessions;
+    protected boolean pinAcceptors;
 
     public Server(ServerConfig config) throws IOException {
-        List<AcceptorThread> acceptors = new ArrayList<>();
-        for (AcceptorConfig ac : config.acceptors) {
-            for (int i = 0; i < ac.threads; i++) {
-                acceptors.add(new AcceptorThread(this, ac, i));
-            }
-        }
-
-        if (acceptors.isEmpty()) {
-            throw new IllegalArgumentException("No configured acceptors");
-        }
-
-        this.acceptors = acceptors.toArray(new AcceptorThread[0]);
-        this.startSync = new CountDownLatch(this.acceptors.length);
-        this.port = this.acceptors[0].port;
+        this.acceptor = AcceptorFactory.get(config).create(this, config.acceptors);
+        this.port = acceptor.getSinglePort();
 
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = new SelectorThread[config.selectors != 0 ? config.selectors : processors];
         for (int i = 0; i < selectors.length; i++) {
-            selectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1, config.schedulingPolicy);
+            String threadName = config.formatSelectorThreadName(i);
+            selectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1, config.schedulingPolicy, threadName);
             selectors[i].setPriority(config.threadPriority);
         }
         this.selectors = selectors;
@@ -81,6 +71,7 @@ public class Server implements ServerMXBean {
         this.cleanup = new CleanupThread(selectors, config.keepAlive);
 
         this.closeSessions = config.closeSessions;
+        this.pinAcceptors = config.pinAcceptors;
 
         this.selectorStats = new SelectorStats();
         this.queueStats = new QueueStats();
@@ -88,7 +79,7 @@ public class Server implements ServerMXBean {
 
     public synchronized void reconfigure(ServerConfig config) throws IOException {
         useWorkers = config.maxWorkers > 0;
-        if (config.minWorkers > workers.getMaximumPoolSize())  {
+        if (config.minWorkers > workers.getMaximumPoolSize()) {
             workers.setMaximumPoolSize(useWorkers ? config.maxWorkers : 2);
             workers.setCorePoolSize(config.minWorkers);
         } else {
@@ -97,47 +88,15 @@ public class Server implements ServerMXBean {
         }
         workers.setQueueTime(config.queueTime);
 
-        // Create a copy of the array, since the elements will be nulled out
-        // to allow reconfiguring multiple acceptors with the same address:port
-        AcceptorThread[] oldAcceptors = acceptors.clone();
-        List<AcceptorThread> newAcceptors = new ArrayList<>();
-        for (AcceptorConfig ac : config.acceptors) {
-            int threads = 0;
-            for (int i = 0; i < oldAcceptors.length; i++) {
-                AcceptorThread oldAcceptor = oldAcceptors[i];
-                if (oldAcceptor != null && oldAcceptor.port == ac.port && oldAcceptor.address.equals(ac.address)) {
-                    if (++threads <= ac.threads) {
-                        log.info("Reconfiguring acceptor: {}", oldAcceptor.getName());
-                        oldAcceptor.reconfigure(ac);
-                        oldAcceptors[i] = null;
-                        newAcceptors.add(oldAcceptor);
-                    }
-                }
-            }
-
-            for (; threads < ac.threads; threads++) {
-                AcceptorThread newAcceptor = new AcceptorThread(this, ac, threads);
-                log.info("New acceptor: {}", newAcceptor.getName());
-                newAcceptor.start();
-                newAcceptors.add(newAcceptor);
-            }
-        }
-
-        for (AcceptorThread oldAcceptor : oldAcceptors) {
-            if (oldAcceptor != null) {
-                log.info("Stopping acceptor: {}", oldAcceptor.getName());
-                oldAcceptor.shutdown();
-            }
-        }
-
-        acceptors = newAcceptors.toArray(new AcceptorThread[0]);
+        acceptor.reconfigure(config.acceptors);
 
         int processors = Runtime.getRuntime().availableProcessors();
         SelectorThread[] selectors = this.selectors;
         if (config.selectors > selectors.length) {
             SelectorThread[] newSelectors = Arrays.copyOf(selectors, config.selectors);
             for (int i = selectors.length; i < config.selectors; i++) {
-                newSelectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1, config.schedulingPolicy);
+                String threadName = config.formatSelectorThreadName(i);
+                newSelectors[i] = new SelectorThread(i, config.affinity ? i % processors : -1, config.schedulingPolicy, threadName);
                 newSelectors[i].setPriority(config.threadPriority);
                 newSelectors[i].start();
             }
@@ -146,6 +105,7 @@ public class Server implements ServerMXBean {
 
         cleanup.update(this.selectors, config.keepAlive);
         closeSessions = config.closeSessions;
+        pinAcceptors = config.pinAcceptors;
     }
 
     public synchronized void start() {
@@ -153,13 +113,10 @@ public class Server implements ServerMXBean {
             selector.start();
         }
 
-        for (AcceptorThread acceptor : acceptors) {
-            acceptor.start();
-        }
+        acceptor.start();
 
-        // Wait until all AcceptorThreads are listening for incoming connections
         try {
-            startSync.await();
+            acceptor.syncStart();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -174,9 +131,7 @@ public class Server implements ServerMXBean {
 
         cleanup.shutdown();
 
-        for (AcceptorThread acceptor : acceptors) {
-            acceptor.shutdown();
-        }
+        acceptor.shutdown();
 
         for (SelectorThread selector : selectors) {
             if (closeSessions) {
@@ -201,12 +156,62 @@ public class Server implements ServerMXBean {
         });
     }
 
-    protected Session createSession(Socket socket) throws RejectedSessionException {
+    public Session createSession(Socket socket) throws RejectedSessionException {
         return new Session(socket);
     }
 
-    protected void register(Session session) {
+    public void register(Session session, int acceptorIndex, int acceptorGroupSize) {
+        if (pinAcceptors) {
+            getSmallestPinnedSelector(acceptorIndex, acceptorGroupSize).register(session);
+            return;
+        }
+        register(session);
+    }
+
+    public void register(Session session) {
         getSmallestSelector().register(session);
+    }
+
+    /*
+     * If `pinAcceptors` is enabled for the server,  accepted sessions are distributed across the disjunctive set of selectors.
+     * When server is configured to have  less `acceptors`(K) less than `selectors`(N), the selectors group for the given acceptor
+     * by its indices forms an finite arithmetic sequence starting from the acceptor index with step K.
+     * Example: ServerConfig.acceptors = 3, ServerConfig.selectors = 8.
+     *   Acceptor #0 -> Selectors #0, #3, #6
+     *   Acceptor #1 -> Selectors #1, #4, #7
+     *   Acceptor #2 -> Selectors #2, #5
+     * Across the selectors' subset, the selector to serve the session is chosen on a random basis.
+     * Provided the server is configured to have more `acceptors`(K) than `selectors`(N), the serving selector index is calculated out of acceptor index modulo N.
+     * Example: ServerConfig.acceptors = 8, ServerConfig.selectors = 3.
+     *   Acceptor #0 -> Selector #0
+     *   Acceptor #1 -> Selector #1
+     *   Acceptor #2 -> Selector #2
+     *   Acceptor #3 -> Selector #0
+     *   ...
+     *   Acceptor #7 -> Selector #1
+     * Base configuration 1: acceptors = 1, selectors = N. The single acceptor balances sessions across all N selectors randomly.
+     * Base configuration 2: acceptors = N, selectors = N. Each acceptor has a single designated selector to serve the sessions.
+     */
+    private Selector getSmallestPinnedSelector(int idx, int total) {
+        Selector chosen;
+        SelectorThread[] selectors = this.selectors;
+        if (total >= selectors.length) {
+            chosen = selectors[idx % selectors.length].selector;
+        } else {
+            int q = selectors.length / total;
+            if (q * total + idx < selectors.length) {
+                q++;
+            }
+            if (q == 1) {
+                chosen = selectors[idx].selector;
+            } else {
+                ThreadLocalRandom r = ThreadLocalRandom.current();
+                Selector a = selectors[r.nextInt(q) * total + idx].selector;
+                Selector b = selectors[r.nextInt(q) * total + idx].selector;
+                chosen = a.size() < b.size() ? a : b;
+            }
+        }
+        return chosen;
     }
 
     private Selector getSmallestSelector() {
@@ -257,20 +262,12 @@ public class Server implements ServerMXBean {
 
     @Override
     public long getAcceptedSessions() {
-        long result = 0;
-        for (AcceptorThread acceptor : acceptors) {
-            result += acceptor.acceptedSessions;
-        }
-        return result;
+        return acceptor.getAcceptedSessions();
     }
 
     @Override
     public long getRejectedSessions() {
-        long result = 0;
-        for (AcceptorThread acceptor : acceptors) {
-            result += acceptor.rejectedSessions;
-        }
-        return result;
+        return acceptor.getRejectedSessions();
     }
 
     @Override
@@ -333,10 +330,7 @@ public class Server implements ServerMXBean {
 
     @Override
     public synchronized void reset() {
-        for (AcceptorThread acceptor : acceptors) {
-            acceptor.acceptedSessions = 0;
-            acceptor.rejectedSessions = 0;
-        }
+        acceptor.resetCounters();
 
         for (SelectorThread selector : selectors) {
             selector.operations = 0;
