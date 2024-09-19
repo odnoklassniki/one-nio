@@ -29,7 +29,6 @@ import java.util.List;
  *          ; When using the quoted-string syntax variant, the value
  *          ; after quoted-string unescaping MUST conform to the
  *          ; 'token' ABNF.
- *
  *  The limiting of parameter values to tokens or "quoted tokens" makes
  *  the parsing of the header significantly simpler and allows a number
  *  of short-cuts to be taken.
@@ -41,9 +40,9 @@ public class ExtensionRequestParser {
     public static List<ExtensionRequest> parse(String header) {
         final List<ExtensionRequest> result = new ArrayList<>();
 
-        // Step one, split the header into individual extensions using ',' as a separator
+        // split the header into array of extensions using ',' as a separator
         for (String unparsedExtension : header.split(",")) {
-            // Step two, split the extension into the registered name and parameter/value pairs
+            // split the extension into the registered name and parameter/value pairs
             final String[] unparsedParameters = unparsedExtension.split(";");
             final ExtensionRequest request = new ExtensionRequest(unparsedParameters[0].trim());
 
@@ -80,7 +79,7 @@ public class ExtensionRequestParser {
     }
 
     private static boolean containsDelims(String input) {
-        if (input == null || input.length() == 0) {
+        if (input == null || input.isEmpty()) {
             return false;
         }
         for (int i = 0; i < input.length(); i++) {

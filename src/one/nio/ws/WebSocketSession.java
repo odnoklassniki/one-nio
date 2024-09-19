@@ -201,10 +201,15 @@ public class WebSocketSession extends HttpSession {
     }
 
     protected void processExtensions(Request request, Response response) {
+        final String extensionsHeader = request.getHeader(WebSocketHeaders.EXTENSIONS);
+        if (extensionsHeader == null) {
+            return;
+        }
+        final List<ExtensionRequest> extensionRequests = ExtensionRequestParser.parse(extensionsHeader);
+        if (extensionRequests.isEmpty()) {
+            return;
+        }
         final StringBuilder responseHeaderBuilder = new StringBuilder(WebSocketHeaders.EXTENSIONS);
-        final List<ExtensionRequest> extensionRequests = ExtensionRequestParser.parse(
-                request.getHeader(WebSocketHeaders.EXTENSIONS)
-        );
         for (ExtensionRequest extensionRequest : extensionRequests) {
             Extension extension = createExtension(extensionRequest);
             if (extension != null) {

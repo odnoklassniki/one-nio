@@ -15,7 +15,7 @@
                        class="form-control"
                        placeholder="payload"
                        autocomplete="off"
-                       autofocus />
+                       autofocus/>
             </div>
             <div class="col-3">
                 <button id="send" name="submitButton" type="submit" class="btn btn-primary">
@@ -39,47 +39,49 @@
     </form>
 </div>
 <script>
-    const form = document.getElementById('form');
-    const logs = document.getElementById('logs');
+	const form = document.getElementById('form');
+	const logs = document.getElementById('logs');
 
-    let ws;
+	let ws;
 
-    form.connectButton.addEventListener('click', connect);
-    form.disconnectButton.addEventListener('click', disconnect);
-    form.addEventListener('submit', e => {
-        e.preventDefault();
-        ws?.send(form.text.value);
-        form.text.value = '';
-    });
+	form.connectButton.addEventListener('click', connect);
+	form.disconnectButton.addEventListener('click', disconnect);
+	form.addEventListener('submit', e => {
+		const text = form.text.value;
+		e.preventDefault();
+		log('info', 'Message sent: ' + text)
+		ws?.send(form.text.value);
+		form.text.value = '';
+	});
 
-    function connect() {
-        ws = new WebSocket('ws://localhost:8002/echo', ['echo1']);
-        log('warning', 'Connecting');
-        ws.addEventListener('open', () => {
-            form.connectButton.classList.remove('show');
-            form.disconnectButton.classList.add('show');
-            log('success', 'Connection established')
-        });
-        ws.addEventListener('close', () => {
-            form.connectButton.classList.add('show');
-            form.disconnectButton.classList.remove('show');
-            log('danger', 'Connection closed');
-        });
-        ws.addEventListener('error', (e) => log('danger', 'Error! ' + e.message));
-        ws.addEventListener('message', (e) => log('info', 'Message received: ' + e.data));
-    }
+	function connect() {
+		ws = new WebSocket('ws://localhost:8002/echo', ['echo1']);
+		log('warning', 'Connecting');
+		ws.addEventListener('open', () => {
+			form.connectButton.classList.remove('show');
+			form.disconnectButton.classList.add('show');
+			log('success', 'Connection established')
+		});
+		ws.addEventListener('close', () => {
+			form.connectButton.classList.add('show');
+			form.disconnectButton.classList.remove('show');
+			log('danger', 'Connection closed');
+		});
+		ws.addEventListener('error', (e) => log('danger', 'Error! ' + e.message));
+		ws.addEventListener('message', (e) => log('info', 'Message received: ' + e.data));
+	}
 
-    function disconnect() {
-        ws?.close();
-        ws = null;
-    }
+	function disconnect() {
+		ws?.close();
+		ws = null;
+	}
 
-    function log(level, text) {
-        const msg = document.createElement('div');
-        msg.classList.add('alert', 'alert-' + level);
-        msg.innerText = text;
-        logs.insertBefore(msg, logs.firstElementChild);
-    }
+	function log(level, text) {
+		const msg = document.createElement('div');
+		msg.classList.add('alert', 'alert-' + level);
+		msg.innerText = text;
+		logs.insertBefore(msg, logs.firstElementChild);
+	}
 </script>
 </body>
 </html>
