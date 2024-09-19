@@ -118,7 +118,7 @@ public class PerMessageDeflate implements Extension {
         }
 
         frame.setPayload(decompress(frame.isFin(), frame.getPayload()));
-        frame.setRsv(frame.getRsv() - RSV_BITMASK);
+        frame.setRsv(frame.getRsv() & ~RSV_BITMASK);
     }
 
     @Override
