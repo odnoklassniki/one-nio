@@ -26,22 +26,30 @@ import one.nio.ws.exception.TooBigException;
 import one.nio.ws.exception.WebSocketException;
 
 /**
+ * Websocket frame reader
+ * https://datatracker.ietf.org/doc/html/rfc6455#section-5.2
+ *
  * @author <a href="mailto:vadim.yelisseyev@gmail.com">Vadim Yelisseyev</a>
  */
 public class FrameReader {
+    // The smallest valid full WebSocket message is 2 bytes,
+    // such as this close message sent from the server with no payload: 138, 0.
+    // Yet the longest possible header is 14 bytes
+    // which would represent a message sent from the client to the server with a payload greater then 64KB.
+    private static final int HEADER_LENGTH = 14;
     private static final int FIRST_HEADER_LENGTH = 2;
     private static final int MASK_LENGTH = 4;
 
     private final Session session;
     private final byte[] header;
-    private final int maxFramePayloadLength = Integer.getInteger("one.nio.ws.MAX_FRAME_PAYLOAD_LENGTH", 64 * 1024);
+    private final int maxFramePayloadLength = Integer.getInteger("one.nio.ws.MAX_FRAME_PAYLOAD_LENGTH", 128 * 1024);
 
     private Frame frame;
     private int ptr;
 
     public FrameReader(Session session) {
         this.session = session;
-        this.header = new byte[10];
+        this.header = new byte[HEADER_LENGTH];
     }
 
     public Frame read() throws IOException {
