@@ -202,7 +202,7 @@ public class WebSocketSession extends HttpSession {
 
     protected void processExtensions(Request request, Response response) {
         final String extensionsHeader = request.getHeader(WebSocketHeaders.EXTENSIONS);
-        if (extensionsHeader == null) {
+        if (extensionsHeader == null || extensionsHeader.isEmpty()) {
             return;
         }
         final List<ExtensionRequest> extensionRequests = ExtensionRequestParser.parse(extensionsHeader);
