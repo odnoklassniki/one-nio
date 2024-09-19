@@ -149,7 +149,7 @@ public class FrameReader {
         int result = 0;
         int shift = 0;
         for (int i = len - 1; i >= 0; i--) {
-            result = result + ((b[i] & 0xFF) << shift);
+            result |= ((b[i] & 0xFF) << shift);
             shift += 8;
         }
         return result;
