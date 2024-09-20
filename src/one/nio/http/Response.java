@@ -59,6 +59,7 @@ public class Response {
     public static final String UNSUPPORTED_MEDIA_TYPE          = "415 Unsupported Media Type";
     public static final String REQUESTED_RANGE_NOT_SATISFIABLE = "416 Requested Range Not Satisfiable";
     public static final String EXPECTATION_FAILED              = "417 Expectation Failed";
+    public static final String UPGRADE_REQUIRED                = "426 Upgrade Required";
     public static final String INTERNAL_ERROR                  = "500 Internal Server Error";
     public static final String NOT_IMPLEMENTED                 = "501 Not Implemented";
     public static final String BAD_GATEWAY                     = "502 Bad Gateway";
