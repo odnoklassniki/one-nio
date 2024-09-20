@@ -1,3 +1,19 @@
+2.0.0
+ * BREAKING CHANGE: The native part of one-nio now links and works only with OpenSSL 3 (tested on OpenSSL versions 3.0 and 3.2). The OpenSSL library file must have name `libssl.so.3`.
+ * BREAKING CHANGE: Switched from GLIBC 2.2.5 to GLIBC 2.38
+ * Added support for Kernel TLS, including [`sendfile()`](https://docs.kernel.org/networking/tls-offload.html)
+ * Added support for TLS early data ([TLS 1.3 0-RTT](https://docs.openssl.org/3.2/man3/SSL_read_early_data/))
+ * Added ability to export encryption keys ([SSL keylog](https://docs.openssl.org/3.2/man3/SSL_CTX_set_keylog_callback/))
+ * Added support for SSL certificate compression (RFC8879, [man](https://docs.openssl.org/3.2/man3/SSL_CTX_set1_cert_comp_preference/))
+ * Added ability to use an external cache for [SSL sessions](https://docs.openssl.org/3.2/man3/SSL_CTX_sess_set_get_cb/)
+ * Added ability to constrain selectors used by an acceptor (`one.nio.server.ServerConfig#pinAcceptors`)
+ * Added ability to use a single acceptor thread for all sockets (`one.nio.server.ServerConfig#multiAcceptor`)
+ * Added support for server-sent events in `one.nio.http.HttpClient` ([spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#server-sent-events))
+ * Also various fixes and optimizations
+
+1.7.1
+ * Rebuilt with GLIBC 2.2.5
+
 1.7.0
  * Switch to slf4j-api for logging (#74)
  * Support new FileChannelImpl.map0() contract from JDK 19 (#75)
