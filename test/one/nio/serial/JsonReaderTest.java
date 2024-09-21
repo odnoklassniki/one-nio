@@ -29,7 +29,7 @@ import java.util.Set;
 public class JsonReaderTest {
     private static final String sample = "[{\n" +
             "  \"created_at\": \"Thu Jun 22 21:00:00 +0000 2017\",\n" +
-            "  \"id\": 877994604561387500,\n" +
+            "  \"id\": \"877994604561387500\",\n" +
             "  \"id_str\": \"877994604561387520\",\n" +
             "  \"text\": \"Creating a Grocery List Manager \\u0026 Display Items https://t.co/xFox12345 #Angular\",\n" +
             "  \"truncated\": false,\n" +
@@ -108,9 +108,34 @@ public class JsonReaderTest {
         Assert.assertTrue(x.set instanceof Set && x.set.isEmpty());
     }
 
+    @Test
+    public void seamlessConvertStringToBoolean() throws IOException, ClassNotFoundException {
+        Assert.assertEquals(true, Json.fromJson("{\"boolValue\":\"true\"}", Custom.class).boolValue);
+    }
+
+    @Test
+    public void seamlessConvertStringToNumber() throws IOException, ClassNotFoundException {
+        Assert.assertEquals(877994604561387500L, Json.fromJson("{\"longValue\":\"877994604561387500\"}", Custom.class).longValue.longValue());
+        Assert.assertEquals(123, Json.fromJson("{\"intValue\":\"123\"}", Custom.class).intValue);
+        Assert.assertEquals(123.456, Json.fromJson("{\"doubleValue\":\"123.456\"}", Custom.class).doubleValue, 0.0001D);
+    }
+
+    @Test
+    public void seamlessConvertBooleanToString() throws IOException, ClassNotFoundException {
+        Assert.assertEquals("true", Json.fromJson("{\"stringValue\":true}", Custom.class).stringValue);
+    }
+    @Test
+    public void seamlessConvertNumberToString() throws IOException, ClassNotFoundException {
+        Assert.assertEquals("877994604561387500", Json.fromJson("{\"stringValue\":877994604561387500}", Custom.class).stringValue);
+    }
+
     static class Custom implements Serializable {
+
+        boolean boolValue;
         int intValue;
+        double doubleValue;
         Long longValue = -77L;
+        String stringValue;
         final String string = "zzz";
         Object[] FB = {"A", true};
         Set<String> set = Collections.emptySet();
