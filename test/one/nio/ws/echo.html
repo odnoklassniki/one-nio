@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Echo server test</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div id="container" class="container m-4 ml-auto mr-auto">
+    <form id="form" class="form">
+        <div class="form-row">
+            <div class="col-9">
+                <input type="text"
+                       name="text"
+                       class="form-control"
+                       placeholder="payload"
+                       autocomplete="off"
+                       autofocus/>
+            </div>
+            <div class="col-3">
+                <button id="send" name="submitButton" type="submit" class="btn btn-primary">
+                    Send
+                </button>
+                <button name="connectButton"
+                        type="button"
+                        class="btn btn-success collapse show"
+                        title="connect to websocket">
+                    ✓
+                </button>
+                <button name="disconnectButton"
+                        type="button"
+                        class="btn btn-danger collapse"
+                        title="disconnect from websocket">
+                    ╳
+                </button>
+            </div>
+        </div>
+        <div class="form-group mt-4" id="logs"></div>
+    </form>
+</div>
+<script>
+	const form = document.getElementById('form');
+	const logs = document.getElementById('logs');
+
+	let ws;
+
+	form.connectButton.addEventListener('click', connect);
+	form.disconnectButton.addEventListener('click', disconnect);
+	form.addEventListener('submit', e => {
+		const text = form.text.value;
+		e.preventDefault();
+		log('info', 'Message sent: ' + text)
+		ws?.send(form.text.value);
+		form.text.value = '';
+	});
+
+	function connect() {
+		ws = new WebSocket('ws://localhost:8002/echo', ['echo1']);
+		log('warning', 'Connecting');
+		ws.addEventListener('open', () => {
+			form.connectButton.classList.remove('show');
+			form.disconnectButton.classList.add('show');
+			log('success', 'Connection established')
+		});
+		ws.addEventListener('close', () => {
+			form.connectButton.classList.add('show');
+			form.disconnectButton.classList.remove('show');
+			log('danger', 'Connection closed');
+		});
+		ws.addEventListener('error', (e) => log('danger', 'Error! ' + e.message));
+		ws.addEventListener('message', (e) => log('info', 'Message received: ' + e.data));
+	}
+
+	function disconnect() {
+		ws?.close();
+		ws = null;
+	}
+
+	function log(level, text) {
+		const msg = document.createElement('div');
+		msg.classList.add('alert', 'alert-' + level);
+		msg.innerText = text;
+		logs.insertBefore(msg, logs.firstElementChild);
+	}
+</script>
+</body>
+</html>
