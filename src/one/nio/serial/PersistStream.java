@@ -69,7 +69,7 @@ public class PersistStream extends SerializeStream {
     }
 
     @Override
-    protected long alloc(int size) {
+    protected long alloc(int size) throws IOException {
         long currentOffset = offset;
         if ((offset = currentOffset + size) > limit) {
             limit = Math.max(offset, limit * 2);
