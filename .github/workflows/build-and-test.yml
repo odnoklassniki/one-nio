@@ -1,0 +1,50 @@
+name: Build and run tests
+
+on:
+  push:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  build:
+
+    name: Build and run tests on JDK ${{ matrix.jdk }}
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        jdk: [8, 11, 17, 19, 21]
+    env:
+      main_jdk: 8
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.jdk }}
+          distribution: 'zulu'
+      - name: Setup dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt install gcc \
+          apt install libssl-dev \
+          apt install maven
+          
+      - name: Build and run tests
+        run: mvn clean test -DargLine="-Dci=true"
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: "target/surefire-reports/*.xml"
+          check_name: "Test results on JDK ${{ matrix.jdk }}"

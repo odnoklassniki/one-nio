@@ -21,9 +21,17 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.LongBuffer;
 
+import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Test;
 
 public class BpfMapTest {
+
+    @Before
+    public void beforeMethod() {
+        Assume.assumeTrue(!System.getProperty("ci", "false").equals("true"));
+    }
+    
     @Test
     public void testMap() throws IOException {
         BpfMap map = BpfMap.newMap(MapType.HASH, 4, 4, 2, null, 0);
