@@ -39,12 +39,15 @@ public class GeneratedSerializer extends Serializer {
     static final AtomicInteger renamedFields = new AtomicInteger();
     static final AtomicInteger unsupportedFields = new AtomicInteger();
 
+    private final boolean jsonOnlySerialization;
+
     private FieldDescriptor[] fds;
     private FieldDescriptor[] defaultFields;
     private Delegate delegate;
 
-    GeneratedSerializer(Class cls) {
+    GeneratedSerializer(Class cls, boolean jsonOnlySerialization) {
         super(cls);
+        this.jsonOnlySerialization = jsonOnlySerialization;
 
         Field[] ownFields = getSerializableFields();
         this.fds = new FieldDescriptor[ownFields.length / 2];
@@ -108,7 +111,7 @@ public class GeneratedSerializer extends Serializer {
 
     @Override
     public byte[] code() {
-        return DelegateGenerator.generate(cls, fds, defaultFields);
+        return DelegateGenerator.generate(cls, fds, defaultFields, jsonOnlySerialization);
     }
 
     @Override
