@@ -84,6 +84,7 @@ public abstract class SslContext {
         }
 
         setCiphers(config.ciphers != null ? config.ciphers : SslConfig.DEFAULT_CIPHERS);
+        setCiphersuites(config.ciphersuites != null ? config.ciphersuites : SslConfig.DEFAULT_CIPHERSUITES);
 
         // with null the curve will be auto-selected by openssl
         setCurve(config.curve);
@@ -307,6 +308,7 @@ public abstract class SslContext {
     public abstract void setRdrand(boolean rdrand) throws SSLException;
     public abstract void setProtocols(String protocols) throws SSLException;
     public abstract void setCiphers(String ciphers) throws SSLException;
+    public abstract void setCiphersuites(String ciphersuites) throws SSLException;
     public abstract void setCurve(String curve) throws SSLException;
     public abstract void setCertificate(String certFile) throws SSLException;
     public abstract void setPrivateKey(String privateKeyFile) throws SSLException;

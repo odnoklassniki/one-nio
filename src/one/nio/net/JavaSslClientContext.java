@@ -65,6 +65,11 @@ public class JavaSslClientContext extends SslContext {
     }
 
     @Override
+    public void setCiphersuites(String ciphersuites) throws SSLException {
+        // Ignore
+    }
+
+    @Override
     public void setCurve(String curve) throws SSLException {
         // Ignore
     }

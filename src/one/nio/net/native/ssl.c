@@ -710,6 +710,20 @@ Java_one_nio_net_NativeSslContext_setCiphers(JNIEnv* env, jobject self, jstring 
 }
 
 JNIEXPORT void JNICALL
+Java_one_nio_net_NativeSslContext_setCiphersuites(JNIEnv* env, jobject self, jstring ciphersuites) {
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
+
+    if (ciphersuites != NULL) {
+        const char* value = (*env)->GetStringUTFChars(env, ciphersuites, NULL);
+        int result = SSL_CTX_set_ciphersuites(ctx, value);
+        (*env)->ReleaseStringUTFChars(env, ciphersuites, value);
+        if (result <= 0) {
+            throw_ssl_exception(env);
+        }
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_setCurve(JNIEnv* env, jobject self, jstring curve) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     if (curve != NULL) {
