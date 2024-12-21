@@ -92,7 +92,7 @@ class NativeSslSocket extends NativeSocket {
         return null;
     }
     @Override
-    public synchronized native void handshake() throws IOException;
+    public synchronized native void handshake(String sniHostName) throws IOException;
 
     @Override
     public synchronized native int writeRaw(long buf, int count, int flags) throws IOException;

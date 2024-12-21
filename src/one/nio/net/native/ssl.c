@@ -1109,12 +1109,31 @@ Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) 
     SSL_free(ssl);
 }
 
+static void set_tlsext_host_name(JNIEnv* env, SSL* ssl, jstring hostName) {
+     if (hostName != NULL) {
+         struct in_addr ipv4;
+         struct in6_addr ipv6;
+         const char *value = (*env) -> GetStringUTFChars(env, hostName, NULL);
+         // set sni if hostname not ipv4/ipv6
+         if (inet_pton(AF_INET, value, &ipv4) != 1 && inet_pton(AF_INET6, value, &ipv6) != 1) {
+             int result = SSL_set_tlsext_host_name(ssl, value);
+             (*env)->ReleaseStringUTFChars(env, hostName, value);
+             if (result <= 0) {
+                 check_ssl_error(env, ssl, result);
+             }
+         } else {
+             (*env)->ReleaseStringUTFChars(env, hostName, value);
+         }
+     }
+}
+
 JNIEXPORT void JNICALL
-Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self) {
+Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self, jstring hostName) {
     SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         throw_socket_closed(env);
     } else {
+        set_tlsext_host_name(env, ssl, hostName);
         int result = SSL_do_handshake(ssl);
         if (result <= 0) {
             check_ssl_error(env, ssl, result);
