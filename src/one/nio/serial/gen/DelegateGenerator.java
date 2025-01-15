@@ -23,7 +23,6 @@ import one.nio.serial.JsonName;
 import one.nio.serial.NotSerial;
 import one.nio.serial.Repository;
 import one.nio.serial.SerializeWith;
-import one.nio.util.Hex;
 import one.nio.util.JavaFeatures;
 import one.nio.util.JavaInternals;
 import one.nio.util.MethodHandlesReflection;
@@ -34,8 +33,6 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandleInfo;
@@ -61,7 +58,7 @@ public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();
 
     // Allows to bypass security checks when accessing private members of other classes
-    private static final String MAGIC_CLASS = "sun/reflect/MagicAccessorImpl";
+    static final String MAGIC_CLASS = "sun/reflect/MagicAccessorImpl";
 
     // In JDK 9+ there is no more sun.reflect.MagicAccessorImpl class.
     // Instead there is package private jdk.internal.reflect.MagicAccessorImpl, which is not visible

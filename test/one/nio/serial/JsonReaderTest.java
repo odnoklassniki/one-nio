@@ -21,19 +21,12 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-
 public class JsonReaderTest {
-
-    static {
-        System.setProperty("one.nio.gen.dump", "/Users/ale.volkov/work/one-nio/dump");
-    }
-    
     private static final String sample = "[{\n" +
             "  \"created_at\": \"Thu Jun 22 21:00:00 +0000 2017\",\n" +
             "  \"id\": 877994604561387500,\n" +
