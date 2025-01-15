@@ -21,8 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         jdk: [8, 11, 17, 19, 21, 23]
-    env:
-      main_jdk: 8
 
     steps:
       - uses: actions/checkout@v3
