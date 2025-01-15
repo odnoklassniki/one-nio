@@ -253,11 +253,6 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitVarInsn(ALOAD, 1);
         mv.visitTypeInsn(NEW, Type.getInternalName(cls));
         mv.visitInsn(DUP_X1);
-//        mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "<init>", "()V", false);
-//        mv.visitVarInsn(ASTORE, 2);
-//        mv.visitVarInsn(ALOAD, 1);
-//        mv.visitVarInsn(ALOAD, 2);
-
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
 
         ArrayList<Field> parents = new ArrayList<>();
@@ -438,9 +433,6 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         // Create instance
         mv.visitTypeInsn(NEW, Type.getInternalName(cls));
-        //mv.visitInsn(DUP);
-//        mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "<init>", "()V", false);
-//        mv.visitVarInsn(ASTORE, 3);
 
         // Prepare a multimap (fieldHash -> fds) for lookupswitch
         TreeMap<Integer, FieldDescriptor> fieldHashes = new TreeMap<>();
@@ -515,7 +507,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             }
             do {
                 Label next = new Label();
-                mv.visitVarInsn(ALOAD, 3);
+                mv.visitVarInsn(ALOAD, 2);
                 mv.visitLdcInsn(fd.ownField().getName());
                 mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
                 mv.visitJumpInsn(IFEQ, fd.next == null ? skipUnknownField : next);
