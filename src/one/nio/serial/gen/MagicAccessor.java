@@ -43,7 +43,6 @@ public class MagicAccessor {
         return majorVersion >= 22;
     }
 
-
     private static byte[] generateClass(String name, String superClass) {
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         cv.visit(Opcodes.V1_6, Opcodes.ACC_PUBLIC, name, null, superClass, new String[]{});
