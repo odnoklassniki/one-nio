@@ -17,6 +17,7 @@
 package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
+import one.nio.serial.Before;
 import one.nio.serial.Default;
 import one.nio.serial.FieldDescriptor;
 import one.nio.serial.JsonName;
@@ -37,6 +38,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -111,10 +113,10 @@ public class DelegateGenerator extends BytecodeGenerator {
     }
     
     public static Delegate instantiate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
-        return instantiate(cls, fds, generate(cls, fds, defaultFields));
+        return instantiate(cls, fds, generate(cls, fds, defaultFields, false));
     }
 
-    public static byte[] generate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
+    public static byte[] generate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, boolean jsonOnly) {
         String className = "sun/reflect/Delegate" + index.getAndIncrement() + '_' + cls.getSimpleName();
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -122,10 +124,19 @@ public class DelegateGenerator extends BytecodeGenerator {
                 new String[]{"one/nio/serial/gen/Delegate"});
 
         generateConstructor(cv, className);
-        generateCalcSize(cv, cls, fds);
-        generateWrite(cv, cls, fds);
-        generateRead(cv, cls, fds, defaultFields, className);
-        generateSkip(cv, fds);
+
+        if (!jsonOnly) {
+            generateCalcSize(cv, cls, fds);
+            generateWrite(cv, cls, fds);
+            generateRead(cv, cls, fds, defaultFields, className);
+            generateSkip(cv, fds);
+        } else {
+            generateThrowCalcSize(cv, cls);
+            generateThrowWrite(cv, cls);
+            generateThrowRead(cv, cls);
+            generateThrowSkip(cv, cls);
+        }
+
         generateToJson(cv, cls, fds);
         generateFromJson(cv, cls, fds, defaultFields, className);
 
@@ -358,6 +369,30 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
+    private static void generateThrowNonSerializableMethod(ClassWriter cv, String methodName, String descriptor, Class cls) {
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, methodName, descriptor,
+                null, new String[]{"java/io/NotSerializableException"});
+        mv.visitCode();
+        emitThrow(mv, "java/io/NotSerializableException", cls.getName());
+        mv.visitEnd();
+    }
+
+    private static void generateThrowCalcSize(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V", cls);
+    }
+
+    private static void generateThrowWrite(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V", cls);
+    }
+
+    private static void generateThrowRead(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "read", "(Lone/nio/serial/DataStream;)Ljava/lang/Object;", cls);
+    }
+
+    private static void generateThrowSkip(ClassWriter cv, Class cls) {
+        generateThrowNonSerializableMethod(cv, "skip", "(Lone/nio/serial/DataStream;)V", cls);
+    }
+
     private static void generateToJson(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "toJson", "(Ljava/lang/Object;Ljava/lang/StringBuilder;)V",
                 null, new String[]{"java/io/IOException"});
@@ -399,6 +434,10 @@ public class DelegateGenerator extends BytecodeGenerator {
                     mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendChar", "(Ljava/lang/StringBuilder;C)V", false);
                     mv.visitVarInsn(ALOAD, 2);
                     break;
+                case Long:
+                    mv.visitMethodInsn(INVOKESTATIC, "one/nio/serial/Json", "appendLong", "(Ljava/lang/StringBuilder;J)V", false);
+                    mv.visitVarInsn(ALOAD, 2);
+                    break;
                 default:
                     mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", srcType.appendSignature(), false);
             }
@@ -430,6 +469,19 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         // Create instance
         mv.visitTypeInsn(NEW, Type.getInternalName(cls));
+
+        // support for calling constructor annotated with @Before
+        for (Class searchClass = cls; searchClass != null; searchClass = searchClass.getSuperclass()) {
+            Constructor constructor = JavaInternals.findConstructor(searchClass);
+            if (constructor != null && constructor.getAnnotation(Before.class) != null) {
+                if (searchClass != cls) {
+                    throw new IllegalArgumentException("To avoid unexpected behavior it is required to add @Before to no-arg constructor in " + cls + " because parent class does the same.");
+                }
+                mv.visitInsn(DUP);
+                mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(cls), "<init>", "()V", false);
+                break;
+            }
+        }
 
         // Prepare a multimap (fieldHash -> fds) for lookupswitch
         TreeMap<Integer, FieldDescriptor> fieldHashes = new TreeMap<>();
