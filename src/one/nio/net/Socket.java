@@ -174,7 +174,7 @@ public abstract class Socket implements ByteChannel {
         return send(data, flags, InetAddress.getByName(host), port);
     }
 
-    public void handshake() throws IOException {
+    public void handshake(String sniHostname) throws IOException {
         // Only for SSL sockets
     }
 
