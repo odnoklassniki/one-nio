@@ -35,14 +35,13 @@ jobs:
         run: |
           sudo apt install gcc \
           apt install libssl-dev \
-          apt install maven
           
       - name: Build and run tests
-        run: mvn clean test -DargLine="-Dci=true"
+        run: ./gradlew build --stacktrace --scan -Pci=true
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          files: "target/surefire-reports/*.xml"
+          files: "build/test-results/**/*.xml"
           check_name: "Test results on JDK ${{ matrix.jdk }}"

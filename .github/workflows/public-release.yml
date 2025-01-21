@@ -1,0 +1,84 @@
+name: Release
+run-name: Releasing ${{inputs.semVer}}
+
+on:
+  workflow_dispatch:
+    inputs:
+      semVer:
+        required: true
+        type: string
+        description: "Version number"
+
+jobs:
+  publish:
+    if: ${{ github.actor == 'lehvolk' || github.actor == 'incubos' || github.actor == 'truslan' || github.actor == 'apangin' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+      - name: Setup dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt install gcc \
+          apt install libssl-dev \
+          apt install maven
+
+      - name: Build and run tests
+        run: mvn versions:set -DnewVersion=${{inputs.semVer}}
+        
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          # Optional. Commit message for the created commit.
+          # Defaults to "Apply automatic changes"
+          commit_message: Releasing ${{inputs.semVer}}
+          # Optional. Options used by `git-commit`.
+          # See https://git-scm.com/docs/git-commit#_options
+          commit_options: '--no-verify --signoff'
+          # Optional glob pattern of files which should be added to the commit
+          # Defaults to all (.)
+          # See the `pathspec`-documentation for git
+          # - https://git-scm.com/docs/git-add#Documentation/git-add.txt-ltpathspecgt82308203
+          # - https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-aiddefpathspecapathspec
+          file_pattern: 'pom.xml'
+
+      - name: Publish to maven central staging
+        env:
+          MAVEN_GPG_KEY=${{ secrets.MAVEN_CENTRAL_LOGIN }}
+          -Ptoken=${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          MAVEN_GPG_KEY="${{ secrets.OSSRH_GPG_SECRET_KEY }}"
+          MAVEN_GPG_PASSPHRASE=${{ secrets.OSSRH_GPG_SECRET_PASSPHRASE }}
+        run: mvn deploy
+          
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{inputs.semVer}}
+          release_name: Release ${{inputs.semVer}}
+          body: |
+            Changes in this Release:
+          draft: true
+          prerelease: false
+
+      - name: Publish package
+        uses: gradle/gradle-build-action@67421db6bd0bf253fb4bd25b31ebb98943c375e1
+        with:
+          gradle-version: 7.6.1
+          arguments: |
+            publish
+            -PincludeDokka=true
+            -PsemVer=${{inputs.semVer}}
+            -Pactor=${{ secrets.MAVEN_CENTRAL_LOGIN }}
+            -Ptoken=${{ secrets.MAVEN_CENTRAL_TOKEN }}
+            -PgpgKey="${{ secrets.OSSRH_GPG_SECRET_KEY }}"
+            -PgpgPassphrase=${{ secrets.OSSRH_GPG_SECRET_PASSPHRASE }}
+            -PrepoUrl=https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/
