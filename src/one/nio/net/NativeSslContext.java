@@ -199,6 +199,9 @@ class NativeSslContext extends SslContext {
     @Override
     public native void setCiphers(String ciphers) throws SSLException;
 
+    @Override
+    public native void setCiphersuites(String ciphersuites) throws SSLException;
+
     /**
      * Sets the curve used for ECDH temporary keys used during key exchange.
      * Use <code>openssl ecparam -list_curves</code> to get list of supported curves.

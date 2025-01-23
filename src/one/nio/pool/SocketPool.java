@@ -177,7 +177,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
 
             if (sslContext != null) {
                 socket = socket.sslWrap(sslContext);
-                socket.handshake();
+                socket.handshake(host);
             }
 
             return socket;
