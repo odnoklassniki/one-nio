@@ -110,24 +110,24 @@ jreleaser {
             overwrite = true
         }
     }
-//    deploy {
-//        maven {
-//            nexus2 {
-//                create("maven-central") {
-//                    active = Active.ALWAYS
-//                    url = "https://oss.sonatype.org/service/local"
-//                    stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
-//                    setAuthorization("Basic")
-//                    sign = true
-//                    checksums = true
-//                    sourceJar = true
-//                    javadocJar = true
-//                    closeRepository = true
-//                    releaseRepository = false
-//                }    
-//            }
-//        }
-//    }
+    deploy {
+        maven {
+            nexus2 {
+                create("maven-central") {
+                    active = Active.ALWAYS
+                    url = "https://oss.sonatype.org/service/local"
+                    stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
+                    setAuthorization("Basic")
+                    sign = true
+                    checksums = true
+                    sourceJar = true
+                    javadocJar = true
+                    closeRepository = true
+                    releaseRepository = false
+                }    
+            }
+        }
+    }
 }
 
 publishing {
