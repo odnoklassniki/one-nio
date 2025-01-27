@@ -1,4 +1,6 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
+import org.jreleaser.model.Active
 
 val semVer: String? by project
 
@@ -8,14 +10,8 @@ version = semVer ?: "2.1-SNAPSHOT"
 plugins {
     id("org.cadixdev.licenser") version "0.6.1"
     `java-library`
+    id("org.jreleaser") version "1.14.0"
     `maven-publish`
-    signing
-}
-
-apply {
-    plugin("org.cadixdev.licenser")
-    plugin("maven-publish")
-    plugin("signing")
 }
 
 repositories {
@@ -28,6 +24,12 @@ dependencies {
     implementation(group = "org.slf4j", name = "slf4j-api", version = "1.7.36")
 
     testImplementation(group = "junit", name = "junit", version = "4.13.1")
+    testImplementation(group = "org.apache.logging.log4j", name = "log4j-slf4j-impl", version = "2.24.3")
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
 }
 
 tasks.withType<JavaCompile> {
@@ -37,16 +39,23 @@ tasks.withType<JavaCompile> {
     options.compilerArgs = options.compilerArgs + "-Xlint:all"
 }
 
-tasks.test {
+tasks.withType<Test> {
     useJUnit()
+    testLogging {
+        debug {
+            events("started", "skipped", "failed")
+            exceptionFormat = TestExceptionFormat.FULL
+        }
+        testLogging.showStandardStreams = true
+        events("passed", "skipped", "failed")
+    }
 }
 
-val nativeBuildDir = layout.buildDirectory.dir("native").get()
-
-tasks.register<Copy>("moveNativeLibrary") {
-    file("$nativeBuildDir/libonenio.so")
-    to(layout.buildDirectory.dir("classes/java/main"))
+tasks.register<Test>("testCI") {
+    jvmArgs("-Dci=true")
 }
+
+val nativeBuildDir = layout.buildDirectory.dir("classes/java/main").get()
 
 tasks.register<Exec>("compileNative") {
     val javaHome = System.getProperty("java.home")
@@ -55,79 +64,86 @@ tasks.register<Exec>("compileNative") {
         logger.info("Using java from $javaHome")
         nativeBuildDir.asFile.mkdirs()
     }
-    executable("gcc")
+    val sourceFiles = fileTree("src") {
+        include("**/*.c")
+    }.map { it.path }.toList()
+
     val args = arrayListOf(
+        "gcc",
         "-D_GNU_SOURCE", "-fPIC", "-shared", "-Wl,-soname,libonenio.so",  "-O3", "-fno-omit-frame-pointer", "-momit-leaf-frame-pointer", "--verbose",
         "-o", "$nativeBuildDir/libonenio.so",
-        "-I", "$javaHome/include", "-I", "$$javaHome/include/linux",
-        "-I", "$$javaHome/../include", "-I", "$$javaHome/../include/linux")
-    args += layout.files("src/*.c").files.joinToString(separator = " ") { it.absolutePath }
+        "-I", "$javaHome/include", "-I", "$javaHome/include/linux",
+        "-I", "$javaHome/../include", "-I", "$javaHome/../include/linux")
+    args += sourceFiles
     args += listOf("-ldl", "-lrt")
+    commandLine(args)
 }
 
 tasks.compileJava {
     if (DefaultNativePlatform.getCurrentOperatingSystem().isLinux) {
-        dependsOn("compileNative")
+        finalizedBy("compileNative")
     }
 }
 
-
 license {
     include("**/*.java")
-    header(rootProject.file("docs/copyright/COPYRIGHT_HEADER.txt"))
+    exclude("**/lz4/*.java")
+    header(rootProject.file("COPYRIGHT_HEADER.txt"))
 }
 
 val repoUrl: String = project.properties["repoUrl"] as? String ?: "https://maven.pkg.github.com/odnoklassniki/one-nio"
 
-tasks {
-    val sourcesJar by creating(Jar::class) {
-        archiveClassifier.set("sources")
+jreleaser {
+    signing {
+        active = Active.ALWAYS
+        armored = true
+        verify = true
     }
-
-    artifacts {
-        archives(sourcesJar)
-    }
-
-}
-publishing {
-    publications {
-        register<MavenPublication>("jar") {
-            from(components["java"])
-            artifact(tasks.named("sourcesJar"))
-
-            groupId = "ru.odnoklassniki"
-            artifactId = project.name
-            addPom()
-            signPublication(rootProject)
+    release {
+        github {
+            tagName = semVer
+            releaseName = "Release $semVer"
+            draft = true
+            sign = true
+            branch = "master"
+            branchPush = "master"
+            overwrite = true
         }
     }
-
-    repositories {
+    deploy {
         maven {
-            name = "repo"
-            url = uri(repoUrl)
-            val actor: String? by project
-            val token: String? by project
-
-            credentials {
-                username = actor
-                password = token
+            nexus2 {
+                create("maven-central") {
+                    active = Active.ALWAYS
+                    url = "https://oss.sonatype.org/service/local"
+                    stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
+                    setAuthorization("Basic")
+                    sign = true
+                    checksums = true
+                    sourceJar = true
+                    javadocJar = true
+                    closeRepository = true
+                    releaseRepository = false
+                }    
             }
         }
     }
 }
 
-fun MavenPublication.signPublication(project: Project) = with(project) {
-    signing {
-        val gpgKey: String? by project
-        val gpgPassphrase: String? by project
-        val gpgKeyValue = gpgKey?.removeSurrounding("\"")
-        val gpgPasswordValue = gpgPassphrase
+publishing {
+    publications {
+        register<MavenPublication>("release") {
+            from(components["java"])
 
-        if (gpgKeyValue != null && gpgPasswordValue != null) {
-            useInMemoryPgpKeys(gpgKeyValue, gpgPasswordValue)
+            groupId = "ru.odnoklassniki"
+            artifactId = project.name
+            addPom()
+        }
+    }
 
-            sign(this@signPublication)
+    repositories {
+        maven {
+            setUrl(layout.buildDirectory.dir("staging-deploy"))
         }
     }
 }
@@ -137,6 +153,7 @@ fun MavenPublication.addPom() {
         packaging = "jar"
         name.set("ru.odnoklassniki")
         description.set("Unconventional Java I/O library")
+        url.set("https://github.com/odnoklassniki/one-nio")
         issueManagement {
             url.set("https://github.com/odnoklassniki/one-nio/issues")
         }

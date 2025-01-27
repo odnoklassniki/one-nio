@@ -37,7 +37,7 @@ jobs:
           apt install libssl-dev \
           
       - name: Build and run tests
-        run: ./gradlew build --stacktrace --scan -Pci=true
+        run: ./gradlew jar testCI --scan --debug
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Odnoklassniki Ltd, Mail.Ru Group
+ * Copyright 2025 VK
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,7 +94,6 @@ public class JsonReaderTest {
     @Test
     public void customClass() throws IOException, ClassNotFoundException {
         String s = Json.toJson(new Custom());
-        System.out.println(s);
         JsonReader reader = new JsonReader(s.getBytes());
         Custom x = reader.readObject(Custom.class);
     }
