@@ -22,7 +22,7 @@ import java.util.Arrays;
 public class PersistStream extends SerializeStream {
 
     public PersistStream() {
-        super(new byte[400]);
+        super(new byte[INITIAL_ARRAY_CAPACITY]);
     }
 
     public PersistStream(int capacity) {

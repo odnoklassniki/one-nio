@@ -61,7 +61,7 @@ public class DeserializeInputStream extends InputStream {
     private class InternalDeserializeStream extends DeserializeStream {
 
         public InternalDeserializeStream() {
-            super(new byte[400]);
+            super(new byte[INITIAL_ARRAY_CAPACITY]);
             limit = offset;
         }
 

@@ -33,6 +33,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
     protected static final byte REF_RECURSIVE2 = -3;
     protected static final byte REF_EMBEDDED   = -4;
     protected static final byte FIRST_BOOT_UID = -10;
+    protected static final int INITIAL_ARRAY_CAPACITY = 400;
 
     protected byte[] array;
     protected long address;
