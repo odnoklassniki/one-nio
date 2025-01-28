@@ -33,6 +33,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
     protected static final byte REF_RECURSIVE2 = -3;
     protected static final byte REF_EMBEDDED   = -4;
     protected static final byte FIRST_BOOT_UID = -10;
+    protected static final int INITIAL_ARRAY_CAPACITY = 400;
 
     protected byte[] array;
     protected long address;
@@ -183,7 +184,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public int read() throws IOException {
-        return unsafe.getByte(array, alloc(1));
+        long offset = alloc(1);
+        return unsafe.getByte(array, offset);
     }
 
     public int read(byte[] b) throws IOException {
@@ -197,11 +199,13 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public void readFully(byte[] b) throws IOException {
-        unsafe.copyMemory(array, alloc(b.length), b, byteArrayOffset, b.length);
+        long offset = alloc(b.length);
+        unsafe.copyMemory(array, offset, b, byteArrayOffset, b.length);
     }
 
     public void readFully(byte[] b, int off, int len) throws IOException {
-        unsafe.copyMemory(array, alloc(len), b, byteArrayOffset + off, len);
+        long offset = alloc(len);
+        unsafe.copyMemory(array, offset, b, byteArrayOffset + off, len);
     }
 
     public long skip(long n) throws IOException {
@@ -215,35 +219,43 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public boolean readBoolean() throws IOException {
-        return unsafe.getBoolean(array, alloc(1));
+        long offset = alloc(1);
+        return unsafe.getBoolean(array, offset);
     }
 
     public byte readByte() throws IOException {
-        return unsafe.getByte(array, alloc(1));
+        long offset = alloc(1);
+        return unsafe.getByte(array, offset);
     }
 
     public int readUnsignedByte() throws IOException {
-        return unsafe.getByte(array, alloc(1)) & 0xff;
+        long offset = alloc(1);
+        return unsafe.getByte(array, offset) & 0xff;
     }
 
     public short readShort() throws IOException {
-        return Short.reverseBytes(unsafe.getShort(array, alloc(2)));
+        long offset = alloc(2);
+        return Short.reverseBytes(unsafe.getShort(array, offset));
     }
 
     public int readUnsignedShort() throws IOException {
-        return Short.reverseBytes(unsafe.getShort(array, alloc(2))) & 0xffff;
+        long offset = alloc(2);
+        return Short.reverseBytes(unsafe.getShort(array, offset)) & 0xffff;
     }
 
     public char readChar() throws IOException {
-        return Character.reverseBytes(unsafe.getChar(array, alloc(2)));
+        long offset = alloc(2);
+        return Character.reverseBytes(unsafe.getChar(array, offset));
     }
 
     public int readInt() throws IOException {
-        return Integer.reverseBytes(unsafe.getInt(array, alloc(4)));
+        long offset = alloc(4);
+        return Integer.reverseBytes(unsafe.getInt(array, offset));
     }
 
     public long readLong() throws IOException {
-        return Long.reverseBytes(unsafe.getLong(array, alloc(8)));
+        long offset = alloc(8);
+        return Long.reverseBytes(unsafe.getLong(array, offset));
     }
 
     public float readFloat() throws IOException {
@@ -276,7 +288,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
         if (length > 0x7fff) {
             length = (length & 0x7fff) << 16 | readUnsignedShort();
         }
-        return Utf8.read(array, alloc(length), length);
+        long offset = alloc(length);
+        return Utf8.read(array, offset, length);
     }
 
     public Object readObject() throws IOException, ClassNotFoundException {
@@ -309,7 +322,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public void readTo(long address, int len) throws IOException {
-        unsafe.copyMemory(array, alloc(len), null, address, len);
+        long offset = alloc(len);
+        unsafe.copyMemory(array, offset, null, address, len);
     }
 
     public ByteBuffer byteBuffer(int len) throws IOException {

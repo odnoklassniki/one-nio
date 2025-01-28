@@ -22,7 +22,7 @@ import java.util.Arrays;
 public class PersistStream extends SerializeStream {
 
     public PersistStream() {
-        super(new byte[400]);
+        super(new byte[INITIAL_ARRAY_CAPACITY]);
     }
 
     public PersistStream(int capacity) {
@@ -69,7 +69,7 @@ public class PersistStream extends SerializeStream {
     }
 
     @Override
-    protected long alloc(int size) {
+    protected long alloc(int size) throws IOException {
         long currentOffset = offset;
         if ((offset = currentOffset + size) > limit) {
             limit = Math.max(offset, limit * 2);
