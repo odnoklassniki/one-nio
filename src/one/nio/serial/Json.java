@@ -24,6 +24,11 @@ import java.nio.charset.StandardCharsets;
 
 public class Json {
 
+
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MIN_SAFE_INTEGER
+    public static final long JS_MIN_SAFE_INTEGER = -9007199254740991L;
+    public static final long JS_MAX_SAFE_INTEGER = 9007199254740991L;
+
     public static void appendChar(StringBuilder builder, char c) {
         builder.append('"');
         if (c == '"' || c == '\\') {
@@ -68,6 +73,18 @@ public class Json {
             Serializer serializer = Repository.get(obj.getClass());
             serializer.toJson(obj, builder);
         }
+    }
+
+    public static void appendLong(StringBuilder builder, long value) {
+        if (isJsSafeInteger(value)) {
+            builder.append(value);
+        } else {
+            builder.append('"').append(value).append('"');
+        }
+    }
+
+    public static boolean isJsSafeInteger(long value) {
+        return JS_MIN_SAFE_INTEGER <= value && value <= JS_MAX_SAFE_INTEGER;
     }
 
     @SuppressWarnings("unchecked")
