@@ -170,9 +170,47 @@ fun MavenPublication.addPom() {
         }
         developers {
             developer {
+                id.set("avrecko")
+                name.set("Alen Vrečko")
+            }
+            developer {
+                id.set("lehvolk")
+                name.set("Alexey Volkov")
+                email.set("lehvolk@yandex.com")
+            }
+            developer {
                 id.set("apangin")
                 name.set("Andrei Pangin")
                 email.set("noreply@pangin.pro")
+            }
+            developer {
+                id.set("ltalal")
+                name.set("Leonid Talalaev")
+                email.set("leonid.talalaev@gmail.com")
+            }
+            developer {
+                id.set("MacX19")
+                name.set("MacX19")
+            }
+            developer {
+                id.set("m0nstermind")
+                name.set("Oleg Anastasyev")
+                email.set("oleganas@gmail.com")
+            }
+            developer {
+                id.set("Sergey_Novikov")
+                name.set("Sergey Novikov")
+                email.set("sergej.morgiewicz@gmail.com")
+            }
+            developer {
+                id.set("Blooof")
+                name.set("Oleg Larionov")
+                email.set("blloof@gmail.com")
+            }
+            developer {
+                id.set("twister55")
+                name.set("Vadim Eliseev")
+                email.set("vadim.yelisseyev@gmail.com")
             }
             developer {
                 id.set("incubos")
