@@ -170,10 +170,6 @@ fun MavenPublication.addPom() {
         }
         developers {
             developer {
-                id.set("avrecko")
-                name.set("Alen Vrečko")
-            }
-            developer {
                 id.set("lehvolk")
                 name.set("Alexey Volkov")
                 email.set("lehvolk@yandex.com")
@@ -184,38 +180,38 @@ fun MavenPublication.addPom() {
                 email.set("noreply@pangin.pro")
             }
             developer {
-                id.set("ltalal")
+                id.set("incubos")
+                name.set("Vadim Tsesko")
+                email.set("mail@incubos.org")
+            }
+        }
+        contributors {
+            contributor {
+                name.set("Alen Vrečko")
+            }
+            contributor {
                 name.set("Leonid Talalaev")
                 email.set("leonid.talalaev@gmail.com")
             }
-            developer {
-                id.set("MacX19")
-                name.set("MacX19")
+            contributor {
+                name.set("Maksim Ponomarev")
+                email.set("macx@mail.ru")
             }
-            developer {
-                id.set("m0nstermind")
+            contributor {
                 name.set("Oleg Anastasyev")
                 email.set("oleganas@gmail.com")
             }
-            developer {
-                id.set("Sergey_Novikov")
+            contributor {
                 name.set("Sergey Novikov")
                 email.set("sergej.morgiewicz@gmail.com")
             }
-            developer {
-                id.set("Blooof")
+            contributor {
                 name.set("Oleg Larionov")
                 email.set("blloof@gmail.com")
             }
-            developer {
-                id.set("twister55")
+            contributor {
                 name.set("Vadim Eliseev")
                 email.set("vadim.yelisseyev@gmail.com")
-            }
-            developer {
-                id.set("incubos")
-                name.set("Vadim Tsesko")
-                email.set("incubos@yandex.com")
             }
         }
     }
