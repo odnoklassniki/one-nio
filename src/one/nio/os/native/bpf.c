@@ -229,6 +229,9 @@ JNIEXPORT void JNICALL
 Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyteArray data_in, jint len_data_in, jbyteArray data_out,
                                     jbyteArray ctx_in, jint len_ctx_in, jbyteArray ctx_out, jintArray retvals /* data_size_out,ctx_size_out,duration,retval */) {
 
+// want to keep support for compilation on CentOS 7 / RHEL 7 legacy system, BPF testing support added in Kernel 4.12
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+
 	union bpf_attr attr;
 	int res;
 
@@ -287,6 +290,9 @@ Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyte
     if (res < 0) {
         throw_io_exception(env);
     }
+#else
+     throw_by_name(env, "java/lang/UnsupportedOperationException", "Library compiled on kernel version without BPF testing support.");
+#endif
 }
 
 JNIEXPORT jint JNICALL
