@@ -39,7 +39,13 @@ public class MagicAccessor {
 
     private static boolean useSerializationConstructorAccessor() {
         String javaVersion = System.getProperty("java.version");
-        int majorVersion = Integer.parseInt(javaVersion.substring(0, javaVersion.indexOf(".")));
+        final int indexOfDot = javaVersion.indexOf(".");
+
+        if (indexOfDot > 0) {
+            javaVersion = javaVersion.substring(0, indexOfDot);
+        }
+
+        int majorVersion = Integer.parseInt(javaVersion);
         return majorVersion >= 22;
     }
 
