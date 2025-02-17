@@ -188,6 +188,7 @@ fun MavenPublication.addPom() {
         contributors {
             contributor {
                 name.set("Alen Vrečko")
+                email.set("rails_fuel_7l@icloud.com")
             }
             contributor {
                 name.set("Leonid Talalaev")
