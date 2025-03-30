@@ -1,4 +1,5 @@
 [![one-nio](https://maven-badges.herokuapp.com/maven-central/ru.odnoklassniki/one-nio/badge.svg)](https://maven-badges.herokuapp.com/maven-central/ru.odnoklassniki/one-nio) [![Javadocs](http://www.javadoc.io/badge/ru.odnoklassniki/one-nio.svg)](http://www.javadoc.io/doc/ru.odnoklassniki/one-nio)
+[![libs.tech recommends](https://libs.tech/project/6667447/badge.svg)](https://libs.tech/project/6667447/one-nio)
 
 one-nio
 =======
