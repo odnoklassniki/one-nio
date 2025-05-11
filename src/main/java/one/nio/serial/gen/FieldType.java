@@ -19,7 +19,7 @@ package one.nio.serial.gen;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-enum FieldType implements Opcodes {
+public enum FieldType implements Opcodes {
     Object (Object.class,  0,         0, new int[] { NOP, NOP, NOP, NOP, NOP, NOP, NOP, NOP, NOP, POP }),
     Int    (int.class,     T_INT,     4, new int[] { NOP, NOP, I2L, I2B, I2B, I2S, I2C, I2F, I2D, POP }),
     Long   (long.class,    T_LONG,    8, new int[] { NOP, L2I, NOP, L2I | I2B << 8, L2I | I2B << 8, L2I | I2S << 8, L2I | I2C << 8, L2F, L2D, POP2}),

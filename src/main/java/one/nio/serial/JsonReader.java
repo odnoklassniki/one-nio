@@ -32,9 +32,10 @@ import java.util.Map;
  * Its main purpose is to decode typical simple queries without third-party dependencies.
  */
 public class JsonReader {
-    protected byte[] array;
-    protected int offset;
-    protected int next;
+    // todo: figure out illegalaccesserror due to classloaders and modules
+    public byte[] array;
+    public int offset;
+    public int next;
 
     public JsonReader(byte[] array) {
         this(array, 0);
@@ -46,7 +47,7 @@ public class JsonReader {
         skipWhitespace();
     }
 
-    protected int read() {
+    public int read() {
         int b = next;
         next = offset < array.length ? array[offset++] & 0xff : -1;
         return b;
