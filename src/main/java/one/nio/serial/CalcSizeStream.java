@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.io.ObjectOutput;
 
 public class CalcSizeStream extends SerializationContext implements ObjectOutput {
-    protected int count;
+    // todo: handle illegal access error due to module system verification
+    // we access this from delegate generated in child class loader
+    public int count;
     protected boolean hasCycles;
 
     public CalcSizeStream() {

@@ -27,10 +27,12 @@ import one.nio.util.JavaFeatures;
 import one.nio.util.JavaInternals;
 import one.nio.util.MethodHandlesReflection;
 
+import one.nio.util.VarHandlesReflection;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import java.io.ObjectInputStream;
@@ -41,7 +43,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
-import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,38 +57,6 @@ import static one.nio.util.JavaInternals.unsafe;
 
 public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();
-
-    // Allows to bypass security checks when accessing private members of other classes
-    static final String MAGIC_CLASS = "sun/reflect/MagicAccessorImpl";
-
-    // In JDK 9+ there is no more sun.reflect.MagicAccessorImpl class.
-    // Instead there is package private jdk.internal.reflect.MagicAccessorImpl, which is not visible
-    // by application classes. We abuse ClassLoaded private API to inject a publicly visible bridge
-    // using the bootstrap ClassLoader.
-    //   ¯\_(ツ)_/¯
-    static {
-        if (JavaInternals.hasModules()) {
-            try {
-                Method m = JavaInternals.getMethod(ClassLoader.class, "defineClass1", ClassLoader.class, String.class,
-                        byte[].class, int.class, int.class, ProtectionDomain.class, String.class);
-                if (m == null) {
-                    throw new NoSuchMethodException("ClassLoader.defineClass1");
-                }
-
-                // public jdk.internal.reflect.MagicAccessorBridge extends jdk.internal.reflect.MagicAccessorImpl
-                defineBootstrapClass(m, MagicAccessor.magicAccessorBridge());
-                // public sun.reflect.MagicAccessorImpl extends jdk.internal.reflect.MagicAccessorBridge
-                defineBootstrapClass(m, MagicAccessor.sunMagicAccessor());
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        }
-    }
-
-    // Defines a new class by the bootstrap ClassLoader
-    private static void defineBootstrapClass(Method m, byte[] code) throws ReflectiveOperationException {
-        m.invoke(null, null, null, code, 0, code.length, null, null);
-    }
 
     public static Delegate instantiate(Class cls, FieldDescriptor[] fds, byte[] code) {
         Map<String, Field> fieldsMap = null;
@@ -109,24 +78,28 @@ public class DelegateGenerator extends BytecodeGenerator {
             throw new IllegalArgumentException("Cannot instantiate class", e);
         }
     }
-    
+
     public static Delegate instantiate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
         return instantiate(cls, fds, generate(cls, fds, defaultFields));
     }
 
     public static byte[] generate(Class cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
-        String className = "sun/reflect/Delegate" + index.getAndIncrement() + '_' + cls.getSimpleName();
+        String className = "one/nio/serial/gen/Delegate" + index.getAndIncrement() + '_' + cls.getSimpleName();
 
         ClassWriter cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL, className, null, MAGIC_CLASS,
+        cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL, className, null, "java/lang/Object",
                 new String[]{"one/nio/serial/gen/Delegate"});
 
         generateConstructor(cv, className);
-        generateCalcSize(cv, cls, fds);
-        generateWrite(cv, cls, fds);
+        generateVarHandleFields(cv, cls, className, fds);
+        // for better clarity and easier maintenance, VarHandles are accessed via convenience static methods
+        // static getters and setters vhGet_<field name>(readObject), vhSet_<field name>(writeObject, field value)
+        generateVarHandleStaticMethods(cv, className, cls, fds);
+        generateCalcSize(cv, className, cls, fds);
+        generateWrite(cv, className, cls, fds);
         generateRead(cv, cls, fds, defaultFields, className);
         generateSkip(cv, fds);
-        generateToJson(cv, cls, fds);
+        generateToJson(cv, className, cls, fds);
         generateFromJson(cv, cls, fds, defaultFields, className);
 
         cv.visitEnd();
@@ -136,11 +109,11 @@ public class DelegateGenerator extends BytecodeGenerator {
     private static void generateConstructor(ClassVisitor cv, String className) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", "(Ljava/util/Map;)V", null, null);
         cv.visitField(ACC_PRIVATE | ACC_FINAL, "fields", "Ljava/util/Map;", null, null).visitEnd();
-        
+
         mv.visitCode();
 
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESPECIAL, MAGIC_CLASS, "<init>", "()V", false);
+        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
 
         mv.visitVarInsn(ALOAD, 0);
         mv.visitVarInsn(ALOAD, 1);
@@ -151,7 +124,166 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
-    private static void generateCalcSize(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
+    private static void generateVarHandleFields(ClassWriter cv, Class cls, String className, FieldDescriptor[] fds) {
+        for (FieldDescriptor fd : fds) {
+            cv.visitField(
+                    ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                    getVarHandleName(fd),
+                    "Ljava/lang/invoke/VarHandle;",
+                    null,
+                    null
+            ).visitEnd();
+        }
+
+        MethodVisitor mv = cv.visitMethod(
+                ACC_STATIC,
+                "<clinit>",
+                "()V",
+                null,
+                null
+        );
+
+        mv.visitCode();
+
+        for (FieldDescriptor fd : fds) {
+            mv.visitLdcInsn(Type.getType(cls));
+            mv.visitLdcInsn(fd.name());
+            Class<?> fieldType = fd.type().resolve();
+            if (fieldType.isPrimitive()) {
+                loadPrimitiveConstant(mv, fieldType);
+            } else {
+                mv.visitLdcInsn(Type.getType(fieldType));
+            }
+
+            mv.visitMethodInsn(
+                    INVOKESTATIC,
+                    Type.getInternalName(VarHandlesReflection.class),
+                    "forField",
+                    "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;",
+                    false
+            );
+
+            mv.visitFieldInsn(
+                    PUTSTATIC,
+                    className,
+                    getVarHandleName(fd),
+                    "Ljava/lang/invoke/VarHandle;"
+            );
+        }
+
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    private static void loadPrimitiveConstant(MethodVisitor mv, Class<?> clazz) {
+        if (clazz == int.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Integer", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == boolean.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Boolean", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == byte.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Byte", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == char.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Character", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == short.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Short", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == float.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Float", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == long.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Long", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == double.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Double", "TYPE", "Ljava/lang/Class;");
+        } else if (clazz == void.class) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Void", "TYPE", "Ljava/lang/Class;");
+        } else {
+            throw new AssertionError("Code invalidation.");
+        }
+    }
+
+    private static void generateVarHandleStaticMethods(ClassWriter cv, String className, Class cls, FieldDescriptor[] fds) {
+        for (FieldDescriptor fd : fds) {
+            // Getter method e.g. public String vhGet_Name(Foo foo)
+            Class<?> fieldType = fd.type().resolve();
+            String description = String.format("(%s)%s", Type.getType(cls), Type.getType(fieldType));
+            MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "vhGet_" + fd.name(), description, null, null);
+            mv.visitCode();
+            mv.visitFieldInsn(Opcodes.GETSTATIC, className, getVarHandleName(fd), "Ljava/lang/invoke/VarHandle;");
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "getOpaque", description, false);
+            if (fieldType.isPrimitive()) {
+                if (fieldType == int.class) {
+                    mv.visitInsn(Opcodes.IRETURN);
+                } else if (fieldType == boolean.class) {
+                    mv.visitInsn(Opcodes.IRETURN);
+                } else if (fieldType == byte.class) {
+                    mv.visitInsn(Opcodes.IRETURN);
+                } else if (fieldType == char.class) {
+                    mv.visitInsn(Opcodes.IRETURN);
+                } else if (fieldType == short.class) {
+                    mv.visitInsn(Opcodes.IRETURN);
+                } else if (fieldType == float.class) {
+                    mv.visitInsn(Opcodes.FRETURN);
+                } else if (fieldType == long.class) {
+                    mv.visitInsn(Opcodes.LRETURN);
+                } else if (fieldType == double.class) {
+                    mv.visitInsn(Opcodes.DRETURN);
+                } else if (fieldType == void.class) {
+                    mv.visitInsn(Opcodes.RETURN);
+                } else {
+                    throw new AssertionError("Code invalidation.");
+                }
+            }else{
+                mv.visitInsn(Opcodes.ARETURN);
+            }
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        for (FieldDescriptor fd : fds) {
+            // Setter method e.g. public String vhSet_name(Foo foo, String value)
+            Class<?> fieldType = fd.type().resolve();
+            String description = String.format("(%s%s)V", Type.getType(cls), Type.getType(fieldType));
+            MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "vhSet_" + fd.name(), description, null, null);
+            mv.visitCode();
+            mv.visitFieldInsn(Opcodes.GETSTATIC, className, getVarHandleName(fd), "Ljava/lang/invoke/VarHandle;");
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            if (fieldType.isPrimitive()) {
+                if (fieldType == int.class) {
+                    mv.visitVarInsn(Opcodes.ILOAD, 1);
+                } else if (fieldType == boolean.class) {
+                    mv.visitVarInsn(Opcodes.ILOAD, 1);
+                } else if (fieldType == byte.class) {
+                    mv.visitVarInsn(Opcodes.ILOAD, 1);
+                } else if (fieldType == char.class) {
+                    mv.visitVarInsn(Opcodes.ILOAD, 1);
+                } else if (fieldType == short.class) {
+                    mv.visitVarInsn(Opcodes.ILOAD, 1);
+                } else if (fieldType == float.class) {
+                    mv.visitVarInsn(Opcodes.FLOAD, 1);
+                } else if (fieldType == long.class) {
+                    mv.visitVarInsn(Opcodes.LLOAD, 1);
+                } else if (fieldType == double.class) {
+                    mv.visitVarInsn(Opcodes.DLOAD, 1);
+                } else if (fieldType == void.class) {
+                    throw new AssertionError("Code invalidation.");
+                } else {
+                    throw new AssertionError("Code invalidation.");
+                }
+            }else{
+                mv.visitVarInsn(Opcodes.ALOAD, 1);
+            }
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "setOpaque", description, false);
+            mv.visitInsn(Opcodes.RETURN);
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+    }
+
+    private static String getVarHandleName(FieldDescriptor fd) {
+        return fd.name().toUpperCase() + "_VARHANDLE";
+    }
+
+    private static void generateCalcSize(ClassVisitor cv, String className, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "calcSize", "(Ljava/lang/Object;Lone/nio/serial/CalcSizeStream;)V",
                 null, new String[]{"java/io/IOException"});
         mv.visitCode();
@@ -177,7 +309,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitVarInsn(ALOAD, 2);
                 mv.visitVarInsn(ALOAD, 1);
                 if (fd.parentField() != null) emitGetField(mv, fd.parentField());
-                emitGetSerialField(mv, ownField);
+                emitGetSerialField(cls,mv, className, ownField);
                 emitTypeCast(mv, ownField.getType(), sourceClass);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/CalcSizeStream", "writeObject", "(Ljava/lang/Object;)V", false);
             }
@@ -197,7 +329,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
-    private static void generateWrite(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
+    private static void generateWrite(ClassVisitor cv, String className, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "write", "(Ljava/lang/Object;Lone/nio/serial/DataStream;)V",
                 null, new String[]{"java/io/IOException"});
         mv.visitCode();
@@ -220,7 +352,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             } else {
                 mv.visitVarInsn(ALOAD, 1);
                 if (fd.parentField() != null) emitGetField(mv, fd.parentField());
-                emitGetSerialField(mv, ownField);
+                emitGetSerialField(cls, mv, className, ownField);
                 emitTypeCast(mv, ownField.getType(), sourceClass);
             }
 
@@ -248,7 +380,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitCode();
 
         mv.visitVarInsn(ALOAD, 1);
-        mv.visitTypeInsn(NEW, Type.getInternalName(cls));
+        emitNewInstance(mv, cls);
         mv.visitInsn(DUP_X1);
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
 
@@ -263,10 +395,10 @@ public class DelegateGenerator extends BytecodeGenerator {
             if (parentField != null && !parents.contains(parentField)) {
                 parents.add(parentField);
                 if (!isRecord) mv.visitInsn(DUP);
-                mv.visitTypeInsn(NEW, Type.getInternalName(parentField.getType()));
+                emitNewInstance(mv, parentField.getType());
                 mv.visitInsn(DUP);
                 mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-                emitPutSerialField(mv, parentField, isRecord, fd);
+                emitPutSerialField(className, cls, mv, parentField, isRecord, fd);
             }
 
             if (isNotSerial(ownField)) {
@@ -280,18 +412,18 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature(), false);
                 if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
                 emitTypeCast(mv, sourceClass, ownField.getType());
-                emitPutSerialField(mv, ownField, isRecord, fd);
+                emitPutSerialField(className, cls, mv, ownField, isRecord, fd);
             }
         }
 
         for (FieldDescriptor defaultField : defaultFields) {
-            setDefaultField(mv, defaultField, isRecord);
+            setDefaultField(className, cls, mv, defaultField, isRecord);
         }
 
         if (isRecord) {
             generateCreateRecord(mv, cls, fds, defaultFields);
         }
-        
+
         emitReadObject(cls, mv, className);
 
         mv.visitInsn(ARETURN);
@@ -358,7 +490,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
-    private static void generateToJson(ClassVisitor cv, Class cls, FieldDescriptor[] fds) {
+    private static void generateToJson(ClassVisitor cv, String className, Class cls, FieldDescriptor[] fds) {
         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, "toJson", "(Ljava/lang/Object;Ljava/lang/StringBuilder;)V",
                 null, new String[]{"java/io/IOException"});
         mv.visitCode();
@@ -387,7 +519,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
             mv.visitVarInsn(ALOAD, 1);
             if (fd.parentField() != null) emitGetField(mv, fd.parentField());
-            emitGetSerialField(mv, ownField);
+            emitGetSerialField(cls, mv, className, ownField);
             emitTypeCast(mv, ownField.getType(), sourceClass);
 
             switch (srcType) {
@@ -429,7 +561,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "expect", "(ILjava/lang/String;)V", false);
 
         // Create instance
-        mv.visitTypeInsn(NEW, Type.getInternalName(cls));
+        emitNewInstance(mv, cls);
 
         // Prepare a multimap (fieldHash -> fds) for lookupswitch
         TreeMap<Integer, FieldDescriptor> fieldHashes = new TreeMap<>();
@@ -440,14 +572,14 @@ public class DelegateGenerator extends BytecodeGenerator {
                 continue;
             }
             fd.next = fieldHashes.put(ownField.getName().hashCode(), fd);
-            setDefaultField(mv, fd, isRecord);
+            setDefaultField(className, cls, mv, fd, isRecord);
         }
 
         // Initialize default fields before parsing fields from JSON
         for (FieldDescriptor fd : defaultFields) {
             Field ownField = fd.ownField();
             fd.next = fieldHashes.put(ownField.getName().hashCode(), fd);
-            setDefaultField(mv, fd, isRecord);
+            setDefaultField(className, cls, mv, fd, isRecord);
         }
 
         // Repeat until '}'
@@ -508,7 +640,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitLdcInsn(fd.ownField().getName());
                 mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
                 mv.visitJumpInsn(IFEQ, fd.next == null ? skipUnknownField : next);
-                generateReadJsonField(mv, fd, parents, isRecord);
+                generateReadJsonField(className, cls, mv, fd, parents, isRecord);
                 mv.visitJumpInsn(GOTO, parseNextField);
                 mv.visitLabel(next);
             } while ((fd = fd.next) != null);
@@ -554,23 +686,23 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitEnd();
     }
 
-    private static void generateReadJsonField(MethodVisitor mv, FieldDescriptor fd, List<Field> parents, boolean isRecord) {
+    private static void generateReadJsonField(String className, Class<?> cls, MethodVisitor mv, FieldDescriptor fd, List<Field> parents, boolean isRecord) {
         Field ownField = fd.ownField();
         Field parentField = fd.parentField();
 
         if (parentField != null && !parents.contains(parentField)) {
             parents.add(parentField);
             if (!isRecord) mv.visitInsn(DUP);
-            mv.visitTypeInsn(NEW, Type.getInternalName(parentField.getType()));
+            emitNewInstance(mv, parentField.getType());
             mv.visitInsn(DUP);
             mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-            emitPutSerialField(mv, parentField, isRecord, fd);
+            emitPutSerialField(className, cls, mv, parentField, isRecord, fd);
         }
 
         if (!isRecord) mv.visitInsn(DUP);
         if (parentField != null) emitGetField(mv, parentField);
         generateReadJsonFieldInternal(mv, ownField);
-        emitPutSerialField(mv, ownField, isRecord, fd);
+        emitPutSerialField(className, cls, mv, ownField, isRecord, fd);
     }
 
     private static void generateReadJsonFieldInternal(MethodVisitor mv, Field ownField) {
@@ -591,6 +723,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         emitInt(mv, 'n');
         mv.visitJumpInsn(IF_ICMPNE, notNull);
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readNull", "()Ljava/lang/Object;", false);
+        mv.visitTypeInsn(CHECKCAST, Type.getInternalName(ownField.getType()));
         mv.visitJumpInsn(GOTO, done);
         mv.visitLabel(notNull);
 
@@ -689,7 +822,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         return field == null || field.getAnnotation(NotSerial.class) != null;
     }
 
-    private static void setDefaultField(MethodVisitor mv, FieldDescriptor fd, boolean isRecord) {
+    private static void setDefaultField(String className, Class<?> cls, MethodVisitor mv, FieldDescriptor fd, boolean isRecord) {
         Field field = fd.ownField();
         Default defaultValue = field.getAnnotation(Default.class);
         if (defaultValue == null && !isRecord) {
@@ -721,7 +854,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             emitDefaultValue(mv, field, fieldType, defaultValue.value());
         }
 
-        emitPutSerialField(mv, field, isRecord, fd);
+        emitPutSerialField(className, cls, mv, field, isRecord, fd);
     }
 
     private static void emitDefaultValue(MethodVisitor mv, Field field, Class<?> fieldType, String value) {
@@ -836,7 +969,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                     dst.isAssignableFrom(HashSet.class) ? HashSet.class : null;
             if (target != null) {
                 Label isNull = emitNullGuard(mv, dst);
-                mv.visitTypeInsn(NEW, Type.getInternalName(target));
+                emitNewInstance(mv, target);
                 mv.visitInsn(DUP_X1);
                 mv.visitInsn(SWAP);
                 mv.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(target), "<init>", "(Ljava/util/Collection;)V", false);
@@ -867,7 +1000,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitInsn(FieldType.Void.convertTo(FieldType.valueOf(dst)));
     }
 
-    private static void emitGetSerialField(MethodVisitor mv, Field f) {
+    private static void emitGetSerialField(Class cls, MethodVisitor mv, String className, Field f) {
         SerializeWith serializeWith = f.getAnnotation(SerializeWith.class);
         if (serializeWith != null && !serializeWith.getter().isEmpty()) {
             try {
@@ -879,11 +1012,12 @@ public class DelegateGenerator extends BytecodeGenerator {
                 throw new IllegalArgumentException("Incompatible getter method", e);
             }
         } else {
-            emitGetField(mv, f);
+            String description = String.format("(%s)%s", Type.getType(cls), Type.getType(f.getType()));
+            mv.visitMethodInsn(INVOKESTATIC, className, "vhGet_" + f.getName(), description, false);
         }
     }
 
-    private static void emitPutSerialField(MethodVisitor mv, Field f, boolean isRecord, FieldDescriptor fd) {
+    private static void emitPutSerialField(String className, Class<?> cls, MethodVisitor mv, Field f, boolean isRecord, FieldDescriptor fd) {
         if (isRecord) {
             mv.visitVarInsn(Type.getType(f.getType()).getOpcode(ISTORE), 3 + fd.index() * 2);
             return;
@@ -904,7 +1038,8 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitLdcInsn(unsafe.objectFieldOffset(f));
             mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/JavaInternals", dstType.putMethod(), dstType.putSignature(), false);
         } else {
-            emitPutField(mv, f);
+            String description = String.format("(%s%s)V", Type.getType(cls), Type.getType(f.getType()));
+            mv.visitMethodInsn(INVOKESTATIC, className, "vhSet_" + f.getName(), description, false);
         }
     }
 
@@ -920,5 +1055,13 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         mv.visitLabel(nonNull);
         return isNull;
+    }
+
+    private static void emitNewInstance(MethodVisitor mv, Class<?> clazz) {
+        mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
+        mv.visitLdcInsn(Type.getType(clazz));
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
+                "(Ljava/lang/Class;)Ljava/lang/Object;", false);
+        mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(clazz));
     }
 }
