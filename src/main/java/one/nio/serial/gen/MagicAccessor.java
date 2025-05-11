@@ -20,6 +20,8 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import static one.nio.serial.gen.strategy.MagicAccessorStrategy.MAGIC_CLASS;
+
 public class MagicAccessor {
     
     public static byte[] magicAccessorBridge() {
@@ -34,7 +36,7 @@ public class MagicAccessor {
     }
 
     public static byte[] sunMagicAccessor() {
-        return generateClass(DelegateGenerator.MAGIC_CLASS, "jdk/internal/reflect/MagicAccessorBridge");
+        return generateClass(MAGIC_CLASS, "jdk/internal/reflect/MagicAccessorBridge");
     }
 
     private static boolean useSerializationConstructorAccessor() {

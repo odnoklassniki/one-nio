@@ -78,7 +78,7 @@ tasks {
             compilerArgs.add("-Xlint:all")
             sourceCompatibility = "1.8"
             targetCompatibility = "1.8"
-            //can't set --release 8 as using non public API
+            //can't set --release 8 cause non-public API is used
             //release.set(8)
             javaCompiler = project.javaToolchains.compilerFor {
                 languageVersion = JavaLanguageVersion.of(8)
