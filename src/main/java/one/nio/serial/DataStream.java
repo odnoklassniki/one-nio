@@ -343,11 +343,6 @@ public class DataStream implements ObjectInput, ObjectOutput {
     public void read(ByteBuffer dst) throws IOException {
         int len = dst.remaining();
         long offset = alloc(len);
-//        if (dst.hasArray()) {
-//            unsafe.copyMemory(array, offset, dst.array(), byteArrayOffset + dst.arrayOffset() + dst.position(), len);
-//        } else {
-//            unsafe.copyMemory(array, offset, null, DirectMemory.getAddress(dst) + dst.position(), len);
-//        }
         MemorySegment dstSegment = MemorySegment.ofBuffer(dst);
         MemorySegment.copy(segment, JAVA_BYTE, offset, dstSegment, JAVA_BYTE, 0, len);
         dst.position(dst.limit());
