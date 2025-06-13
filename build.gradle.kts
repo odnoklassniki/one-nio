@@ -23,6 +23,9 @@ dependencies {
     implementation(group = "org.ow2.asm", name = "asm", version = "9.2")
     implementation(group = "org.slf4j", name = "slf4j-api", version = "1.7.36")
 
+    implementation("org.openjdk.jmh:jmh-core:1.37")
+    annotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+
     testImplementation(group = "junit", name = "junit", version = "4.13.1")
     testImplementation(group = "org.apache.logging.log4j", name = "log4j-slf4j-impl", version = "2.24.3")
 }
@@ -33,12 +36,12 @@ java {
 }
 
 tasks.withType<JavaCompile> {
-    sourceCompatibility = "1.8"
-    targetCompatibility = "1.8"
+    sourceCompatibility = "22"
+    targetCompatibility = "22"
     options.encoding = "UTF-8"
     options.compilerArgs = options.compilerArgs + "-Xlint:all"
+    options.compilerArgs = options.compilerArgs + "--add-opens=java.base/sun.security=ALL-UNNAMED"
 }
-
 tasks.withType<Test> {
     useJUnit()
     testLogging {

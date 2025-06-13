@@ -23,40 +23,72 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.lang.foreign.MemorySegment;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
 
+import static java.lang.foreign.ValueLayout.JAVA_BOOLEAN;
+import static java.lang.foreign.ValueLayout.JAVA_BYTE;
+import static java.lang.foreign.ValueLayout.JAVA_CHAR_UNALIGNED;
+import static java.lang.foreign.ValueLayout.JAVA_INT_UNALIGNED;
+import static java.lang.foreign.ValueLayout.JAVA_LONG_UNALIGNED;
+import static java.lang.foreign.ValueLayout.JAVA_SHORT_UNALIGNED;
 import static one.nio.util.JavaInternals.*;
 
 public class DataStream implements ObjectInput, ObjectOutput {
-    protected static final byte REF_NULL       = -1;
-    protected static final byte REF_RECURSIVE  = -2;
+    private static final VarHandle B_HANDLE;
+    private static final VarHandle BOOL_HANDLE;
+    private static final VarHandle SH_HANDLE;
+    private static final VarHandle CH_HANDLE;
+    private static final VarHandle I_HANDLE;
+    private static final VarHandle L_HANDLE;
+
+    static {
+        B_HANDLE = JAVA_BYTE.varHandle().withInvokeExactBehavior();
+        BOOL_HANDLE = JAVA_BOOLEAN.varHandle().withInvokeExactBehavior();
+        SH_HANDLE = JAVA_SHORT_UNALIGNED.varHandle().withInvokeExactBehavior();
+        CH_HANDLE = JAVA_CHAR_UNALIGNED.varHandle().withInvokeExactBehavior();
+        I_HANDLE = JAVA_INT_UNALIGNED.varHandle().withInvokeExactBehavior();
+        L_HANDLE = JAVA_LONG_UNALIGNED.varHandle().withInvokeBehavior();
+    }
+
+    protected static final byte REF_NULL = -1;
+    protected static final byte REF_RECURSIVE = -2;
     protected static final byte REF_RECURSIVE2 = -3;
-    protected static final byte REF_EMBEDDED   = -4;
+    protected static final byte REF_EMBEDDED = -4;
     protected static final byte FIRST_BOOT_UID = -10;
     protected static final int INITIAL_ARRAY_CAPACITY = 400;
 
+    protected MemorySegment segment;
     protected byte[] array;
     protected long address;
     protected long limit;
     protected long offset;
 
+    public DataStream(MemorySegment segment) {
+        this.segment = segment;
+        this.limit = segment.byteSize();
+        this.offset = 0;
+    }
+
     public DataStream(int capacity) {
-        this(new byte[capacity], byteArrayOffset, capacity);
+        this(new byte[capacity], capacity);
     }
 
     public DataStream(byte[] array) {
-        this(array, byteArrayOffset, array.length);
+        this(array, array.length);
     }
 
-    public DataStream(long address, long length) {
-        this(null, address, length);
+    public DataStream(long length) {
+        this(null, length);
     }
 
-    protected DataStream(byte[] array, long address, long length) {
+    protected DataStream(byte[] array, long length) {
         this.array = array;
-        this.address = address;
-        this.limit = address + length;
-        this.offset = address;
+        this.segment = MemorySegment.ofArray(array);
+        this.address = segment.address();
+        this.limit = length;
+        this.offset = 0;
     }
 
     public byte[] array() {
@@ -68,52 +100,52 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public int count() {
-        return (int) (offset - address);
+        return (int) (offset);
     }
 
     public void write(int b) throws IOException {
         long offset = alloc(1);
-        unsafe.putByte(array, offset, (byte) b);
+        B_HANDLE.set(segment, offset, (byte) b);
     }
 
     public void write(byte[] b) throws IOException {
         long offset = alloc(b.length);
-        unsafe.copyMemory(b, byteArrayOffset, array, offset, b.length);
+        MemorySegment.copy(b, 0, segment, JAVA_BYTE, offset, b.length);
     }
 
     public void write(byte[] b, int off, int len) throws IOException {
         long offset = alloc(len);
-        unsafe.copyMemory(b, byteArrayOffset + off, array, offset, len);
+        MemorySegment.copy(b, off, segment, JAVA_BYTE, offset, len);
     }
 
     public void writeBoolean(boolean v) throws IOException {
         long offset = alloc(1);
-        unsafe.putBoolean(array, offset, v);
+        BOOL_HANDLE.set(segment, offset, v);
     }
 
     public void writeByte(int v) throws IOException {
         long offset = alloc(1);
-        unsafe.putByte(array, offset, (byte) v);
+        B_HANDLE.set(segment, offset, (byte) v);
     }
 
     public void writeShort(int v) throws IOException {
         long offset = alloc(2);
-        unsafe.putShort(array, offset, Short.reverseBytes((short) v));
+        SH_HANDLE.set(segment, offset, Short.reverseBytes((short) v));
     }
 
     public void writeChar(int v) throws IOException {
         long offset = alloc(2);
-        unsafe.putChar(array, offset, Character.reverseBytes((char) v));
+        CH_HANDLE.set(segment, offset, Character.reverseBytes((char) v));
     }
 
     public void writeInt(int v) throws IOException {
         long offset = alloc(4);
-        unsafe.putInt(array, offset, Integer.reverseBytes(v));
+        I_HANDLE.set(segment, offset, Integer.reverseBytes(v));
     }
 
     public void writeLong(long v) throws IOException {
         long offset = alloc(8);
-        unsafe.putLong(array, offset, Long.reverseBytes(v));
+        L_HANDLE.set(segment, offset, Long.reverseBytes(v));
     }
 
     public void writeFloat(float v) throws IOException {
@@ -128,7 +160,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
         int length = s.length();
         long offset = alloc(length);
         for (int i = 0; i < length; i++) {
-            unsafe.putByte(array, offset++, (byte) s.charAt(i));
+            B_HANDLE.set(segment, offset, (byte) s.charAt(i));
         }
     }
 
@@ -136,7 +168,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
         int length = s.length();
         long offset = alloc(length * 2);
         for (int i = 0; i < length; i++) {
-            unsafe.putChar(array, offset, Character.reverseBytes(s.charAt(i)));
+            CH_HANDLE.set(segment, offset, Character.reverseBytes(s.charAt(i)));
             offset += 2;
         }
     }
@@ -149,7 +181,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
             writeInt(utfLength | 0x80000000);
         }
         long offset = alloc(utfLength);
-        Utf8.write(s, array, offset);
+        Utf8.write(s, segment, offset);
     }
 
     @SuppressWarnings("unchecked")
@@ -170,11 +202,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
     public void write(ByteBuffer src) throws IOException {
         int len = src.remaining();
         long offset = alloc(len);
-        if (src.hasArray()) {
-            unsafe.copyMemory(src.array(), byteArrayOffset + src.arrayOffset() + src.position(), array, offset, len);
-        } else {
-            unsafe.copyMemory(null, DirectMemory.getAddress(src) + src.position(), array, offset, len);
-        }
+        MemorySegment scrSegment = MemorySegment.ofBuffer(src);
+        MemorySegment.copy(scrSegment, JAVA_BYTE, (src.arrayOffset() + src.position()), segment, JAVA_BYTE, offset, len);
         src.position(src.limit());
     }
 
@@ -185,7 +214,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
 
     public int read() throws IOException {
         long offset = alloc(1);
-        return unsafe.getByte(array, offset);
+        return segment.get(JAVA_BYTE, offset);
     }
 
     public int read(byte[] b) throws IOException {
@@ -200,12 +229,12 @@ public class DataStream implements ObjectInput, ObjectOutput {
 
     public void readFully(byte[] b) throws IOException {
         long offset = alloc(b.length);
-        unsafe.copyMemory(array, offset, b, byteArrayOffset, b.length);
+        MemorySegment.copy(segment, JAVA_BYTE, offset, b, 0, b.length);
     }
 
     public void readFully(byte[] b, int off, int len) throws IOException {
         long offset = alloc(len);
-        unsafe.copyMemory(array, offset, b, byteArrayOffset + off, len);
+        MemorySegment.copy(segment, JAVA_BYTE, offset, b, 0, b.length);
     }
 
     public long skip(long n) throws IOException {
@@ -220,42 +249,42 @@ public class DataStream implements ObjectInput, ObjectOutput {
 
     public boolean readBoolean() throws IOException {
         long offset = alloc(1);
-        return unsafe.getBoolean(array, offset);
+        return segment.get(JAVA_BOOLEAN, offset);
     }
 
     public byte readByte() throws IOException {
         long offset = alloc(1);
-        return unsafe.getByte(array, offset);
+        return segment.get(JAVA_BYTE, offset);
     }
 
     public int readUnsignedByte() throws IOException {
         long offset = alloc(1);
-        return unsafe.getByte(array, offset) & 0xff;
+        return segment.get(JAVA_BYTE, offset) & 0xff;
     }
 
     public short readShort() throws IOException {
         long offset = alloc(2);
-        return Short.reverseBytes(unsafe.getShort(array, offset));
+        return Short.reverseBytes(segment.get(JAVA_SHORT_UNALIGNED, offset));
     }
 
     public int readUnsignedShort() throws IOException {
         long offset = alloc(2);
-        return Short.reverseBytes(unsafe.getShort(array, offset)) & 0xffff;
+        return Short.reverseBytes(segment.get(JAVA_SHORT_UNALIGNED, offset)) & 0xffff;
     }
 
     public char readChar() throws IOException {
         long offset = alloc(2);
-        return Character.reverseBytes(unsafe.getChar(array, offset));
+        return Character.reverseBytes(segment.get(JAVA_CHAR_UNALIGNED, offset));
     }
 
     public int readInt() throws IOException {
         long offset = alloc(4);
-        return Integer.reverseBytes(unsafe.getInt(array, offset));
+        return Integer.reverseBytes(segment.get(JAVA_INT_UNALIGNED, offset));
     }
 
     public long readLong() throws IOException {
         long offset = alloc(8);
-        return Long.reverseBytes(unsafe.getLong(array, offset));
+        return Long.reverseBytes(segment.get(JAVA_LONG_UNALIGNED, offset));
     }
 
     public float readFloat() throws IOException {
@@ -267,17 +296,18 @@ public class DataStream implements ObjectInput, ObjectOutput {
     }
 
     public String readLine() throws IOException {
-        for (long ptr = offset; ptr < limit; ptr++) {
-            if (unsafe.getByte(array, ptr) == '\n') {
-                int length = (int) (ptr - offset);
-                int cr = length > 0 && unsafe.getByte(array, ptr - 1) == '\r' ? 1 : 0;
-                return Utf8.read(array, alloc(length + 1), length - cr);
-            }
-        }
-
-        // The last line without CR
-        int length = (int) (limit - offset);
-        return length > 0 ? Utf8.read(array, alloc(length), length) : null;
+//        for (long ptr = offset; ptr < limit; ptr++) {
+//            if (unsafe.getByte(array, ptr) == '\n') {
+//                int length = (int) (ptr - offset);
+//                int cr = length > 0 && unsafe.getByte(array, ptr - 1) == '\r' ? 1 : 0;
+//                return Utf8.read(array, alloc(length + 1), length - cr);
+//            }
+//        }
+//
+//        // The last line without CR
+//        int length = (int) (limit - offset);
+//        return length > 0 ? Utf8.read(array, alloc(length), length) : null;
+        return null;
     }
 
     public String readUTF() throws IOException {
@@ -289,7 +319,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
             length = (length & 0x7fff) << 16 | readUnsignedShort();
         }
         long offset = alloc(length);
-        return Utf8.read(array, offset, length);
+        return Utf8.read(segment, offset, length);
     }
 
     public Object readObject() throws IOException, ClassNotFoundException {
@@ -313,11 +343,8 @@ public class DataStream implements ObjectInput, ObjectOutput {
     public void read(ByteBuffer dst) throws IOException {
         int len = dst.remaining();
         long offset = alloc(len);
-        if (dst.hasArray()) {
-            unsafe.copyMemory(array, offset, dst.array(), byteArrayOffset + dst.arrayOffset() + dst.position(), len);
-        } else {
-            unsafe.copyMemory(array, offset, null, DirectMemory.getAddress(dst) + dst.position(), len);
-        }
+        MemorySegment dstSegment = MemorySegment.ofBuffer(dst);
+        MemorySegment.copy(segment, JAVA_BYTE, offset, dstSegment, JAVA_BYTE, 0, len);
         dst.position(dst.limit());
     }
 
@@ -329,7 +356,7 @@ public class DataStream implements ObjectInput, ObjectOutput {
     public ByteBuffer byteBuffer(int len) throws IOException {
         long offset = alloc(len);
         if (array != null) {
-            return ByteBuffer.wrap(array, (int) (offset - byteArrayOffset), len);
+            return ByteBuffer.wrap(array, (int) (offset), len);
         } else {
             return DirectMemory.wrap(offset, len);
         }

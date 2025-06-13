@@ -32,13 +32,13 @@ public class ObjectOutputChannel extends DataStream {
     private long bytesWritten;
 
     public ObjectOutputChannel(WritableByteChannel ch) {
-        super(0, 0);
+        super(0);
         this.ch = ch;
         this.context = new SerializationContext();
     }
 
     public ObjectOutputChannel(WritableByteChannel ch, int bufSize) {
-        super(unsafe.allocateMemory(bufSize), bufSize);
+        super(bufSize);
         this.ch = ch;
         this.context = new SerializationContext();
     }

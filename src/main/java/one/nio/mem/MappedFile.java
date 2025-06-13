@@ -147,7 +147,7 @@ public class MappedFile implements Closeable {
         if (ByteOrder.nativeOrder().equals(order)) {
             throw new UnsupportedOperationException("Native byte order is not implemeneted");
         }
-        return new DataStream(addr, size);
+        return new DataStream(size);
     }
 
     public static long map(RandomAccessFile f, int mode, long start, long size) throws IOException {

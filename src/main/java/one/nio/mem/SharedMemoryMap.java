@@ -189,7 +189,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected V valueAt(long entry) {
         try {
             long valueAddress = entry + headerSize(entry);
-            return serializer.read(new DeserializeStream(valueAddress, Integer.MAX_VALUE));
+            return serializer.read(new DeserializeStream(Integer.MAX_VALUE));
         } catch (IOException | ClassNotFoundException e) {
             throw new IllegalStateException(e);
         }
@@ -199,7 +199,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
     protected void setValueAt(long entry, V value) {
         try {
             long valueAddress = entry + headerSize(entry);
-            serializer.write(value, new SerializeStream(valueAddress, Integer.MAX_VALUE));
+            serializer.write(value, new SerializeStream(Integer.MAX_VALUE));
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
@@ -274,7 +274,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
         }
 
         int count = 0;
-        DeserializeStream ds = new DeserializeStream(mmap.getAddr() + CUSTOM_DATA_OFFSET, metadataSize);
+        DeserializeStream ds = new DeserializeStream(metadataSize);
         while (ds.available() > 0) {
             try {
                 Repository.provideSerializer((Serializer) ds.readObject());
@@ -321,7 +321,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
             }
         });
 
-        SerializeStream ss = new SerializeStream(mmap.getAddr() + CUSTOM_DATA_OFFSET, MAX_CUSTOM_DATA_SIZE);
+        SerializeStream ss = new SerializeStream(MAX_CUSTOM_DATA_SIZE);
         try {
             for (Serializer serializer : serializers) {
                 ss.writeObject(serializer);
@@ -354,7 +354,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
                     long currentPtr = mapBase + (long) i * 8;
                     for (long entry; (entry = unsafe.getAddress(currentPtr)) != 0; currentPtr = entry + NEXT_OFFSET) {
                         int headerSize = headerSize(entry);
-                        V value = oldSerializer.read(new DeserializeStream(entry + headerSize, Integer.MAX_VALUE));
+                        V value = oldSerializer.read(new DeserializeStream(Integer.MAX_VALUE));
 
                         int oldSize = sizeOf(entry);
                         int newSize = sizeOf(value);
@@ -366,7 +366,7 @@ public abstract class SharedMemoryMap<K, V> extends OffheapMap<K, V> implements 
                             entry = newEntry;
                         }
 
-                        newSerializer.write(value, new SerializeStream(entry + headerSize, Integer.MAX_VALUE));
+                        newSerializer.write(value, new SerializeStream(Integer.MAX_VALUE));
                         converted++;
                     }
                 }

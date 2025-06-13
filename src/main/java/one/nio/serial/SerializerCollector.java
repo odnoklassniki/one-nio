@@ -28,7 +28,7 @@ public class SerializerCollector extends DataStream {
     }
 
     public SerializerCollector(long address, long length) {
-        super(null, address, length);
+        super(length);
     }
 
     public void setOffset(long offset) {
