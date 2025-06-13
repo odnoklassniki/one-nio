@@ -37,14 +37,14 @@ public class ObjectInputChannel extends DataStream {
     private long bytesRead;
 
     public ObjectInputChannel(ReadableByteChannel ch) {
-        super(0, 0);
+        super(0);
         this.ch = ch;
         this.capacity = 0;
         this.context = EMPTY_CONTEXT;
     }
 
     public ObjectInputChannel(ReadableByteChannel ch, int bufSize) {
-        super(unsafe.allocateMemory(bufSize), 0);
+        super(0);
         this.ch = ch;
         this.capacity = bufSize;
         this.context = EMPTY_CONTEXT;

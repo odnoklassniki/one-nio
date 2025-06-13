@@ -186,7 +186,7 @@ class NativeSslContext extends SslContext {
                 break;
             case "external":
                 setCacheMode(CacheMode.EXTERNAL);
-                SslSessionCache.Singleton.setCapacity(size);
+//                SslSessionCache.Singleton.setCapacity(size);
                 break;
             default:
                 throw new SSLException("Unsupported session cache mode: " + mode);

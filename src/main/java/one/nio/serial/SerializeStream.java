@@ -32,8 +32,8 @@ public class SerializeStream extends DataStream {
         this.context = new SerializationContext(contextCapacity);
     }
 
-    public SerializeStream(long address, long length) {
-        super(address, length);
+    public SerializeStream(long length) {
+        super(length);
         this.context = new SerializationContext();
     }
 
