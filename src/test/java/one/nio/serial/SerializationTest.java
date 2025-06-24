@@ -31,16 +31,47 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.*;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.Year;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.chrono.ChronoZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.zone.ZoneRules;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 public class SerializationTest {
 
@@ -173,11 +204,11 @@ public class SerializationTest {
         checkSerialize(makeList(200000));
     }
 
-    static class Outer implements Serializable {
+    public static class Outer implements Serializable {
         private int outerValue = 123;
 
         @SerialOptions(Repository.SYNTHETIC_FIELDS)
-        private class Inner implements Serializable {
+        public class Inner implements Serializable {
             private int innerValue = 5;
 
             private int outerValue() {
@@ -218,11 +249,11 @@ public class SerializationTest {
         checkSerialize(new Outer().getInner());
     }
 
-    private enum SimpleEnum {
+    public enum SimpleEnum {
         A, B
     }
 
-    private enum ComplexEnum {
+    public enum ComplexEnum {
         A1, B2, C3 {
             @Override
             public String toString() {
@@ -326,7 +357,7 @@ public class SerializationTest {
         checkSerializeToString(new StringBuffer(1000).append(new Object()).append("zzz").append(1234.56789));
     }
 
-    private static class ReadObject1 implements Serializable {
+    public static class ReadObject1 implements Serializable {
         private Object[] array = new String[]{"regular", "array"};
 
         private void readObject(ObjectInputStream in) {
@@ -345,7 +376,7 @@ public class SerializationTest {
         }
     }
 
-    private static class ReadObject2 implements Serializable {
+    public static class ReadObject2 implements Serializable {
         private final Object[] array = new String[]{"final", "field"};
 
         private void readObject(ObjectInputStream in) {
@@ -374,7 +405,7 @@ public class SerializationTest {
         }
     }
 
-    private static class User implements Serializable {
+    public static class User implements Serializable {
         private long id;
         private long phone;
         private String name;
@@ -460,7 +491,7 @@ public class SerializationTest {
         checkSerialize(ZoneRules.of(ZoneOffset.ofHours(-8)));
     }
 
-    static class Parent implements Serializable {
+    public static class Parent implements Serializable {
         SimpleEnum nameClash = SimpleEnum.A;
 
         @Override
@@ -469,7 +500,7 @@ public class SerializationTest {
         }
     }
 
-    static class Child extends Parent implements Serializable {
+    public static class Child extends Parent implements Serializable {
         ComplexEnum nameClash = ComplexEnum.A1;
 
         @Override
@@ -525,7 +556,7 @@ public class SerializationTest {
         assertEquals(deserializedArray[0], deserializedArray[3]);
     }
 
-    static class GetterSetter implements Serializable {
+    public static class GetterSetter implements Serializable {
         @SerializeWith(getter = "getN")
         int n;
 
@@ -588,7 +619,7 @@ public class SerializationTest {
         new PersistStream().writeObject(new Object());
     }
 
-    static class SomeData implements Serializable {
+    public static class SomeData implements Serializable {
         final String s1;
         @NotSerial
         final String s2;

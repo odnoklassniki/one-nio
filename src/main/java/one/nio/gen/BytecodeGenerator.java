@@ -16,9 +16,12 @@
 
 package one.nio.gen;
 
-import static java.nio.file.StandardOpenOption.CREATE;
-import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
-import static java.nio.file.StandardOpenOption.WRITE;
+import one.nio.mgt.Management;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandleInfo;
@@ -30,12 +33,11 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
-import one.nio.mgt.Management;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.regex.Pattern;
+
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorMXBean, Opcodes {
     private static final Logger log = LoggerFactory.getLogger(BytecodeGenerator.class);
@@ -112,6 +114,36 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         mv.visitFieldInsn(opcode, holder, name, sig);
     }
 
+    public static String getMethodHandleName(String fieldName, String accessType, Class type) {
+        if (accessType == null) {
+            accessType = "";
+        }
+        return fieldName.toUpperCase() + "_" + accessType + "_" + buildNameForMethodHandle(type).toUpperCase() + "_MH";
+    }
+
+    private static String buildNameForMethodHandle(Class type) {
+        String[] t = type.getName().split(Pattern.quote("."));
+        String name = t[t.length - 1];
+        if (name.equalsIgnoreCase("[Z")) {
+            return "boolean_array";
+        } else if (name.equalsIgnoreCase("[B")) {
+            return "byte_array";
+        } else if (name.equalsIgnoreCase("[C")) {
+            return "char_array";
+        } else if (name.equalsIgnoreCase("[S")) {
+            return "short_array";
+        } else if (name.equalsIgnoreCase("[I")) {
+            return "int_array";
+        } else if (name.equalsIgnoreCase("[J")) {
+            return "long_array";
+        } else if (name.equalsIgnoreCase("[F")) {
+            return "float_array";
+        } else if (name.equalsIgnoreCase("[D")) {
+            return "double_array";
+        }
+        return name.replace(";", "").replace(Pattern.quote("$"), "");
+    }
+
     public static void emitInvoke(MethodVisitor mv, Method m) {
         int opcode;
         if ((m.getModifiers() & Modifier.STATIC) != 0) {
@@ -148,7 +180,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         mv.visitMethodInsn(opcode, holder, name, sig, opcode == INVOKEINTERFACE);
     }
 
-    private static String getMethodDescriptor(final MethodType method) {
+    public static String getMethodDescriptor(final MethodType method) {
         StringBuilder b = new StringBuilder().append('(');
         for (Class<?> parameter : method.parameterArray()) {
             b.append(Type.getDescriptor(parameter));

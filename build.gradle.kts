@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    implementation(group = "org.ow2.asm", name = "asm", version = "9.2")
+    implementation(group = "org.ow2.asm", name = "asm", version = "9.8")
     implementation(group = "org.slf4j", name = "slf4j-api", version = "1.7.36")
 
     testImplementation(group = "junit", name = "junit", version = "4.13.1")
@@ -41,6 +41,7 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnit()
+    jvmArgs = listOf("--add-opens=java.base/java.math=ALL-UNNAMED", "--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.net=ALL-UNNAMED")
     testLogging {
         debug {
             events("started", "skipped", "failed")

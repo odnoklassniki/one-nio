@@ -16,6 +16,8 @@
 
 package one.nio.util;
 
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
@@ -50,7 +52,15 @@ public class MethodHandlesReflection {
         return privateLookup.revealDirect(privateLookup.findVirtual(cls, name, type));
     }
 
-    public static MethodHandleInfo findStaticMethod(Class<?> cls, String name, MethodType type){
+    public static MethodType findMethodTypeForWriteObject() {
+        return MethodType.methodType(void.class, ObjectOutputStream.class);
+    }
+
+    public static MethodType findMethodTypeForReadObject() {
+        return MethodType.methodType(void.class, ObjectInputStream.class);
+    }
+
+    public static MethodHandleInfo findStaticMethod(Class<?> cls, String name, MethodType type) {
         try {
             return findStaticMethodOrThrow(cls, name, type);
         } catch (NoSuchMethodException | IllegalAccessException e) {

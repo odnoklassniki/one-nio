@@ -51,7 +51,7 @@ public class StreamsTest {
         assertEquals(place, place2);
     }
 
-    private static class Place implements Serializable {
+    public static class Place implements Serializable {
         private String name;
         private String altName;
         private String intName;
