@@ -22,12 +22,12 @@ import java.io.ObjectStreamClass;
 import java.lang.reflect.Field;
 import java.util.Map;
 
-class GetFieldInputStream extends NullObjectInputStream {
+public class GetFieldInputStream extends NullObjectInputStream {
 
     private final Map<String, Field> fields;
     private final Object source;
 
-    GetFieldInputStream(Object source, Map<String, Field> fields) throws IOException, SecurityException {
+    public GetFieldInputStream(Object source, Map<String, Field> fields) throws IOException, SecurityException {
         this.fields = fields;
         this.source = source;
     }

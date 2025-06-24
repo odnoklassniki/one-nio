@@ -34,7 +34,7 @@ import java.util.Map;
 public class JsonReader {
     protected byte[] array;
     protected int offset;
-    protected int next;
+    public int next;
 
     public JsonReader(byte[] array) {
         this(array, 0);
@@ -46,7 +46,7 @@ public class JsonReader {
         skipWhitespace();
     }
 
-    protected int read() {
+    public int read() {
         int b = next;
         next = offset < array.length ? array[offset++] & 0xff : -1;
         return b;

@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.ObjectOutput;
 
 public class CalcSizeStream extends SerializationContext implements ObjectOutput {
-    protected int count;
+    public int count;
     protected boolean hasCycles;
 
     public CalcSizeStream() {

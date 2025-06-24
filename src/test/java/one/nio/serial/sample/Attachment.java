@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class Attachment implements Serializable {
-    enum Type {PHOTO, VIDEO}
+    public enum Type {PHOTO, VIDEO}
 
     public final Type type;
     public final long id;

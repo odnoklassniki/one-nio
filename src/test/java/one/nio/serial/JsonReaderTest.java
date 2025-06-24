@@ -107,7 +107,7 @@ public class JsonReaderTest {
         Assert.assertTrue(x.set instanceof Set && x.set.isEmpty());
     }
 
-    static class Custom implements Serializable {
+    public static class Custom implements Serializable {
         int intValue;
         Long longValue = -77L;
         final String string = "zzz";
