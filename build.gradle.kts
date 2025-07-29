@@ -28,32 +28,92 @@ dependencies {
     testRuntimeOnly(group = "org.apache.logging.log4j", name = "log4j-slf4j-impl", version = "2.24.3")
 }
 
+val currentJdk = System.getProperty("java.specification.version").substringAfter(".")
+val testJdk = System.getProperty("test.jdk", currentJdk).substringBefore("-") //process ea build, e.g. 25-ea
+
 java {
     withJavadocJar()
     withSourcesJar()
 }
 
-tasks.withType<JavaCompile> {
-    sourceCompatibility = "1.8"
-    targetCompatibility = "1.8"
-    options.encoding = "UTF-8"
-    options.compilerArgs = options.compilerArgs + "-Xlint:all"
-}
-
-tasks.withType<Test> {
-    useJUnit()
-    testLogging {
-        debug {
-            events("started", "skipped", "failed")
-            exceptionFormat = TestExceptionFormat.FULL
+sourceSets {
+    create("java9") {
+        java {
+            srcDir("src/main/java9")
         }
-        testLogging.showStandardStreams = true
-        events("passed", "skipped", "failed")
+        compileClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().output
     }
 }
 
-tasks.register<Test>("testCI") {
-    jvmArgs("-Dci=true")
+tasks {
+    withType<JavaCompile>().configureEach {
+        options.apply {
+            encoding = "UTF-8"
+            compilerArgs.add("-Xlint:all")
+            sourceCompatibility = "1.8"
+            targetCompatibility = "1.8"
+            //can't set --release 8 as using non public API
+            //release.set(8)
+            javaCompiler = project.javaToolchains.compilerFor {
+                languageVersion = JavaLanguageVersion.of(8)
+            }
+        }
+    }
+
+    named<JavaCompile>("compileJava9Java") {
+        javaCompiler = project.javaToolchains.compilerFor {
+            val jdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
+            languageVersion = JavaLanguageVersion.of(jdk)
+        }
+        options.release.set(9)
+
+        dependsOn(named("compileJava"))
+    }
+
+    jar {
+        dependsOn(named("compileJava9Java"))
+        into("META-INF/versions/9") {
+            from(sourceSets["java9"].output)
+        }
+        manifest {
+            attributes("Multi-Release" to "true")
+        }
+    }
+
+    withType<Test>().configureEach {
+        dependsOn(named("jar"))
+        classpath += files(jar.get().archiveFile)
+
+        javaLauncher.set(project.javaToolchains.launcherFor {
+            logger.info("Executing tests using $testJdk")
+            languageVersion.set(JavaLanguageVersion.of(testJdk))
+        })
+
+        if (currentJdk != testJdk && testJdk != "8") {
+            //`NativeReflectionTest.testOpenModules` test fails if executed in different JDK than gradle:
+            //      class one.nio.util.NativeReflectionTest cannot access class jdk.internal.ref.Cleaner (in module java.base)
+            //      because module java.base does not export jdk.internal.ref to unnamed module
+            // TODO: Further investigation is required: is it incorrect test or tested logic doesn't work properly in all cases.
+            filter {
+                excludeTestsMatching("one.nio.util.NativeReflectionTest.testOpenModules")
+            }
+        }
+
+        useJUnit()
+        testLogging {
+            debug {
+                events("started", "skipped", "failed")
+                exceptionFormat = TestExceptionFormat.FULL
+            }
+            showStandardStreams = true
+            events("passed", "skipped", "failed")
+        }
+    }
+
+    register<Test>("testCI") {
+        jvmArgs("-Dci=true")
+    }
 }
 
 val nativeBuildDir = layout.buildDirectory.dir("classes/java/main").get()
