@@ -47,8 +47,8 @@ jobs:
           sudo apt install gcc \
           apt install libssl-dev \
           
-      - name: Build and run tests on JDK ${{matrix.jdk}}
-        run: ./gradlew jar testCI --scan --debug -Dtest.jdk=${{matrix.jdk}}
+      - name: Build and run checks and tests on JDK ${{matrix.jdk}}
+        run: ./gradlew jar check -Pci=true --scan --debug -Ptest.jdk=${{matrix.jdk}}
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2

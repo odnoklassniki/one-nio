@@ -40,65 +40,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
 
+import static one.nio.serial.Utils.*;
 import static org.junit.Assert.*;
 
 public class SerializationTest {
 
     private Object clone(Object obj) throws IOException, ClassNotFoundException {
-        CalcSizeStream css = new CalcSizeStream();
-        css.writeObject(obj);
-        int length = css.count();
-
-        byte[] buf = new byte[length];
-        SerializeStream out = new SerializeStream(buf);
-        out.writeObject(obj);
-        assertEquals(out.count(), length);
-
-        DeserializeStream in = new DeserializeStream(buf);
-        Object objCopy = in.readObject();
-        assertEquals(in.count(), length);
-
-        return objCopy;
-    }
-
-    private Object cloneViaPersist(Object obj) throws IOException, ClassNotFoundException {
-        PersistStream out = new PersistStream();
-        out.writeObject(obj);
-        byte[] buf = out.toByteArray();
-
-        DeserializeStream in = new DeserializeStream(buf);
-        Object objCopy = in.readObject();
-        assertEquals(in.count(), buf.length);
-
-        return objCopy;
-    }
-
-    private static final Class[] collectionInterfaces = {SortedSet.class, NavigableSet.class, Set.class, Queue.class, List.class};
-    private static final Class[] mapInterfaces = {SortedMap.class, NavigableMap.class};
-
-    private void checkClass(Class<?> cls, Class<?> other) {
-        if (other != cls) {
-            if (Collection.class.isAssignableFrom(cls)) {
-                for (Class<?> iface : collectionInterfaces) {
-                    assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
-                }
-            }
-            if (Map.class.isAssignableFrom(cls)) {
-                for (Class<?> iface : mapInterfaces) {
-                    assertTrue(!iface.isAssignableFrom(cls) || iface.isAssignableFrom(other));
-                }
-            }
-        }
-    }
-
-    private void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
-        Object clone1 = clone(obj);
-        checkClass(obj.getClass(), clone1.getClass());
-        assertEquals(obj, clone1);
-
-        Object clone2 = cloneViaPersist(obj);
-        checkClass(obj.getClass(), clone2.getClass());
-        assertEquals(obj, clone2);
+        return Utils.clone(obj);
     }
 
     private void checkSerializeToString(Object obj) throws IOException, ClassNotFoundException {
@@ -668,88 +616,4 @@ public class SerializationTest {
         assertNull(clone.s2);
         assertNull(clone.s3);
     }
-/*
-    static record SomeRecord(String s1, @NotSerial String s2) implements Serializable {}
-
-    @Test
-    public void testNotSerialRecord() throws IOException, ClassNotFoundException {
-        SomeRecord someRecord = new SomeRecord("s1", "s2");
-        assertEquals("s1", someRecord.s1);
-        assertEquals("s2", someRecord.s2);
-
-        SomeRecord clone = (SomeRecord) clone(someRecord);
-        assertEquals("s1", clone.s1);
-        assertNull(clone.s2);
-
-        String json = Json.toJson(someRecord);
-        assertEquals("{\"s1\":\"s1\"}", json);
-
-        byte[] bytes = "{\"s1\":\"s1\",\"s2\":\"s2\"}".getBytes();
-        SomeRecord fromJson = new JsonReader(bytes).readObject(SomeRecord.class);
-
-        assertEquals("s1", fromJson.s1);
-        assertNull(fromJson.s2);
-    }
-
-    record Color(String name, int r, int g, int b) implements Serializable {
-
-        public Color(String name, String rgb) {
-            this(name, hh(rgb, 1, 3), hh(rgb, 3, 5), hh(rgb, 5, 7));
-        }
-
-        private static int hh(String s, int from, int to) {
-            return Integer.parseInt(s.substring(from, to), 16);
-        }
-    }
-
-    @Test
-    public void testRecord() throws IOException, ClassNotFoundException {
-        checkSerialize(new Color("gold", 255, 215, 0));
-        checkSerialize(new Color("skyblue", "#87CEEB"));
-
-        Color pink = (Color) clone(new Color("pink", "#FFC0CB"));
-        Color pink2 = (Color) clone(new Color("pink", 255, 192, 203));
-        assertEquals(pink, pink2);
-    }
-
-    private record PrivateRecord(float x, double y) implements Serializable {
-        private PrivateRecord {
-        }
-    }
-
-    @Test
-    public void testPrivateRecord() throws IOException, ClassNotFoundException {
-        checkSerialize(new PrivateRecord(12.34f, 56.789));
-    }
-
-    record Node(Object value, Node left, Node right) implements Serializable {
-        Node(Object value) {
-            this(value, null, null);
-        }
-    }
-
-    @Test
-    public void testRecordJson() throws IOException, ClassNotFoundException {
-        Integer n = 1000;
-        Node root = new Node("root",
-                new Node(n,
-                        new Node("leaf_l1"),
-                        new Node("leaf_r1")),
-                new Node(n,
-                        new Node("leaf_l2"),
-                        new Node("node_r2",
-                                new Node(true),
-                                new Node(false))));
-
-        checkSerialize(root);
-        Node root2 = (Node) clone(root);
-        assertSame(root2.left.value, root2.right.value);
-
-        String s = Json.toJson(root);
-        Node root3 = Repository.get(Node.class).fromJson(new JsonReader(s.getBytes()));
-        assertEquals(root, root2);
-        assertEquals(root, root3);
-        assertEquals(s, Json.toJson(root2));
-    }
-*/
 }

@@ -29,7 +29,8 @@ dependencies {
 }
 
 val currentJdk = System.getProperty("java.specification.version").substringAfter(".")
-val testJdk = System.getProperty("test.jdk", currentJdk).substringBefore("-") //process ea build, e.g. 25-ea
+val testJdk = (findProperty("test.jdk") as? String ?: currentJdk).substringBefore("-") //process ea build, e.g. 25-ea
+val multiReleaseJdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
 
 java {
     withJavadocJar()
@@ -43,6 +44,30 @@ sourceSets {
         }
         compileClasspath += sourceSets.main.get().output
         runtimeClasspath += sourceSets.main.get().output
+    }
+
+    create("testJava16") {
+        java {
+            srcDir("src/test/java16")
+        }
+        // Include standard test outputs so Java16 tests can import test fixtures like one.nio.serial.sample.Sample
+        compileClasspath += sourceSets.test.get().output + sourceSets.test.get().compileClasspath + sourceSets.main.get().output
+        runtimeClasspath += sourceSets.test.get().output + sourceSets.test.get().runtimeClasspath + sourceSets.main.get().output
+    }
+}
+
+if ((testJdk.toIntOrNull() ?: 0) >= 16) {
+    val testJava16 by tasks.registering(Test::class) {
+
+        description = "Runs additional Java 16 specific tests."
+        group = LifecycleBasePlugin.VERIFICATION_GROUP
+
+        testClassesDirs = sourceSets["testJava16"].output.classesDirs
+        classpath = sourceSets["testJava16"].runtimeClasspath
+    }
+
+    tasks.named("check").configure {
+        dependsOn(testJava16)
     }
 }
 
@@ -63,12 +88,24 @@ tasks {
 
     named<JavaCompile>("compileJava9Java") {
         javaCompiler = project.javaToolchains.compilerFor {
-            val jdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
-            languageVersion = JavaLanguageVersion.of(jdk)
+            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
         }
         options.release.set(9)
+        sourceCompatibility = "9"
+        targetCompatibility = "9"
 
         dependsOn(named("compileJava"))
+    }
+
+    // Configure Java 16 test compilation toolchain
+    named<JavaCompile>("compileTestJava16Java") {
+        options.release.set(16)
+        sourceCompatibility = "16"
+        targetCompatibility = "16"
+        javaCompiler = project.javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
+        }
+        dependsOn(named("compileTestJava"))
     }
 
     jar {
@@ -90,16 +127,6 @@ tasks {
             languageVersion.set(JavaLanguageVersion.of(testJdk))
         })
 
-        if (currentJdk != testJdk && testJdk != "8") {
-            //`NativeReflectionTest.testOpenModules` test fails if executed in different JDK than gradle:
-            //      class one.nio.util.NativeReflectionTest cannot access class jdk.internal.ref.Cleaner (in module java.base)
-            //      because module java.base does not export jdk.internal.ref to unnamed module
-            // TODO: Further investigation is required: is it incorrect test or tested logic doesn't work properly in all cases.
-            filter {
-                excludeTestsMatching("one.nio.util.NativeReflectionTest.testOpenModules")
-            }
-        }
-
         useJUnit()
         testLogging {
             debug {
@@ -109,10 +136,11 @@ tasks {
             showStandardStreams = true
             events("passed", "skipped", "failed")
         }
-    }
 
-    register<Test>("testCI") {
-        jvmArgs("-Dci=true")
+        val isCIBuild = findProperty("ci") as String?
+        if (isCIBuild != null) {
+            systemProperties["ci"] = isCIBuild
+        }
     }
 }
 
