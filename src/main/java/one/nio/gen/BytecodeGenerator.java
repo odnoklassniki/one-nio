@@ -167,12 +167,6 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         return b.append(')').append(Type.getDescriptor(method.returnType())).toString();
     }
 
-    public static void emitInvoke(MethodVisitor mv, Constructor c) {
-        String holder = Type.getInternalName(c.getDeclaringClass());
-        String sig = Type.getConstructorDescriptor(c);
-        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig, false);
-    }
-
     public static void emitThrow(MethodVisitor mv, String exceptionClass, String message) {
         mv.visitTypeInsn(NEW, exceptionClass);
         mv.visitInsn(DUP);

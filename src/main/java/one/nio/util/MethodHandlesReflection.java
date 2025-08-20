@@ -55,6 +55,10 @@ public class MethodHandlesReflection {
         return privateLookup.findVirtual(cls, name, type);
     }
 
+    public static MethodHandle findMHConstructorOrThrow(Class<?> cls, MethodType type) throws NoSuchMethodException, IllegalAccessException {
+        return privateLookup.findConstructor(cls, type);
+    }
+
     public static MethodHandleInfo findStaticMethod(Class<?> cls, String name, MethodType type){
         try {
             return findStaticMethodOrThrow(cls, name, type);

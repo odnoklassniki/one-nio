@@ -20,6 +20,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Objects;
 
 import static one.nio.serial.Utils.*;
 import static org.junit.Assert.*;
@@ -81,6 +82,46 @@ public class RecordTest {
     @Test
     public void testPrivateRecord() throws IOException, ClassNotFoundException {
         checkSerialize(new PrivateRecord(12.34f, 56.789));
+    }
+
+
+    static class SameRecordTwoTimes implements Serializable {
+
+        record Simple(String data, String data2) implements Serializable {}
+
+        private Simple record;
+
+        private final Simple same_record;
+
+        @Override
+        public String toString() {
+            return "SameRecordTwoTimes{" +
+                    "record=" + record +
+                    ", same_record=" + same_record +
+                    '}';
+        }
+
+        public SameRecordTwoTimes(String data) {
+            this.record = new Simple(data, data + "2");
+            this.same_record = this.record;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            SameRecordTwoTimes that = (SameRecordTwoTimes) o;
+            return Objects.equals(record, that.record) && Objects.equals(same_record, that.same_record);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(record, same_record);
+        }
+    }
+
+    @Test
+    public void testSameRecordTwiceInObject() throws IOException, ClassNotFoundException {
+        checkSerialize(new SameRecordTwoTimes("1"));
     }
 
     record Node(Object value, Node left, Node right) implements Serializable {
