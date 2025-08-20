@@ -19,7 +19,9 @@ package one.nio.serial.gen.strategy;
 
 import one.nio.serial.FieldDescriptor;
 import one.nio.serial.SerializeWith;
+import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.FieldType;
+import one.nio.util.JavaFeatures;
 import one.nio.util.MethodHandlesReflection;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -31,20 +33,24 @@ import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static one.nio.serial.AsmUtils.OBJECT_TYPE;
-import static one.nio.serial.gen.DelegateGenerator.emitClassForName;
+import static one.nio.serial.gen.DelegateGenerator.loadClassSafe;
 import static one.nio.serial.gen.DelegateGenerator.isNotSerial;
 import static one.nio.util.JavaInternals.unsafe;
 import static org.objectweb.asm.Opcodes.*;
 
 public final class HandlesStrategy extends GenerationStrategy {
+
+    private final static String CONSTRUCTOR_HANDLE = "$$$constructor";
 
     @Override
     public String getBaseClassName() {
@@ -83,6 +89,16 @@ public final class HandlesStrategy extends GenerationStrategy {
             generateFieldForStaticVarOrMethodHandlerIfNeeded(cv, fd);
         }
 
+        if (JavaFeatures.isRecord(cls)) {
+            cv.visitField(
+                    ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                    CONSTRUCTOR_HANDLE,
+                    "Ljava/lang/invoke/MethodHandle;",
+                    null,
+                    null
+            ).visitEnd();
+        }
+
         generateClassInit(cv, cls, className, fds, defaultFields, parentDescriptors);
     }
 
@@ -109,6 +125,15 @@ public final class HandlesStrategy extends GenerationStrategy {
             initializeFieldAccessorsIfNeeded(cls, className, fd, mv, true);
         }
 
+        if (JavaFeatures.isRecord(cls)) {
+            emitConstructorHandleObtain(mv, cls, DelegateGenerator.getConstructorArgs(fds, defaultFields));
+            mv.visitFieldInsn(
+                    PUTSTATIC,
+                    className,
+                    CONSTRUCTOR_HANDLE,
+                    Type.getDescriptor(MethodHandle.class)
+            );
+        }
 
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
@@ -126,17 +151,12 @@ public final class HandlesStrategy extends GenerationStrategy {
 
     private static void initializeFieldAccessors(Class cls, String className, FieldDescriptor fd, MethodVisitor mv, Field ownField) {
         Field field = fd.ownField();
-        emitClassForName(mv, field.getDeclaringClass());
+        loadClassSafe(mv, field.getDeclaringClass());
 
-        mv.visitLdcInsn(fd.name());
+        mv.visitLdcInsn(field.getName());
         Class<?> fieldType = field.getType();
 
-        if (fieldType.isPrimitive()) {
-            loadPrimitiveType(mv, fieldType);
-        } else {
-            //mv.visitLdcInsn(Type.getType(fieldType));
-            emitClassForName(mv, fieldType);
-        }
+        loadClassSafe(mv, fieldType);
 
         mv.visitMethodInsn(
                 INVOKESTATIC,
@@ -285,7 +305,7 @@ public final class HandlesStrategy extends GenerationStrategy {
         return "$" + ((isGetter) ? "get" : "set")  + "_" + getVarHandleName(fd);
     }
 
-    private static void loadPrimitiveType(MethodVisitor mv, Class<?> clazz) {
+    public static void loadPrimitiveType(MethodVisitor mv, Class<?> clazz) {
         if (clazz == int.class) {
             mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Integer", "TYPE", "Ljava/lang/Class;");
         } else if (clazz == boolean.class) {
@@ -334,14 +354,14 @@ public final class HandlesStrategy extends GenerationStrategy {
     }
 
     private static void emitMethodHandleObtain(MethodVisitor mv, Class clazz, String methodName, Class returnType, Class... args) {
-        emitClassForName(mv, clazz);
+        loadClassSafe(mv, clazz);
         mv.visitLdcInsn(methodName);
 
         //MethodType.methodType(void.class, ObjectOutputStream.class);
         if (returnType.isPrimitive()) {
             loadPrimitiveType(mv, returnType);
         } else {
-            emitClassForName(mv, returnType);
+            loadClassSafe(mv, returnType);
         }
 
         for (Class cl: args) {
@@ -356,9 +376,28 @@ public final class HandlesStrategy extends GenerationStrategy {
         mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodHandlesReflection.class).getInternalName(), "findMHInstanceMethodOrThrow", Type.getMethodDescriptor(Type.getType(MethodHandle.class), Type.getType(Class.class), Type.getType(String.class), Type.getType(MethodType.class)), false);
     }
 
+    private static void emitConstructorHandleObtain(MethodVisitor mv, Class clazz, Class... args) {
+        loadClassSafe(mv, clazz);
+        loadClassSafe(mv, Void.TYPE);
+
+        mv.visitLdcInsn(args.length);
+        mv.visitTypeInsn(ANEWARRAY, Type.getType(Class.class).getInternalName());
+        int index = 0;
+        for (Class cl: args) {
+            mv.visitInsn(DUP);
+            mv.visitLdcInsn(index++);
+            loadClassSafe(mv, cl);
+            mv.visitInsn(AASTORE);
+        }
+
+        mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodType.class).getInternalName(), "methodType", Type.getMethodDescriptor(Type.getType(MethodType.class), Type.getType(Class.class), Type.getType(Class[].class)), false);
+
+        mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodHandlesReflection.class).getInternalName(), "findMHConstructorOrThrow", Type.getMethodDescriptor(Type.getType(MethodHandle.class), Type.getType(Class.class), Type.getType(MethodType.class)), false);
+    }
+
     @Override
     public void emitReadSerialField(MethodVisitor mv, Class clazz, Field field, String serializerClassName) {
-        Type erasedFieldType = field.getType().isPrimitive() ? Type.getType(field.getType()) : OBJECT_TYPE;;
+        Type erasedFieldType = eraseTypeIfNeeded(field);;
         String descriptor = String.format("(%s)%s", OBJECT_TYPE.getDescriptor(), erasedFieldType);
         mv.visitMethodInsn(INVOKESTATIC, serializerClassName, "vhGet_" + HandlesStrategy.getVarHandleName(field), descriptor, false);
     }
@@ -370,10 +409,26 @@ public final class HandlesStrategy extends GenerationStrategy {
             mv.visitLdcInsn(unsafe.objectFieldOffset(field));
             mv.visitMethodInsn(INVOKESTATIC, "one/nio/util/JavaInternals", dstType.putMethod(), dstType.putSignature(), false);
         } else {
-            Type erasedFieldType = field.getType().isPrimitive() ? Type.getType(field.getType()) : OBJECT_TYPE;
+            Type erasedFieldType = eraseTypeIfNeeded(field);
             String description = String.format("(%s%s)V", OBJECT_TYPE.getDescriptor(), erasedFieldType);
             mv.visitMethodInsn(INVOKESTATIC, serializerClassName, "vhSet_" + HandlesStrategy.getVarHandleName(field), description, false);
 
         }
+    }
+
+    @Override
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator) {
+        mv.visitFieldInsn(GETSTATIC, className, CONSTRUCTOR_HANDLE, Type.getDescriptor(MethodHandle.class));
+        argGenerator.accept(mv);
+        Type[] types = Arrays.stream(constuctor.getParameterTypes()).map(HandlesStrategy::eraseClassType).toArray(Type[]::new);
+        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getType(MethodHandle.class).getInternalName(), "invoke", Type.getMethodDescriptor(eraseClassType(clazz), types), false);
+    }
+
+    private static Type eraseTypeIfNeeded(Field field) {
+        return eraseClassType(field.getType());
+    }
+
+    private static Type eraseClassType(Class clazz) {
+        return clazz.isPrimitive() ? Type.getType(clazz) : OBJECT_TYPE;
     }
 }

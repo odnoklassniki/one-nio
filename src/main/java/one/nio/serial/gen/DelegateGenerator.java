@@ -36,10 +36,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -50,8 +47,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static one.nio.serial.AsmUtils.OBJECT_TYPE;
-import static one.nio.util.JavaInternals.unsafe;
+import static one.nio.serial.gen.strategy.HandlesStrategy.loadPrimitiveType;
 
 public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();
@@ -219,13 +215,24 @@ public class DelegateGenerator extends BytecodeGenerator {
                 null, new String[]{"java/io/IOException", "java/lang/ClassNotFoundException"});
         mv.visitCode();
 
+        boolean isRecord = JavaFeatures.isRecord(cls);
         mv.visitVarInsn(ALOAD, 1);
-        emitNewInstance(mv, className, cls);
-        mv.visitInsn(DUP_X1);
-        mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+
+        if (!isRecord || strategy instanceof MagicAccessorStrategy) {
+            emitNewInstance(mv, className, cls);
+            mv.visitInsn(DUP_X1);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+        } else {
+            mv.visitTypeInsn(NEW, "one/nio/serial/RecordPositionHolder");
+            mv.visitInsn(DUP);
+            mv.visitInsn(DUP);
+            mv.visitMethodInsn(INVOKESPECIAL, "one/nio/serial/RecordPositionHolder", "<init>", "()V", false);
+            mv.visitVarInsn(ASTORE, 100); // TODO: calculate proper index
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+        }
 
         ArrayList<Field> parents = new ArrayList<>();
-        boolean isRecord = JavaFeatures.isRecord(cls);
+
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
             Field parentField = fd.parentField();
@@ -267,7 +274,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         }
 
         if (isRecord) {
-            generateCreateRecord(mv, cls, fds, defaultFields);
+            generateCreateRecord(mv, cls, className, fds, defaultFields, strategy instanceof HandlesStrategy);
         }
 
         emitReadObject(cls, mv, className);
@@ -414,6 +421,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         // Prepare a multimap (fieldHash -> fds) for lookupswitch
         TreeMap<Integer, FieldDescriptor> fieldHashes = new TreeMap<>();
         boolean isRecord = JavaFeatures.isRecord(cls);
+
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
             if (isNotSerial(ownField)) {
@@ -528,7 +536,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitInsn(POP);
 
         if (isRecord) {
-            generateCreateRecord(mv, cls, fds, defaultFields);
+            generateCreateRecord(mv, cls, className, fds, defaultFields, false);
         }
 
         emitReadObject(cls, mv, className);
@@ -621,7 +629,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readMap", "()Ljava/util/Map;", false);
             //emitTypeCast(mv, Map.class, fieldClass);
         } else if (isConcreteClass(fieldClass)) {
-            mv.visitLdcInsn(Type.getType(fieldClass));
+            loadClassSafe(mv, fieldClass);
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readObject", "(Ljava/lang/Class;)Ljava/lang/Object;", false);
             //emitTypeCast(mv, Object.class, fieldClass);
         } else {
@@ -632,7 +640,32 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitLabel(done);
     }
 
-    private static void generateCreateRecord(MethodVisitor mv, Class<?> cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
+    private static void generateCreateRecord(MethodVisitor mv, Class<?> cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, boolean register) {
+        Class<?>[] args = getConstructorArgs(fds, defaultFields);
+        int length = args.length;
+
+        try {
+            Constructor c = cls.getDeclaredConstructor(args);
+            strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c, (v) -> {
+                for (int i = 0; i < length; i++) {
+                    v.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
+                }
+            });
+            if (register) {
+                mv.visitInsn(DUP);
+                mv.visitVarInsn(ALOAD, 100);
+                mv.visitInsn(SWAP);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/RecordPositionHolder", "setRecord", "(Ljava/lang/Object;)V", false);
+                mv.visitVarInsn(ALOAD, 1);
+                mv.visitVarInsn(ALOAD, 100);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+            }
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException("Cannot find matching canonical constructor for " + cls.getName());
+        }
+    }
+
+    public static Class<?>[] getConstructorArgs(FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
         Class<?>[] args = new Class[fds.length + defaultFields.length];
         for (FieldDescriptor fd : fds) {
             if (fd.ownField() != null) {
@@ -650,17 +683,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         if (length != args.length) {
             args = Arrays.copyOf(args, length);
         }
-
-        mv.visitInsn(DUP);
-        for (int i = 0; i < length; i++) {
-            mv.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
-        }
-
-        try {
-            emitInvoke(mv, cls.getDeclaredConstructor(args));
-        } catch (NoSuchMethodException e) {
-            throw new IllegalArgumentException("Cannot find matching canonical constructor for " + cls.getName());
-        }
+        return args;
     }
 
     private static boolean isConcreteClass(Class cls) {
@@ -881,19 +904,32 @@ public class DelegateGenerator extends BytecodeGenerator {
     }
 
     private static void emitNewInstance(MethodVisitor mv, String className, Class<?> clazz) {
-        mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
+        if (strategy instanceof MagicAccessorStrategy) {
+            mv.visitTypeInsn(NEW, Type.getInternalName(clazz));
+        } else {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
 
-        emitClassForName(mv, clazz);
+            loadClassSafe(mv, clazz);
 
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
-                "(Ljava/lang/Class;)Ljava/lang/Object;", false);
-        if (className == null) {
-            mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(clazz));
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
+                    "(Ljava/lang/Class;)Ljava/lang/Object;", false);
+            if (className == null) {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(clazz));
+            }
+
         }
     }
 
-    public static void emitClassForName(MethodVisitor mv, Class<?> clazz) {
-        mv.visitLdcInsn(clazz.getName());
-        mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+    public static void loadClassSafe(MethodVisitor mv, Class<?> clazz) {
+        if (clazz.isPrimitive()) {
+            loadPrimitiveType(mv, clazz);
+        } else {
+            if (strategy instanceof MagicAccessorStrategy || Modifier.isPublic(clazz.getModifiers())) {
+                mv.visitLdcInsn(Type.getType(clazz));
+            } else {
+                mv.visitLdcInsn(clazz.getName());
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+            }
+        }
     }
 }

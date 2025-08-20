@@ -29,13 +29,14 @@ import org.objectweb.asm.Type;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
+import java.util.function.Consumer;
 
 import static one.nio.gen.BytecodeGenerator.*;
-import static one.nio.serial.AsmUtils.OBJECT_TYPE;
 import static one.nio.util.JavaInternals.unsafe;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
@@ -130,5 +131,15 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
         } else {
             emitPutField(mv, field);
         }
+    }
+
+    @Override
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator) {
+        mv.visitInsn(DUP);
+
+        argGenerator.accept(mv);
+        String holder = Type.getInternalName(constuctor.getDeclaringClass());
+        String sig = Type.getConstructorDescriptor(constuctor);
+        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig, false);
     }
 }
