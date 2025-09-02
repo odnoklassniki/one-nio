@@ -20,7 +20,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: [8, 11, 17, 19, 21, 23]
+        jdk: [8, 11, 17, 21, 23] #TODO: add 24, 25-ea targets
+        include:
+          - jdk: 8
+            main_jdk: 8
+            second_jdk: 21
+#          - jdk: 25-ea
+#            main_jdk: 8
+#            second_jdk: 25-ea
 
     steps:
       - uses: actions/checkout@v3
@@ -28,16 +35,20 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
-          java-version: ${{ matrix.jdk }}
+#          All versions are added to the PATH. The last version will be used and available globally.
+          java-version: |
+            ${{ matrix.second_jdk || '8' }}
+            ${{ matrix.main_jdk || matrix.jdk }}
           distribution: 'zulu'
+
       - name: Setup dependencies
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt install gcc \
           apt install libssl-dev \
           
-      - name: Build and run tests
-        run: ./gradlew jar testCI --scan --debug
+      - name: Build and run checks and tests on JDK ${{matrix.jdk}}
+        run: ./gradlew jar check -Pci=true --scan --debug -Ptest.jdk=${{matrix.jdk}}
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2

@@ -28,32 +28,120 @@ dependencies {
     testRuntimeOnly(group = "org.apache.logging.log4j", name = "log4j-slf4j-impl", version = "2.24.3")
 }
 
+val currentJdk = System.getProperty("java.specification.version").substringAfter(".")
+val testJdk = (findProperty("test.jdk") as? String ?: currentJdk).substringBefore("-") //process ea build, e.g. 25-ea
+val multiReleaseJdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
+
 java {
     withJavadocJar()
     withSourcesJar()
 }
 
-tasks.withType<JavaCompile> {
-    sourceCompatibility = "1.8"
-    targetCompatibility = "1.8"
-    options.encoding = "UTF-8"
-    options.compilerArgs = options.compilerArgs + "-Xlint:all"
-}
-
-tasks.withType<Test> {
-    useJUnit()
-    testLogging {
-        debug {
-            events("started", "skipped", "failed")
-            exceptionFormat = TestExceptionFormat.FULL
+sourceSets {
+    create("java9") {
+        java {
+            srcDir("src/main/java9")
         }
-        testLogging.showStandardStreams = true
-        events("passed", "skipped", "failed")
+        compileClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().output
+    }
+
+    create("testJava16") {
+        java {
+            srcDir("src/test/java16")
+        }
+        // Include standard test outputs so Java16 tests can import test fixtures like one.nio.serial.sample.Sample
+        compileClasspath += sourceSets.test.get().output + sourceSets.test.get().compileClasspath + sourceSets.main.get().output
+        runtimeClasspath += sourceSets.test.get().output + sourceSets.test.get().runtimeClasspath + sourceSets.main.get().output
     }
 }
 
-tasks.register<Test>("testCI") {
-    jvmArgs("-Dci=true")
+if ((testJdk.toIntOrNull() ?: 0) >= 16) {
+    val testJava16 by tasks.registering(Test::class) {
+
+        description = "Runs additional Java 16 specific tests."
+        group = LifecycleBasePlugin.VERIFICATION_GROUP
+
+        testClassesDirs = sourceSets["testJava16"].output.classesDirs
+        classpath = sourceSets["testJava16"].runtimeClasspath
+    }
+
+    tasks.named("check").configure {
+        dependsOn(testJava16)
+    }
+}
+
+tasks {
+    withType<JavaCompile>().configureEach {
+        options.apply {
+            encoding = "UTF-8"
+            compilerArgs.add("-Xlint:all")
+            sourceCompatibility = "1.8"
+            targetCompatibility = "1.8"
+            //can't set --release 8 as using non public API
+            //release.set(8)
+            javaCompiler = project.javaToolchains.compilerFor {
+                languageVersion = JavaLanguageVersion.of(8)
+            }
+        }
+    }
+
+    named<JavaCompile>("compileJava9Java") {
+        javaCompiler = project.javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
+        }
+        options.release.set(9)
+        sourceCompatibility = "9"
+        targetCompatibility = "9"
+
+        dependsOn(named("compileJava"))
+    }
+
+    // Configure Java 16 test compilation toolchain
+    named<JavaCompile>("compileTestJava16Java") {
+        options.release.set(16)
+        sourceCompatibility = "16"
+        targetCompatibility = "16"
+        javaCompiler = project.javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
+        }
+        dependsOn(named("compileTestJava"))
+    }
+
+    jar {
+        dependsOn(named("compileJava9Java"))
+        into("META-INF/versions/9") {
+            from(sourceSets["java9"].output)
+        }
+        manifest {
+            attributes("Multi-Release" to "true")
+        }
+    }
+
+    withType<Test>().configureEach {
+        dependsOn(named("jar"))
+        classpath += files(jar.get().archiveFile)
+
+        javaLauncher.set(project.javaToolchains.launcherFor {
+            logger.info("Executing tests using $testJdk")
+            languageVersion.set(JavaLanguageVersion.of(testJdk))
+        })
+
+        useJUnit()
+        testLogging {
+            debug {
+                events("started", "skipped", "failed")
+                exceptionFormat = TestExceptionFormat.FULL
+            }
+            showStandardStreams = true
+            events("passed", "skipped", "failed")
+        }
+
+        val isCIBuild = findProperty("ci") as String?
+        if (isCIBuild != null) {
+            systemProperties["ci"] = isCIBuild
+        }
+    }
 }
 
 val nativeBuildDir = layout.buildDirectory.dir("classes/java/main").get()
