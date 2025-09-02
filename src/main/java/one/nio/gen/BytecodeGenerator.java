@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
 import one.nio.mgt.Management;
+import one.nio.serial.AsmUtils;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -49,6 +50,8 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     protected final AtomicInteger totalClasses;
     protected final AtomicInteger totalBytes;
     protected String dumpPath;
+    protected final boolean printClassesAsTextInConsole;
+    protected final boolean verifyBytecode;
 
     public BytecodeGenerator() {
         this(BytecodeGenerator.class.getClassLoader());
@@ -59,9 +62,17 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         this.totalClasses = new AtomicInteger();
         this.totalBytes = new AtomicInteger();
         this.dumpPath = System.getProperty("one.nio.gen.dump");
+        this.printClassesAsTextInConsole = Boolean.getBoolean("one.nio.gen.debug.dump_generated_classes_as_text");
+        this.verifyBytecode = Boolean.getBoolean("one.nio.gen.verify_bytecode");
     }
 
     public Class<?> defineClass(byte[] classData) {
+        if (printClassesAsTextInConsole) {
+            AsmUtils.printify(classData, System.out);
+        }
+        if (verifyBytecode) {
+            AsmUtils.verifyBytecode(classData);
+        }
         Class<?> result = super.defineClass(null, classData, 0, classData.length, null);
         totalClasses.incrementAndGet();
         totalBytes.addAndGet(classData.length);
