@@ -48,4 +48,8 @@ public class JavaVersion {
         return JAVA_VERSION != null && JAVA_VERSION >= 9;
     }
 
+    public static boolean isJava24Plus() {
+        return JAVA_VERSION != null && JAVA_VERSION >= 24;
+    }
+
 }

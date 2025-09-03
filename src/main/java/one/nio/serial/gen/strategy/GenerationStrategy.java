@@ -25,8 +25,15 @@ import java.lang.invoke.MethodHandleInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 
 public abstract class GenerationStrategy {
+
+    private static final String STRATEGY_OPTION = "one.nio.serial.gen.strategy";
+
+    private static final String OLD_STRATEGY = "magic_accessor";
+
+    private static final String NEW_STRATEGY = "handles";
 
     public abstract String getBaseClassName();
 
@@ -42,11 +49,41 @@ public abstract class GenerationStrategy {
 
     public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator);
 
+
     public static GenerationStrategy createStrategy() {
-        if (JavaVersion.isJava9Plus()) { //TODO: also check runtime flag
+        String option = System.getProperty(STRATEGY_OPTION);
+        GenerationStrategy strategy = null;
+
+        if (option == null) {
+            option = OLD_STRATEGY;
+        }
+
+        Logger logger = Logger.getLogger(GenerationStrategy.class.getName());
+
+        if (OLD_STRATEGY.equalsIgnoreCase(option) && JavaVersion.isJava24Plus()) {
+            String msg = "One-nio 2.x supports JDK 24+ only in experimental mode, which can be enable by setting the `one.nio.serial.gen.strategy=handles` environment variable. Please refer to the documentation for additional details.";
+            logger.warning(msg);
+            throw new RuntimeException(msg);
+        }
+
+        if (NEW_STRATEGY.equalsIgnoreCase(option) && JavaVersion.isJava8()) {
+            String msg = "One-nio doesn't support the `one.nio.serial.gen.strategy=handles` mode with JDK 8. Please use JDK 9 or higher, or remove the `one.nio.serial.gen.strategy` environment variable.";
+            logger.warning(msg);
+            throw new RuntimeException(msg);
+        }
+
+        if (!NEW_STRATEGY.equalsIgnoreCase(option) && !OLD_STRATEGY.equalsIgnoreCase(option)) {
+            String msg = "Unknown value for `one.nio.serial.gen.strategy` flag: '" + option + "'. Supported values are 'magic_accessor' and 'handles'.";
+            logger.warning(msg);
+            throw new RuntimeException(msg);
+        }
+
+        logger.info("One-nio uses `" + option + "` strategy for class generation.");
+        if (NEW_STRATEGY.equalsIgnoreCase(option)) {
             return new HandlesStrategy();
         } else {
             return new MagicAccessorStrategy();
         }
     }
+
 }
