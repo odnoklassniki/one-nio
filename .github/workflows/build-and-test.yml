@@ -20,14 +20,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: [8, 11, 17, 21, 23] #TODO: add 24, 25-ea targets
+        jdk: [8, 11, 17, 21, 23, 24, 25]
         include:
           - jdk: 8
             main_jdk: 8
             second_jdk: 21
-#          - jdk: 25-ea
-#            main_jdk: 8
-#            second_jdk: 25-ea
+          - jdk: 25
+            main_jdk: 8
+            second_jdk: 25
 
     steps:
       - uses: actions/checkout@v3
