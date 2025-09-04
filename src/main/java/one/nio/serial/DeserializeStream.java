@@ -16,6 +16,8 @@
 
 package one.nio.serial;
 
+import one.nio.util.JavaFeatures;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
@@ -82,7 +84,16 @@ public class DeserializeStream extends DataStream {
 
     @Override
     public void register(Object obj) {
-        context[contextSize] = obj;
+        if (obj instanceof RecordPositionHolder) {
+            RecordPositionHolder holder = (RecordPositionHolder) obj;
+            if (holder.getRecord() == null) {
+                holder.setPosition(contextSize);
+            } else {
+                context[holder.getPosition()] = holder.getRecord();
+            }
+        } else {
+            context[contextSize] = obj;
+        }
     }
 
     @Override
