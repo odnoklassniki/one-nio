@@ -252,7 +252,17 @@ public class Repository {
         if (uid < 0) {
             bootstrapSerializers[128 + (int) uid] = null;
         }
-        return uidMap.remove(uid);
+
+        Serializer serializer = uidMap.remove(uid);
+        if (serializer != null && serializer.origin != Origin.EXTERNAL) {
+            if (serializer instanceof MethodSerializer) {
+                MethodSerializer methodSerializer = (MethodSerializer) serializer;
+                methodMap.remove(methodSerializer.method);
+            } else {
+                classMap.remove(serializer.cls);
+            }
+        }
+        return serializer;
     }
 
     public static void setOptions(String className, int options) {
