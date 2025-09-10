@@ -24,7 +24,7 @@ import static org.junit.Assert.assertTrue;
 
 public class Utils {
 
-    static Object clone(Object obj) throws IOException, ClassNotFoundException {
+    static byte[] serializeObject(Object obj) throws IOException {
         CalcSizeStream css = new CalcSizeStream();
         css.writeObject(obj);
         int length = css.count();
@@ -33,12 +33,20 @@ public class Utils {
         SerializeStream out = new SerializeStream(buf);
         out.writeObject(obj);
         assertEquals(out.count(), length);
+        return buf;
+    }
 
+    static Object deserializeObject(byte[] buf) throws IOException, ClassNotFoundException {
         DeserializeStream in = new DeserializeStream(buf);
         Object objCopy = in.readObject();
-        assertEquals(in.count(), length);
-
+        assertEquals(in.count(), buf.length);
         return objCopy;
+    }
+
+    static Object clone(Object obj) throws IOException, ClassNotFoundException {
+        byte[] buf = serializeObject(obj);
+
+        return deserializeObject(buf);
     }
 
     static Object cloneViaPersist(Object obj) throws IOException, ClassNotFoundException {
@@ -46,14 +54,12 @@ public class Utils {
         out.writeObject(obj);
         byte[] buf = out.toByteArray();
 
-        DeserializeStream in = new DeserializeStream(buf);
-        Object objCopy = in.readObject();
-        assertEquals(in.count(), buf.length);
+        Object objCopy = deserializeObject(buf);
 
         return objCopy;
     }
 
-    static void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
+    public static void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
         Object clone1 = clone(obj);
         checkClass(obj.getClass(), clone1.getClass());
         assertEquals(obj, clone1);
