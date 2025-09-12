@@ -269,6 +269,26 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         }
     }
 
+    public static void generateDefault(MethodVisitor mv, Field field) {
+        mv.visitInsn(defaultValueOpcode(Type.getType(field.getType())));
+    }
+
+    public static int defaultValueOpcode(Type type) {
+        switch (type.getSort()) {
+            case Type.OBJECT:
+            case Type.ARRAY:
+                return ACONST_NULL;
+            case Type.FLOAT:
+                return FCONST_0;
+            case Type.DOUBLE:
+                return DCONST_0;
+            case Type.LONG:
+                return LCONST_0;
+            default:
+                return ICONST_0;
+        }
+    }
+
     @Override
     public String getDumpPath() {
         return dumpPath;
