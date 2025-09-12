@@ -273,6 +273,10 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature(), false);
                 mv.visitInsn(srcType.convertTo(FieldType.Void));
+                if (isRecord) {
+                    generateDefault(mv, ownField);
+                    storeRecordArgument(mv, ownField, fd);
+                }
             } else {
                 if (!isRecord) mv.visitInsn(DUP);
                 if (parentField != null) emitGetField(mv, parentField);
@@ -437,6 +441,10 @@ public class DelegateGenerator extends BytecodeGenerator {
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
             if (isNotSerial(ownField)) {
+                if (isRecord) {
+                    generateDefault(mv, ownField);
+                    storeRecordArgument(mv, ownField, fd);
+                }
                 continue;
             }
             fd.next = fieldHashes.put(ownField.getName().hashCode(), fd);
@@ -885,7 +893,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
     private static void emitPutSerialField(MethodVisitor mv, Field f, boolean isRecord, FieldDescriptor fd) {
         if (isRecord) {
-            mv.visitVarInsn(Type.getType(f.getType()).getOpcode(ISTORE), 3 + fd.index() * 2);
+            storeRecordArgument(mv, f, fd);
             return;
         }
 
@@ -906,6 +914,10 @@ public class DelegateGenerator extends BytecodeGenerator {
         } else {
             emitPutField(mv, f);
         }
+    }
+
+    private static void storeRecordArgument(MethodVisitor mv, Field f, FieldDescriptor fd) {
+        mv.visitVarInsn(Type.getType(f.getType()).getOpcode(ISTORE), 3 + fd.index() * 2);
     }
 
     private static Label emitNullGuard(MethodVisitor mv, Class<?> dst) {
