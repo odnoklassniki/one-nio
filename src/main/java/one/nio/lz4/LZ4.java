@@ -68,7 +68,11 @@ public class LZ4 {
     // Public API
 
     public static int compressBound(int size) {
-        return size + size / 255 + 16;
+        int bound = size + size / 255 + 16;
+        if (bound < 0) {
+            throw new IllegalArgumentException("Invalid size");
+        }
+        return bound;
     }
 
     public static int compress(byte[] src, byte[] dst) {
@@ -76,7 +80,7 @@ public class LZ4 {
     }
 
     public static int compress(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
-        if (srcOffset < 0 || srcOffset + length > src.length || dstOffset < 0 || length < 0) {
+        if (srcOffset < 0 || srcOffset > src.length - length || dstOffset < 0 || length < 0) {
             throw new IndexOutOfBoundsException();
         }
         if (compressBound(length) > dst.length - dstOffset) {
@@ -121,7 +125,7 @@ public class LZ4 {
     }
 
     public static int decompress(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
-        if (srcOffset < 0 || srcOffset + length > src.length || dstOffset < 0 || length <= 0) {
+        if (srcOffset < 0 || srcOffset > src.length - length || dstOffset < 0 || length <= 0) {
             throw new IndexOutOfBoundsException();
         }
 
@@ -139,6 +143,10 @@ public class LZ4 {
     }
 
     public static int decompress(ByteBuffer src, ByteBuffer dst) {
+        if (src.remaining() == 0) {
+            throw new IndexOutOfBoundsException();
+        }
+
         int result;
         if (NativeLibrary.IS_SUPPORTED) {
             result = decompress0(array(src), offset(src), array(dst), offset(dst), src.remaining(), dst.remaining());
@@ -536,11 +544,11 @@ public class LZ4 {
             int token = unsafe.getByte(src, ip++) & 0xff;
             int length = token >>> ML_BITS;
             if (length == RUN_MASK) {
-                int s;
-                do {
+                int s = 255;
+                while (ip < srcEnd - RUN_MASK && s == 255) {
                     s = unsafe.getByte(src, ip++) & 0xff;
                     length += s;
-                } while (ip < srcEnd - RUN_MASK && s == 255);
+                }
                 if (length < 0)
                     return -1;  // Error: overflow
             }
