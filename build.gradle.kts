@@ -127,6 +127,9 @@ tasks {
             languageVersion.set(JavaLanguageVersion.of(testJdk))
         })
 
+
+        systemProperty("one.nio.gen.verify_bytecode", true)
+
         useJUnit()
         testLogging {
             debug {
