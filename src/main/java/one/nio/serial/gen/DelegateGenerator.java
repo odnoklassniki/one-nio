@@ -18,9 +18,6 @@ package one.nio.serial.gen;
 
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.*;
-import one.nio.serial.gen.strategy.GenerationStrategy;
-import one.nio.serial.gen.strategy.HandlesStrategy;
-import one.nio.serial.gen.strategy.MagicAccessorStrategy;
 import one.nio.util.JavaFeatures;
 import one.nio.util.JavaInternals;
 import one.nio.util.MethodHandlesReflection;
@@ -47,7 +44,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static one.nio.serial.gen.strategy.HandlesStrategy.loadPrimitiveType;
+import static one.nio.serial.gen.HandlesStrategy.loadPrimitiveType;
 
 public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();

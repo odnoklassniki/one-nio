@@ -36,7 +36,8 @@ public class FieldDescriptor {
         this.typeDescriptor = typeDescriptor;
     }
 
-    FieldDescriptor(Field ownField, Field parentField, int index) {
+    // TODO: revert publicity
+    public FieldDescriptor(Field ownField, Field parentField, int index) {
         Renamed renamed = ownField.getAnnotation(Renamed.class);
         this.nameDescriptor = renamed == null ? ownField.getName() : ownField.getName() + '|' + renamed.from();
         this.typeDescriptor = new TypeDescriptor(ownField.getType());

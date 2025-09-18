@@ -22,11 +22,13 @@ import java.io.ObjectStreamClass;
 import java.lang.reflect.Field;
 import java.util.Map;
 
+// TODO: revert publicity
 public class GetFieldInputStream extends NullObjectInputStream {
 
     private final Map<String, Field> fields;
     private final Object source;
 
+    // TODO: revert publicity
     public GetFieldInputStream(Object source, Map<String, Field> fields) throws IOException, SecurityException {
         this.fields = fields;
         this.source = source;

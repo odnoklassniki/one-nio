@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package one.nio.serial.gen.strategy;
+package one.nio.serial.gen;
 
 import one.nio.serial.FieldDescriptor;
 import one.nio.util.JavaVersion;

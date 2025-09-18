@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package one.nio.serial.gen.strategy;
+package one.nio.serial.gen;
 
 
 import one.nio.serial.FieldDescriptor;
 import one.nio.serial.SerializeWith;
-import one.nio.serial.gen.DelegateGenerator;
-import one.nio.serial.gen.FieldType;
 import one.nio.util.JavaFeatures;
 import one.nio.util.MethodHandlesReflection;
 import org.objectweb.asm.ClassWriter;
