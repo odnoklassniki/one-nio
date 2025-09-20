@@ -20,12 +20,15 @@ import one.nio.serial.FieldDescriptor;
 import one.nio.util.JavaVersion;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
+
+import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 public abstract class GenerationStrategy {
 
@@ -84,6 +87,14 @@ public abstract class GenerationStrategy {
         } else {
             return new MagicAccessorStrategy();
         }
+    }
+
+    public void generateCast(MethodVisitor mv, Class dst) {
+        mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
+    }
+
+    public void loadClassSafe(MethodVisitor mv, Class clazz) {
+        mv.visitLdcInsn(Type.getType(clazz));;
     }
 
 }

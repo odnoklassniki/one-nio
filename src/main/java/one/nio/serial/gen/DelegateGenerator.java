@@ -119,11 +119,9 @@ public class DelegateGenerator extends BytecodeGenerator {
                 null, new String[]{"java/io/IOException"});
         mv.visitCode();
 
-        if (strategy instanceof MagicAccessorStrategy) {
-            mv.visitVarInsn(ALOAD, 1);
-            emitTypeCast(mv, Object.class, cls);
-            mv.visitVarInsn(ASTORE, 1);
-        }
+        mv.visitVarInsn(ALOAD, 1);
+        emitTypeCast(mv, Object.class, cls);
+        mv.visitVarInsn(ASTORE, 1);
 
         emitWriteObject(cls, mv);
 
@@ -164,11 +162,9 @@ public class DelegateGenerator extends BytecodeGenerator {
                 null, new String[]{"java/io/IOException"});
         mv.visitCode();
 
-        if (strategy instanceof MagicAccessorStrategy) {
-            mv.visitVarInsn(ALOAD, 1);
-            emitTypeCast(mv, Object.class, cls);
-            mv.visitVarInsn(ASTORE, 1);
-        }
+        mv.visitVarInsn(ALOAD, 1);
+        emitTypeCast(mv, Object.class, cls);
+        mv.visitVarInsn(ASTORE, 1);
 
         emitWriteObject(cls, mv);
 
@@ -257,11 +253,8 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature(), false);
 
-                //TODO: improve
-                if (strategy instanceof MagicAccessorStrategy || sourceClass != ownField.getType()) {
-                    if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
-                    emitTypeCast(mv, sourceClass, ownField.getType());
-                }
+                if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
+                emitTypeCast(mv, sourceClass, ownField.getType());
                 emitPutSerialField(className, cls, mv, ownField, isRecord, recordParamsOffset, fd);
             }
         }
@@ -345,11 +338,9 @@ public class DelegateGenerator extends BytecodeGenerator {
                 null, new String[]{"java/io/IOException"});
         mv.visitCode();
 
-        if (strategy instanceof MagicAccessorStrategy) {
-            mv.visitVarInsn(ALOAD, 1);
-            emitTypeCast(mv, Object.class, cls);
-            mv.visitVarInsn(ASTORE, 1);
-        }
+        mv.visitVarInsn(ALOAD, 1);
+        emitTypeCast(mv, Object.class, cls);
+        mv.visitVarInsn(ASTORE, 1);
 
         boolean firstWritten = false;
         mv.visitVarInsn(ALOAD, 2);
@@ -625,14 +616,14 @@ public class DelegateGenerator extends BytecodeGenerator {
                 }
             }
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readMap", "()Ljava/util/Map;", false);
-            //emitTypeCast(mv, Map.class, fieldClass);
+            emitTypeCast(mv, Map.class, fieldClass);
         } else if (isConcreteClass(fieldClass)) {
             loadClassSafe(mv, fieldClass);
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readObject", "(Ljava/lang/Class;)Ljava/lang/Object;", false);
-            //emitTypeCast(mv, Object.class, fieldClass);
+            emitTypeCast(mv, Object.class, fieldClass);
         } else {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readObject", "()Ljava/lang/Object;", false);
-            //emitTypeCast(mv, Object.class, fieldClass);
+            emitTypeCast(mv, Object.class, fieldClass);
         }
 
         mv.visitLabel(done);
@@ -809,7 +800,7 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         // Type widening
         if (src.isAssignableFrom(dst)) {
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
+            strategy.generateCast(mv, dst);
             return;
         }
 
@@ -922,12 +913,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         if (clazz.isPrimitive()) {
             loadPrimitiveType(mv, clazz);
         } else {
-            if (strategy instanceof MagicAccessorStrategy || Modifier.isPublic(clazz.getModifiers())) {
-                mv.visitLdcInsn(Type.getType(clazz));
-            } else {
-                mv.visitLdcInsn(clazz.getName());
-                mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
-            }
+            strategy.loadClassSafe(mv, clazz);
         }
     }
 }

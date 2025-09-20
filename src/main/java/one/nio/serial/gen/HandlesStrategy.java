@@ -41,7 +41,6 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static one.nio.serial.AsmUtils.OBJECT_TYPE;
-import static one.nio.serial.gen.DelegateGenerator.loadClassSafe;
 import static one.nio.serial.gen.DelegateGenerator.isNotSerial;
 import static one.nio.util.JavaInternals.unsafe;
 import static org.objectweb.asm.Opcodes.*;
@@ -149,12 +148,12 @@ public final class HandlesStrategy extends GenerationStrategy {
 
     private static void initializeFieldAccessors(Class cls, String className, FieldDescriptor fd, MethodVisitor mv, Field ownField) {
         Field field = fd.ownField();
-        loadClassSafe(mv, field.getDeclaringClass());
+        DelegateGenerator.loadClassSafe(mv, field.getDeclaringClass());
 
         mv.visitLdcInsn(field.getName());
         Class<?> fieldType = field.getType();
 
-        loadClassSafe(mv, fieldType);
+        DelegateGenerator.loadClassSafe(mv, fieldType);
 
         mv.visitMethodInsn(
                 INVOKESTATIC,
@@ -323,7 +322,7 @@ public final class HandlesStrategy extends GenerationStrategy {
         } else if (clazz == void.class) {
             mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Void", "TYPE", "Ljava/lang/Class;");
         } else {
-            throw new AssertionError("Code invalidation.");
+            throw new AssertionError("Not supported primitive type: " + clazz);
         }
     }
 
@@ -352,14 +351,14 @@ public final class HandlesStrategy extends GenerationStrategy {
     }
 
     private static void emitMethodHandleObtain(MethodVisitor mv, Class clazz, String methodName, Class returnType, Class... args) {
-        loadClassSafe(mv, clazz);
+        DelegateGenerator.loadClassSafe(mv, clazz);
         mv.visitLdcInsn(methodName);
 
         //MethodType.methodType(void.class, ObjectOutputStream.class);
         if (returnType.isPrimitive()) {
             loadPrimitiveType(mv, returnType);
         } else {
-            loadClassSafe(mv, returnType);
+            DelegateGenerator.loadClassSafe(mv, returnType);
         }
 
         for (Class cl: args) {
@@ -375,8 +374,8 @@ public final class HandlesStrategy extends GenerationStrategy {
     }
 
     private static void emitConstructorHandleObtain(MethodVisitor mv, Class clazz, Class... args) {
-        loadClassSafe(mv, clazz);
-        loadClassSafe(mv, Void.TYPE);
+        DelegateGenerator.loadClassSafe(mv, clazz);
+        DelegateGenerator.loadClassSafe(mv, Void.TYPE);
 
         mv.visitLdcInsn(args.length);
         mv.visitTypeInsn(ANEWARRAY, Type.getType(Class.class).getInternalName());
@@ -384,7 +383,7 @@ public final class HandlesStrategy extends GenerationStrategy {
         for (Class cl: args) {
             mv.visitInsn(DUP);
             mv.visitLdcInsn(index++);
-            loadClassSafe(mv, cl);
+            DelegateGenerator.loadClassSafe(mv, cl);
             mv.visitInsn(AASTORE);
         }
 
@@ -428,5 +427,27 @@ public final class HandlesStrategy extends GenerationStrategy {
 
     private static Type eraseClassType(Class clazz) {
         return clazz.isPrimitive() ? Type.getType(clazz) : OBJECT_TYPE;
+    }
+
+    @Override
+    public void generateCast(MethodVisitor mv, Class dst) {
+        // TODO: here we should check that `dst` is also exported
+        if (Modifier.isPublic(dst.getModifiers())) {
+            super.generateCast(mv, dst);
+        } else {
+            //TODO
+        }
+    }
+
+    @Override
+    public void loadClassSafe(MethodVisitor mv, Class clazz) {
+        // TODO: here we should check that `clazz` is also exported
+        if (Modifier.isPublic(clazz.getModifiers())) {
+            mv.visitLdcInsn(Type.getType(clazz));
+        } else {
+            mv.visitLdcInsn(clazz.getName());
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+        }
+
     }
 }
