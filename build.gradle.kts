@@ -58,11 +58,11 @@ sourceSets {
 }
 
 val testOldStrategy by tasks.registering(Test::class) {
-    systemProperty("one.nio.serial.gen.strategy", "magic_accessor")
+    systemProperty("one.nio.serial.gen.mode", "magic_accessor")
 }
 
 val testNewStrategy by tasks.registering(Test::class) {
-    systemProperty("one.nio.serial.gen.strategy", "handles")
+    systemProperty("one.nio.serial.gen.mode", "method_handles")
     filter {
         excludeTestsMatching("one.nio.serial.evolution.BaseDerivedChangeTest.testFinalBase2DerivedFail")
     }
