@@ -225,21 +225,39 @@ jreleaser {
     }
     deploy {
         maven {
-            nexus2 {
-                create("maven-central") {
-                    active = Active.ALWAYS
-                    url = "https://oss.sonatype.org/service/local"
-                    stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
-                    setAuthorization("Basic")
-                    sign = true
-                    checksums = true
-                    sourceJar = true
-                    javadocJar = true
-                    closeRepository = true
-                    releaseRepository = false
-                }    
+            create("MavenCentral") {
+                url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/") // OSSRH staging
+                credentials {
+                    username = project.findProperty("ossrhUsername") ?: ""
+                    password = project.findProperty("ossrhPassword") ?: ""
+                }
+                stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
+                sign = true
+                checksums = true
+                sourceJar = true
+                javadocJar = true
+                closeRepository = true
+                releaseRepository = false
             }
         }
+
+//        maven {
+//            nexus2 {
+//                create("ossrh-staging-api") {
+//                    active = Active.ALWAYS
+//                    url = "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/service/local"
+//
+//                    stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
+//                    setAuthorization("Basic")
+//                    sign = true
+//                    checksums = true
+//                    sourceJar = true
+//                    javadocJar = true
+//                    closeRepository = true
+//                    releaseRepository = false
+//                }
+//            }
+//        }
     }
 }
 

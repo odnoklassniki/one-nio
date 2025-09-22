@@ -35,7 +35,7 @@ jobs:
       - name: Build and publish with Gradle
         uses: gradle/gradle-build-action@ac2d340dc04d9e1113182899e983b5400c17cda1
         with:
-          arguments: --no-daemon -i jreleaserConfig publish -PsemVer=${{inputs.semVer}}
+          arguments: --no-daemon -i jreleaserConfig publish -PsemVer=${{inputs.semVer}} -PossrhUsername=${{ secrets.MAVEN_CENTRAL_LOGIN_NEW }} -PossrhPassword=${{ secrets.MAVEN_CENTRAL_TOKEN_NEW }}
         env:
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.OSSRH_GPG_SECRET_KEY }}
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.OSSRH_GPG_SECRET_PASSPHRASE }}
@@ -47,7 +47,7 @@ jobs:
       - name: Release with gradle
         uses: gradle/gradle-build-action@ac2d340dc04d9e1113182899e983b5400c17cda1
         with:
-          arguments: --no-daemon -i jreleaserFullRelease -PsemVer=${{inputs.semVer}} --stacktrace
+          arguments: --no-daemon -i jreleaserFullRelease -PsemVer=${{inputs.semVer}} --stacktrace -PossrhUsername=${{ secrets.MAVEN_CENTRAL_LOGIN_NEW }} -PossrhPassword=${{ secrets.MAVEN_CENTRAL_TOKEN_NEW }}
         env:
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.OSSRH_GPG_SECRET_KEY }}
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.OSSRH_GPG_SECRET_PASSPHRASE }}
