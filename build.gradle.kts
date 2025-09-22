@@ -10,7 +10,7 @@ version = semVer ?: "2.1-SNAPSHOT"
 plugins {
     id("org.cadixdev.licenser") version "0.6.1"
     `java-library`
-    id("org.jreleaser") version "1.14.0"
+    id("org.jreleaser") version "1.20.0"
     `maven-publish`
 }
 
@@ -228,7 +228,7 @@ jreleaser {
             nexus2 {
                 create("maven-central") {
                     active = Active.ALWAYS
-                    url = "https://oss.sonatype.org/service/local"
+                    url = "https://ossrh-staging-api.central.sonatype.com/service/local/"
                     stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
                     setAuthorization("Basic")
                     sign = true
@@ -237,7 +237,7 @@ jreleaser {
                     javadocJar = true
                     closeRepository = true
                     releaseRepository = false
-                }    
+                }
             }
         }
     }
