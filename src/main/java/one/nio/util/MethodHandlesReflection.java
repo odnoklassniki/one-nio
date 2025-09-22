@@ -16,6 +16,7 @@
 
 package one.nio.util;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
@@ -47,7 +48,15 @@ public class MethodHandlesReflection {
     }
 
     public static MethodHandleInfo findInstanceMethodOrThrow(Class<?> cls, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException {
-        return privateLookup.revealDirect(privateLookup.findVirtual(cls, name, type));
+        return privateLookup.revealDirect(findMHInstanceMethodOrThrow(cls, name, type));
+    }
+
+    public static MethodHandle findMHInstanceMethodOrThrow(Class<?> cls, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException {
+        return privateLookup.findVirtual(cls, name, type);
+    }
+
+    public static MethodHandle findMHConstructorOrThrow(Class<?> cls, MethodType type) throws NoSuchMethodException, IllegalAccessException {
+        return privateLookup.findConstructor(cls, type);
     }
 
     public static MethodHandleInfo findStaticMethod(Class<?> cls, String name, MethodType type){

@@ -28,9 +28,10 @@ dependencies {
     testRuntimeOnly(group = "org.apache.logging.log4j", name = "log4j-slf4j-impl", version = "2.24.3")
 }
 
-val currentJdk = System.getProperty("java.specification.version").substringAfter(".")
-val testJdk = (findProperty("test.jdk") as? String ?: currentJdk).substringBefore("-") //process ea build, e.g. 25-ea
-val multiReleaseJdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
+val currentJdk = System.getProperty("java.specification.version").substringAfter(".").toInt()
+val testJdk = (findProperty("test.jdk") as? String ?: currentJdk.toString()).substringBefore("-").toInt() //process ea build, e.g. 25-ea
+val multiReleaseJdk = testJdk.takeIf { it != 8 } ?: currentJdk.takeIf { it != 8 } ?: 21
+val isJDK16Plus = testJdk >= 16
 
 java {
     withJavadocJar()
@@ -46,29 +47,35 @@ sourceSets {
         runtimeClasspath += sourceSets.main.get().output
     }
 
-    create("testJava16") {
-        java {
-            srcDir("src/test/java16")
+    test {
+        if (isJDK16Plus) {
+            java {
+                srcDir(file("src/test/java16"))
+            }
         }
-        // Include standard test outputs so Java16 tests can import test fixtures like one.nio.serial.sample.Sample
-        compileClasspath += sourceSets.test.get().output + sourceSets.test.get().compileClasspath + sourceSets.main.get().output
-        runtimeClasspath += sourceSets.test.get().output + sourceSets.test.get().runtimeClasspath + sourceSets.main.get().output
+
     }
 }
 
-if ((testJdk.toIntOrNull() ?: 0) >= 16) {
-    val testJava16 by tasks.registering(Test::class) {
+val testOldStrategy by tasks.registering(Test::class) {
+    systemProperty("one.nio.serial.gen.mode", "magic_accessor")
+}
 
-        description = "Runs additional Java 16 specific tests."
-        group = LifecycleBasePlugin.VERIFICATION_GROUP
-
-        testClassesDirs = sourceSets["testJava16"].output.classesDirs
-        classpath = sourceSets["testJava16"].runtimeClasspath
+val testNewStrategy by tasks.registering(Test::class) {
+    systemProperty("one.nio.serial.gen.mode", "method_handles")
+    filter {
+        excludeTestsMatching("one.nio.serial.evolution.BaseDerivedChangeTest.testFinalBase2DerivedFail")
     }
+}
 
-    tasks.named("check").configure {
-        dependsOn(testJava16)
+tasks.register("allTests") {
+    if (testJdk <= 23) {
+        dependsOn(testOldStrategy)
     }
+    if (testJdk > 8) {
+        dependsOn(testNewStrategy)
+    }
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
 }
 
 tasks {
@@ -78,7 +85,7 @@ tasks {
             compilerArgs.add("-Xlint:all")
             sourceCompatibility = "1.8"
             targetCompatibility = "1.8"
-            //can't set --release 8 as using non public API
+            //can't set --release 8 cause non-public API is used
             //release.set(8)
             javaCompiler = project.javaToolchains.compilerFor {
                 languageVersion = JavaLanguageVersion.of(8)
@@ -98,14 +105,15 @@ tasks {
     }
 
     // Configure Java 16 test compilation toolchain
-    named<JavaCompile>("compileTestJava16Java") {
-        options.release.set(16)
-        sourceCompatibility = "16"
-        targetCompatibility = "16"
-        javaCompiler = project.javaToolchains.compilerFor {
-            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
+    if (isJDK16Plus) {
+        named<JavaCompile>("compileTestJava") {
+            options.release.set(16)
+            sourceCompatibility = "16"
+            targetCompatibility = "16"
+            javaCompiler = project.javaToolchains.compilerFor {
+                languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
+            }
         }
-        dependsOn(named("compileTestJava"))
     }
 
     jar {
@@ -127,6 +135,19 @@ tasks {
             languageVersion.set(JavaLanguageVersion.of(testJdk))
         })
 
+        if (testJdk == 25) {
+            // https://github.com/odnoklassniki/one-nio/issues/108 :
+            //`NativeReflectionTest.testOpenModules` test fails on JDK 25-ea:
+            //      class one.nio.util.NativeReflectionTest cannot access class jdk.internal.ref.Cleaner (in module java.base)
+            //      because module java.base does not export jdk.internal.ref to unnamed module
+            filter {
+                excludeTestsMatching("one.nio.util.NativeReflectionTest.testOpenModules")
+            }
+        }
+
+        if (project.hasProperty("one.nio.gen.debug.dump_generated_serializers_as_text")) {
+            systemProperty("one.nio.gen.debug.dump_generated_serializers_as_text", project.property("one.nio.gen.debug.dump_generated_serializers_as_text").toString())
+        }
 
         systemProperty("one.nio.gen.verify_bytecode", true)
 

@@ -46,7 +46,7 @@ public class JsonReader {
         skipWhitespace();
     }
 
-    protected int read() {
+    public int read() {
         int b = next;
         next = offset < array.length ? array[offset++] & 0xff : -1;
         return b;
