@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   publish:
-    if: ${{ github.actor == 'lehvolk' || github.actor == 'incubos' || github.actor == 'truslan' || github.actor == 'apangin' }}
+    if: ${{ github.actor == 'lehvolk' || github.actor == 'incubos' || github.actor == 'truslan' || github.actor == 'apangin' || github.actor == 'max-kammerer' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
