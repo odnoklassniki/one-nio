@@ -76,7 +76,7 @@ public abstract class GenerationStrategy {
         }
 
         if (!NEW_MODE.equalsIgnoreCase(option) && !OLD_MODE.equalsIgnoreCase(option)) {
-            String msg = "Unknown value for `one.nio.serial.gen.mode` option: '" + option + "'. Supported values are 'magic_accessor' and 'handles'.";
+            String msg = "Unknown value for `one.nio.serial.gen.mode` option: '" + option + "'. Supported values are '" + OLD_MODE + "' and '" + NEW_MODE + "'.";
             logger.warning(msg);
             throw new RuntimeException(msg);
         }
