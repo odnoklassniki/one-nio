@@ -14,7 +14,7 @@ It exposes OS capabilities and selected JDK internal APIs to help high-load appl
 - **Extended Functionality**: Includes a simple, high-performance HTTP server, a general-purpose TCP server, and utility functions for asynchronous execution, resource pooling, and JMX management.
 - **Access to System Internals**: Java accessors for perf events and eBPF on supported platforms.
 
-(Detailed package description)[https://github.com/odnoklassniki/one-nio/wiki/Package-description]
+[Detailed package description](https://github.com/odnoklassniki/one-nio/wiki/Package-description)
 
 ## Table of contents
 
