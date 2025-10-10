@@ -78,6 +78,8 @@ public class LZ4Test {
     @Test
     public void compressBound() {
         Assert.assertEquals(144, LZ4.compressBound(128));
+        Assert.assertEquals(273, LZ4.compressBound(256));
+        Assert.assertEquals(4128, LZ4.compressBound(4096));
         IllegalArgumentException e = Assert.assertThrows(IllegalArgumentException.class,
                 () -> LZ4.compressBound(Integer.MAX_VALUE));
         Assert.assertEquals("Unsupported size: " + Integer.MAX_VALUE, e.getMessage());
