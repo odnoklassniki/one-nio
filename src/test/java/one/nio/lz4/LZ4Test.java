@@ -74,4 +74,73 @@ public class LZ4Test {
 
         return bytesCompressed;
     }
+
+    @Test
+    public void compressBound() {
+        Assert.assertEquals(144, LZ4.compressBound(128));
+        IllegalArgumentException e = Assert.assertThrows(IllegalArgumentException.class,
+                () -> LZ4.compressBound(Integer.MAX_VALUE));
+        Assert.assertEquals("Unsupported size: " + Integer.MAX_VALUE, e.getMessage());
+    }
+
+    @Test
+    public void compress_BoundsChecks() {
+        byte[] src = new byte[10];
+        byte[] dest = new byte[10];
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, -1, dest, 0, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, Integer.MAX_VALUE, dest, 0, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, 0, dest, -1, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, 0, dest, Integer.MAX_VALUE, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, 0, dest, 0, -1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, 1, dest, 0, Integer.MAX_VALUE));
+    }
+
+    @Test
+    public void decompress_BoundsChecks() {
+        byte[] src = new byte[10];
+        byte[] dest = new byte[10];
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, -1, dest, 0, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, Integer.MAX_VALUE, dest, 0, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, 0, dest, -1, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, 0, dest, Integer.MAX_VALUE, 1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, 0, dest, 0, -1));
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, 1, dest, 0, Integer.MAX_VALUE));
+
+        // Cannot decompress empty src
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, 0, dest, 0, 0));
+        ByteBuffer srcBuf = ByteBuffer.allocate(0);
+        ByteBuffer destBuf = ByteBuffer.allocate(10);
+        Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(srcBuf, destBuf));
+    }
+
+    @Test
+    public void compress_Empty() {
+        byte[] src = new byte[0];
+        byte[] dest = new byte[256];
+        Assert.assertEquals(1, LZ4.compress(src, dest));
+        Assert.assertEquals(0, dest[0]);
+    }
+
+    @Test
+    public void decompress_Incomplete() {
+        // Just a single RUN_MASK token
+        byte[] src = {(byte) (15 << 4)};
+        byte[] dest = new byte[256];
+        IllegalArgumentException e = Assert.assertThrows(IllegalArgumentException.class,
+                () -> LZ4.decompress(src, dest));
+        Assert.assertEquals("Malformed input or destination buffer overflow", e.getMessage());
+    }
+
+    @Test
+    public void decompress_EmptyOutput() {
+        Assert.assertEquals(0, LZ4.decompress(new byte[] {0}, new byte[0]));
+        Assert.assertEquals(0, LZ4.decompress(ByteBuffer.wrap(new byte[] {0}), ByteBuffer.allocate(0)));
+
+        IllegalArgumentException e = Assert.assertThrows(IllegalArgumentException.class,
+                () -> LZ4.decompress(new byte[] {1}, new byte[0]));
+        Assert.assertEquals("Malformed input or destination buffer overflow", e.getMessage());
+        e = Assert.assertThrows(IllegalArgumentException.class,
+                () -> LZ4.decompress(ByteBuffer.wrap(new byte[] {1}), ByteBuffer.allocate(0)));
+        Assert.assertEquals("Malformed input or destination buffer overflow", e.getMessage());
+    }
 }

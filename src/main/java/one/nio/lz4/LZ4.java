@@ -70,7 +70,7 @@ public class LZ4 {
     public static int compressBound(int size) {
         int bound = size + size / 255 + 16;
         if (bound < 0) {
-            throw new IllegalArgumentException("Invalid size");
+            throw new IllegalArgumentException("Unsupported size: " + size);
         }
         return bound;
     }
@@ -80,7 +80,7 @@ public class LZ4 {
     }
 
     public static int compress(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
-        if (srcOffset < 0 || srcOffset > src.length - length || dstOffset < 0 || length < 0) {
+        if (srcOffset < 0 || srcOffset > src.length - length || dstOffset < 0 || dstOffset > dst.length || length < 0) {
             throw new IndexOutOfBoundsException();
         }
         if (compressBound(length) > dst.length - dstOffset) {
@@ -125,7 +125,7 @@ public class LZ4 {
     }
 
     public static int decompress(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
-        if (srcOffset < 0 || srcOffset > src.length - length || dstOffset < 0 || length <= 0) {
+        if (srcOffset < 0 || srcOffset > src.length - length || dstOffset < 0 || dstOffset > dst.length || length <= 0) {
             throw new IndexOutOfBoundsException();
         }
 
