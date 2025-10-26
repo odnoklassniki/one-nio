@@ -526,7 +526,8 @@ public class LZ4 {
 
     // Decompression implementation
 
-    private static int decompress(final Object src, final long srcOffset,
+    // package-private for testing
+    static int decompress(final Object src, final long srcOffset,
                                   final Object dst, final long dstOffset,
                                   final int inputSize, final int outputSize) {
         final long srcEnd = srcOffset + inputSize;

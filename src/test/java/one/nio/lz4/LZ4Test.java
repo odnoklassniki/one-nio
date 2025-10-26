@@ -29,6 +29,8 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 
+import static one.nio.util.JavaInternals.byteArrayOffset;
+
 public class LZ4Test {
 
     @Test
@@ -86,7 +88,7 @@ public class LZ4Test {
     }
 
     @Test
-    public void compress_BoundsChecks() {
+    public void compressBoundsChecks() {
         byte[] src = new byte[10];
         byte[] dest = new byte[10];
         Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.compress(src, -1, dest, 0, 1));
@@ -98,7 +100,7 @@ public class LZ4Test {
     }
 
     @Test
-    public void decompress_BoundsChecks() {
+    public void decompressBoundsChecks() {
         byte[] src = new byte[10];
         byte[] dest = new byte[10];
         Assert.assertThrows(IndexOutOfBoundsException.class, () -> LZ4.decompress(src, -1, dest, 0, 1));
@@ -116,7 +118,7 @@ public class LZ4Test {
     }
 
     @Test
-    public void compress_Empty() {
+    public void compressEmpty() {
         byte[] src = new byte[0];
         byte[] dest = new byte[256];
         Assert.assertEquals(1, LZ4.compress(src, dest));
@@ -124,17 +126,18 @@ public class LZ4Test {
     }
 
     @Test
-    public void decompress_Incomplete() {
+    public void decompressIncomplete() {
         // Just a single RUN_MASK token
         byte[] src = {(byte) (15 << 4)};
         byte[] dest = new byte[256];
         IllegalArgumentException e = Assert.assertThrows(IllegalArgumentException.class,
-                () -> LZ4.decompress(src, dest));
+                // Uses pure Java decompress implementation instead of native one
+                () -> LZ4.decompress(src, byteArrayOffset, dest, byteArrayOffset, src.length, dest.length));
         Assert.assertEquals("Malformed input or destination buffer overflow", e.getMessage());
     }
 
     @Test
-    public void decompress_EmptyOutput() {
+    public void decompressEmptyOutput() {
         Assert.assertEquals(0, LZ4.decompress(new byte[] {0}, new byte[0]));
         Assert.assertEquals(0, LZ4.decompress(ByteBuffer.wrap(new byte[] {0}), ByteBuffer.allocate(0)));
 
