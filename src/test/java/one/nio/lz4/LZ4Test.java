@@ -130,10 +130,9 @@ public class LZ4Test {
         // Just a single RUN_MASK token
         byte[] src = {(byte) (15 << 4)};
         byte[] dest = new byte[256];
-        IllegalArgumentException e = Assert.assertThrows(IllegalArgumentException.class,
-                // Uses pure Java decompress implementation instead of native one
-                () -> LZ4.decompress(src, byteArrayOffset, dest, byteArrayOffset, src.length, dest.length));
-        Assert.assertEquals("Malformed input or destination buffer overflow", e.getMessage());
+        // Uses pure Java decompress implementation instead of native one
+        int result = LZ4.decompress(src, byteArrayOffset, dest, byteArrayOffset, src.length, dest.length);
+        Assert.assertTrue("Decompression should have failed", result < 0);
     }
 
     @Test
