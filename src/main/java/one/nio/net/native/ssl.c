@@ -1536,6 +1536,12 @@ Java_one_nio_net_NativeSslSocket_sslSessionTicket(JNIEnv* env, jobject self) {
     return ssl == NULL ? 0 : ((intptr_t)SSL_get_app_data(ssl) & SF_NEW_TICKET) >> 2;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSslSocket_sslCanUseSendfile(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    return ssl != NULL && BIO_get_ktls_send(SSL_get_wbio(ssl)) ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jstring JNICALL
 Java_one_nio_net_NativeSslSocket_sslCurrentCipher(JNIEnv* env, jobject self) {
     SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
