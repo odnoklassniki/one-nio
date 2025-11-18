@@ -88,6 +88,8 @@ class NativeSslSocket extends NativeSocket {
                 return sslSessionEarlyDataAccepted();
             case SslOption.SESSION_HANDSHAKE_DONE_ID:
                 return sslHandshakeDone();
+            case SslOption.CAN_USE_SENDFILE_ID:
+                return sslCanUseSendfile();
         }
         return null;
     }
@@ -134,6 +136,7 @@ class NativeSslSocket extends NativeSocket {
     private synchronized native int sslSessionTicket();
 
     private synchronized native String sslCurrentCipher();
+    private synchronized native boolean sslCanUseSendfile();
 
     static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
     static native void sslFree(long ssl);
