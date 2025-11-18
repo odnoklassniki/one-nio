@@ -179,6 +179,14 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
                     throw_io_exception(env);
                     return 0;
                 }
+                // TBD: this workaround needs to be checked against the #23722 fix. Potentially, different issue.
+                if (errno == EWOULDBLOCK && reason == SSL_R_UNINITIALIZED) {
+                    return SSL_ERROR_WANT_WRITE;
+                }
+                if (errno > 0 && reason == SSL_R_UNINITIALIZED) {
+                    throw_io_exception_code(env, errno);
+                    return 0;
+                }
             }
             throw_ssl_exception(env);
             return 0;
