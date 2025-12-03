@@ -22,9 +22,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.objectweb.asm.util.TraceClassVisitor;
+import org.slf4j.Logger;
 
-import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 
 public class AsmUtils {
     static class MyVisitor extends ClassVisitor {
@@ -35,10 +36,12 @@ public class AsmUtils {
 
     public static Type OBJECT_TYPE = Type.getType(Object.class);
 
-    public static void printify(byte[] classData, PrintStream out) {
+    public static void printify(byte[] classData, Logger log) {
         ClassReader classReader = new ClassReader(classData);
-        PrintWriter printWriter = new PrintWriter(out);
+        StringWriter writer = new StringWriter(4096);
+        PrintWriter printWriter = new PrintWriter(writer);
         classReader.accept(new TraceClassVisitor(printWriter), ClassReader.SKIP_DEBUG);
+        log.debug(writer.toString());
     }
 
     public static void verifyBytecode(byte[] classData) {

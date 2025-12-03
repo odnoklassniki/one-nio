@@ -20,25 +20,41 @@ import one.nio.serial.gen.Delegate;
 import one.nio.serial.gen.DelegateGenerator;
 import org.junit.Test;
 
-import java.io.Serializable;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 
 import static org.junit.Assert.assertEquals;
 
-public class ConversionTest implements Serializable {
-    int intField = 1;
-    long longField = 2;
+public class ConversionTest {
 
-    @Test
-    public void testFieldConversion() throws Exception {
-        Delegate delegate = DelegateGenerator.instantiate(ConversionTest.class, new FieldDescriptor[]{
-                fd("intField", BigInteger.class),
-                fd("longField", BigInteger.class)
-        }, new FieldDescriptor[0]);
+    protected <T> T convert(Class<T> owner, FieldDescriptor[] fieldDescriptors) throws InvocationTargetException, InstantiationException, IllegalAccessException, IOException, ClassNotFoundException, NoSuchMethodException {
+        Delegate delegate = DelegateGenerator.instantiate(owner, fieldDescriptors, new FieldDescriptor[0]);
 
         byte[] data = new byte[100];
-        delegate.write(new ConversionTest(), new DataStream(data));
-        ConversionTest clone = (ConversionTest) delegate.read(new DataStream(data));
+        delegate.write(owner.getDeclaredConstructor().newInstance(), new DataStream(data));
+        return (T) delegate.read(new DataStream(data));
+    }
+
+    protected FieldDescriptor fd(Class<?> owner, String fieldName, Class<?> modifiedType) throws ReflectiveOperationException {
+        FieldDescriptor fd = new FieldDescriptor(fieldName, new TypeDescriptor(modifiedType));
+        fd.assignField(owner.getDeclaredField(fieldName), null, 0);
+        return fd;
+    }
+
+    static class BigIntegerToPrimitive {
+        int intField = 1;
+        long longField = 2;
+    }
+
+    @Test
+    public void testBigIntegerToPrimitiveConvertion() throws Exception {
+        BigIntegerToPrimitive clone = convert(BigIntegerToPrimitive.class,
+                new FieldDescriptor[]{
+                        fd(BigIntegerToPrimitive.class, "intField", BigInteger.class),
+                        fd(BigIntegerToPrimitive.class, "longField", BigInteger.class)
+                }
+        );
 
         // There is no int -> BigInteger converter
         assertEquals(0, clone.intField);
@@ -46,9 +62,25 @@ public class ConversionTest implements Serializable {
         assertEquals(2, clone.longField);
     }
 
-    private FieldDescriptor fd(String fieldName, Class<?> modifiedType) throws ReflectiveOperationException {
-        FieldDescriptor fd = new FieldDescriptor(fieldName, new TypeDescriptor(modifiedType));
-        fd.assignField(getClass().getDeclaredField(fieldName), null, 0);
-        return fd;
+
+    static class NumberToNumber {
+        Integer intField = 1;
+        Long longField = 2L;
+        Byte byteField = 3;
+    }
+
+    @Test
+    public void testNumberConvertion() throws Exception {
+        NumberToNumber clone = convert(NumberToNumber.class,
+                new FieldDescriptor[]{
+                        fd(NumberToNumber.class, "intField", Long.class),
+                        fd(NumberToNumber.class, "longField", Integer.class),
+                        fd(NumberToNumber.class, "byteField", Long.class)
+                }
+        );
+
+        assertEquals(Integer.valueOf(1), clone.intField);
+        assertEquals(Long.valueOf(2L), clone.longField);
+        assertEquals(Byte.valueOf((byte) 3), clone.byteField);
     }
 }

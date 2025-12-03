@@ -249,7 +249,7 @@ public final class HandlesStrategy extends GenerationStrategy {
 
         // Getter method e.g. public String vhGet_Name(Foo foo)
         Class<?> fieldType = ownField.getType();
-        Type erasedFieldType = fieldType.isPrimitive() ? Type.getType(fieldType) : OBJECT_TYPE;
+        Type erasedFieldType = eraseTypeIfNeeded(ownField);
         SerializeWith serializeWith = ownField.getAnnotation(SerializeWith.class);
 
         if (!isDefaults) {
@@ -280,7 +280,7 @@ public final class HandlesStrategy extends GenerationStrategy {
             mv.visitFieldInsn(Opcodes.GETSTATIC, className, getVarHandleAccessorName(ownField, false), "Ljava/lang/invoke/MethodHandle;");
             mv.visitVarInsn(Opcodes.ALOAD, 0);
             mv.visitVarInsn(Type.getType(fieldType).getOpcode(ILOAD), 1);
-            mv.visitMethodInsn(INVOKEVIRTUAL, Type.getType(MethodHandle.class).getInternalName(), "invoke", Type.getMethodDescriptor(Type.getType(void.class), erasedFieldType, OBJECT_TYPE), false);
+            mv.visitMethodInsn(INVOKEVIRTUAL, Type.getType(MethodHandle.class).getInternalName(), "invoke", Type.getMethodDescriptor(Type.getType(void.class), OBJECT_TYPE, erasedFieldType), false);
         } else {
             mv.visitFieldInsn(Opcodes.GETSTATIC, className, getVarHandleName(ownField), "Ljava/lang/invoke/VarHandle;");
             mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -426,13 +426,19 @@ public final class HandlesStrategy extends GenerationStrategy {
     }
 
     private static Type eraseClassType(Class clazz) {
-        return clazz.isPrimitive() ? Type.getType(clazz) : OBJECT_TYPE;
+        if (isAccessible(clazz)) return Type.getType(clazz);
+        return OBJECT_TYPE;
+    }
+
+    private static boolean isAccessible(Class clazz) {
+        if (clazz.isPrimitive()) return true;
+        // TODO: here we should check that `cls` is also exported
+        return Modifier.isPublic(clazz.getModifiers());
     }
 
     @Override
     public void generateCast(MethodVisitor mv, Class dst) {
-        // TODO: here we should check that `dst` is also exported
-        if (Modifier.isPublic(dst.getModifiers())) {
+        if (isAccessible(dst)) {
             super.generateCast(mv, dst);
         } else {
             //TODO

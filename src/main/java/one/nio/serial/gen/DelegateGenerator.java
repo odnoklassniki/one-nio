@@ -570,6 +570,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         emitInt(mv, 'n');
         mv.visitJumpInsn(IF_ICMPNE, notNull);
         mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readNull", "()Ljava/lang/Object;", false);
+        strategy.generateCast(mv, fieldClass);
         mv.visitJumpInsn(GOTO, done);
         mv.visitLabel(notNull);
 

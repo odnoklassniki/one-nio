@@ -60,15 +60,19 @@ public class Utils {
     }
 
     public static void checkSerialize(Object obj) throws IOException, ClassNotFoundException {
-        Object clone1 = clone(obj);
-        checkClass(obj.getClass(), clone1.getClass());
-        assertEquals(obj, clone1);
-
-        Object clone2 = cloneViaPersist(obj);
-        checkClass(obj.getClass(), clone2.getClass());
-        assertEquals(obj, clone2);
+        checkSerialize(obj, obj);
     }
 
+    public static Object checkSerialize(Object value, Object expectedValue) throws IOException, ClassNotFoundException {
+        Object clone1 = clone(value);
+        checkClass(value.getClass(), clone1.getClass());
+        assertEquals(expectedValue, clone1);
+
+        Object clone2 = cloneViaPersist(value);
+        checkClass(value.getClass(), clone2.getClass());
+        assertEquals(expectedValue, clone2);
+        return clone2;
+    }
 
     private static final Class[] collectionInterfaces = {SortedSet.class, NavigableSet.class, Set.class, Queue.class, List.class};
     private static final Class[] mapInterfaces = {SortedMap.class, NavigableMap.class};
