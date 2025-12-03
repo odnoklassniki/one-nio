@@ -17,16 +17,17 @@
 package one.nio.serial.gen;
 
 import one.nio.serial.FieldDescriptor;
+import one.nio.serial.Repository;
 import one.nio.util.JavaVersion;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
+import org.slf4j.Logger;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
 
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 
@@ -61,23 +62,23 @@ public abstract class GenerationStrategy {
             option = OLD_MODE;
         }
 
-        Logger logger = Logger.getLogger(GenerationStrategy.class.getName());
+        Logger logger = Repository.log;
 
         if (OLD_MODE.equalsIgnoreCase(option) && JavaVersion.isJava24Plus()) {
             String msg = "One-nio 2.x supports JDK 24+ only in experimental mode, which can be enable by setting the `one.nio.serial.gen.strategy=handles` environment variable. Please refer to the documentation for additional details.";
-            logger.warning(msg);
+            logger.warn(msg);
             throw new RuntimeException(msg);
         }
 
         if (NEW_MODE.equalsIgnoreCase(option) && JavaVersion.isJava8()) {
             String msg = "One-nio doesn't support the `one.nio.serial.gen.strategy=handles` mode with JDK 8. Please use JDK 9 or higher, or remove the `one.nio.serial.gen.strategy` environment variable.";
-            logger.warning(msg);
+            logger.warn(msg);
             throw new RuntimeException(msg);
         }
 
         if (!NEW_MODE.equalsIgnoreCase(option) && !OLD_MODE.equalsIgnoreCase(option)) {
             String msg = "Unknown value for `one.nio.serial.gen.mode` option: '" + option + "'. Supported values are '" + OLD_MODE + "' and '" + NEW_MODE + "'.";
-            logger.warning(msg);
+            logger.warn(msg);
             throw new RuntimeException(msg);
         }
 
