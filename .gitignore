@@ -3,10 +3,10 @@
 *.war
 *.ear
 
-/build
-/out
-/lib
-/target
+.gradle
+build/
+out/
+lib/
 
 .idea
 *.iml

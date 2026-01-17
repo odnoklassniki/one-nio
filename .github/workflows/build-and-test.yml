@@ -48,7 +48,7 @@ jobs:
           apt install libssl-dev \
           
       - name: Build and run checks and tests on JDK ${{matrix.jdk}}
-        run: ./gradlew jar allTests -Pci=true --scan --debug -Ptest.jdk=${{matrix.jdk}}
+        run: ./gradlew jar allTests -Pci=true --scan --info -Ptest.jdk=${{matrix.jdk}}
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2

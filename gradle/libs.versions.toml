@@ -1,0 +1,9 @@
+[versions]
+asm = "9.8"
+
+[libraries]
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+asm-util = { module = "org.ow2.asm:asm-util", version.ref = "asm" }
+junit = { module = "junit:junit", version = "4.13.2"}
+log4j-slf4j-impl = { module = "org.apache.logging.log4j:log4j-slf4j-impl", version = "2.24.3"}
+slf4j-api = { module = "org.slf4j:slf4j-api", version = "1.7.36"}
