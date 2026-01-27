@@ -22,7 +22,6 @@ import java.nio.channels.SelectionKey;
 import one.nio.net.Selector;
 import one.nio.net.Session;
 import one.nio.net.Socket;
-import one.nio.os.NativeLibrary;
 import one.nio.server.AcceptorConfig;
 
 class MultiAcceptSession extends Session {
@@ -47,6 +46,6 @@ class MultiAcceptSession extends Session {
     }
 
     static int acceptOp() {
-        return NativeLibrary.IS_SUPPORTED ? READABLE : SelectionKey.OP_ACCEPT;
+        return Socket.USE_NATIVE_SOCKET ? READABLE : SelectionKey.OP_ACCEPT;
     }
 }

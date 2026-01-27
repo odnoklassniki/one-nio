@@ -16,8 +16,6 @@
 
 package one.nio.net;
 
-import one.nio.os.NativeLibrary;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
@@ -36,6 +34,6 @@ public abstract class Selector implements Iterable<Session>, Closeable {
     public abstract long lastWakeupTime();
 
     public static Selector create() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSelector() : new JavaSelector();
+        return Socket.USE_NATIVE_SOCKET ? new NativeSelector() : new JavaSelector();
     }
 }
