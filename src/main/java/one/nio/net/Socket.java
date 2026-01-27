@@ -27,6 +27,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 
 public abstract class Socket implements ByteChannel {
+
+    public static final String FORCE_JAVA_SOCKET_PROP = "one.nio.net.force.java.socket";
+    public static final boolean USE_NATIVE_SOCKET = NativeLibrary.IS_SUPPORTED && !isForceJavaSocket();
+    
     // Protocol family
     public static final int AF_UNIX  = 1;
     public static final int AF_INET  = 2;
@@ -186,6 +190,10 @@ public abstract class Socket implements ByteChannel {
         return read(data, offset, count, 0);
     }
 
+    private static boolean isForceJavaSocket() {
+        return "true".equalsIgnoreCase(System.getProperty(FORCE_JAVA_SOCKET_PROP, "false"));
+    }
+    
     @Deprecated
     public static Socket create() throws IOException {
         return createClientSocket(null);
@@ -197,7 +205,7 @@ public abstract class Socket implements ByteChannel {
 
     public static Socket createClientSocket(SslContext sslContext) throws IOException {
         Socket socket;
-        if (NativeLibrary.IS_SUPPORTED) {
+        if (USE_NATIVE_SOCKET) {
             socket = new NativeSocket(0, SOCK_STREAM);
         } else {
             socket = sslContext == null ? new JavaSocket() : new JavaSslClientSocket((JavaSslClientContext) sslContext);
@@ -206,15 +214,15 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket createServerSocket() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(0, SOCK_STREAM) : new JavaServerSocket();
+        return USE_NATIVE_SOCKET ? new NativeSocket(0, SOCK_STREAM) : new JavaServerSocket();
     }
 
     public static Socket createDatagramSocket() throws IOException {
-        return NativeLibrary.IS_SUPPORTED ? new NativeSocket(0, SOCK_DGRAM) : new JavaDatagramSocket();
+        return USE_NATIVE_SOCKET ? new NativeSocket(0, SOCK_DGRAM) : new JavaDatagramSocket();
     }
 
     public static Socket createUnixSocket(int type) throws IOException {
-        if (!NativeLibrary.IS_SUPPORTED) {
+        if (!USE_NATIVE_SOCKET) {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
@@ -235,7 +243,7 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket connectUnix(File unixPath) throws IOException {
-        if (!NativeLibrary.IS_SUPPORTED) {
+        if (!USE_NATIVE_SOCKET) {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
@@ -245,7 +253,7 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket bindUnix(File unixPath, int backlog) throws IOException {
-        if (!NativeLibrary.IS_SUPPORTED) {
+        if (!USE_NATIVE_SOCKET) {
             throw new IOException("Unix sockets are supported in native mode only");
         }
 
@@ -256,7 +264,7 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket fromFD(int fd) throws IOException {
-        if (NativeLibrary.IS_SUPPORTED) {
+        if (USE_NATIVE_SOCKET) {
             return new NativeSocket(fd);
         }
         throw new IOException("Operation is not supported");

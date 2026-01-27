@@ -31,7 +31,6 @@ import javax.net.ssl.SSLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import one.nio.os.NativeLibrary;
 import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
 
@@ -51,11 +50,11 @@ public abstract class SslContext {
     protected SslConfig currentConfig = new SslConfig();
 
     public static SslContext getDefault() {
-        return NativeLibrary.IS_SUPPORTED ? NativeSslContext.Holder.DEFAULT : null;
+        return Socket.USE_NATIVE_SOCKET ? NativeSslContext.Holder.DEFAULT : null;
     }
 
     public static SslContext create() throws SSLException {
-        if (NativeLibrary.IS_SUPPORTED) {
+        if (Socket.USE_NATIVE_SOCKET) {
             return new NativeSslContext();
         }
         throw new UnsupportedOperationException();

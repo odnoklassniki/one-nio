@@ -19,12 +19,10 @@ package one.nio.net;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 
-import one.nio.os.NativeLibrary;
-
 public class SslClientContextFactory {
 
     public static SslContext create() {
-        if (NativeLibrary.IS_SUPPORTED) {
+        if (Socket.USE_NATIVE_SOCKET) {
             return SslContext.getDefault();
         } else {
             try {
