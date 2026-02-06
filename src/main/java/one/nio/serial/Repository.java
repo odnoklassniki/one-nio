@@ -148,6 +148,7 @@ public class Repository {
         // Unable to run readObject/writeObject for the following classes.
         // Fortunately standard serialization works well for them.
         setOptions(InetAddress.class, SKIP_CUSTOM_SERIALIZATION);
+        setOptions(Inet6Address.class, SKIP_CUSTOM_SERIALIZATION);
         setOptions(InetSocketAddress.class, SKIP_CUSTOM_SERIALIZATION);
         setOptions(StringBuilder.class, SKIP_CUSTOM_SERIALIZATION);
         setOptions(StringBuffer.class, SKIP_CUSTOM_SERIALIZATION);
@@ -157,6 +158,7 @@ public class Repository {
         // At some moment InetAddress fields were moved to an auxilary holder class.
         // This resolves backward compatibility problem by inlining holder fields during serialization.
         setOptions("java.net.InetAddress$InetAddressHolder", INLINE);
+        setOptions("java.net.Inet6Address$Inet6AddressHolder", INLINE);
         setOptions("java.net.InetSocketAddress$InetSocketAddressHolder", INLINE);
 
         Management.registerMXBean(new SerializationMXBeanImpl(), "one.nio.serial:type=Serialization");

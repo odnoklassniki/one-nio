@@ -16,11 +16,6 @@
 
 package one.nio.serial;
 
-import one.nio.serial.sample.Sample;
-import one.nio.util.Base64;
-import one.nio.util.Utf8;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
@@ -31,17 +26,47 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.*;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.Year;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.chrono.ChronoZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.zone.ZoneRules;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
 
-import static one.nio.serial.Utils.*;
-import static org.junit.Assert.*;
+import org.junit.Test;
+
+import one.nio.serial.sample.Sample;
+import one.nio.util.Base64;
+import one.nio.util.Utf8;
+
+import static one.nio.serial.Utils.checkSerialize;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 public class SerializationTest {
 
@@ -248,8 +273,8 @@ public class SerializationTest {
         checkSerialize(new BigDecimal("88888888888888888.88888888888888888888888"));
         checkSerialize(new BigDecimal("12.3E+7"));
         checkSerialize(Arrays.asList(
-                new BigDecimal("88888888888888888.88888888888888888888888"), 
-                new BigDecimal("1"), 
+                new BigDecimal("88888888888888888.88888888888888888888888"),
+                new BigDecimal("1"),
                 new BigDecimal(1),
                 new BigDecimal(0)));
     }
@@ -265,6 +290,73 @@ public class SerializationTest {
         checkSerialize(new InetSocketAddress(InetAddress.getByAddress(new byte[]{8, 8, 8, 8}), 53));
         checkSerialize(new InetSocketAddress("google.com", 443));
     }
+
+    private class InetAddressListHolder implements Serializable {
+        private Collection<TokenRange> ranges;
+        private final String name;
+
+        private InetAddressListHolder(String name) {
+            this.name = name;
+        }
+
+        public Collection<TokenRange> getRanges() {
+            return ranges;
+        }
+
+        public void setRanges(Collection<TokenRange> ranges) {
+            this.ranges = ranges;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            InetAddressListHolder that = (InetAddressListHolder) o;
+            return Objects.equals(ranges, that.ranges);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(ranges);
+        }
+    }
+
+    private class TokenRange implements Serializable {
+        public final List<InetAddress> endpoints;
+        public final int left, right;
+
+        private TokenRange(List<InetAddress> endpoints, int left, int right) {
+            this.endpoints = endpoints;
+            this.left = left;
+            this.right = right;
+        }
+
+        public List<InetAddress> getEndpoints() {
+            return endpoints;
+        }
+
+        public int getLeft() {
+            return left;
+        }
+
+        public int getRight() {
+            return right;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            TokenRange that = (TokenRange) o;
+            return left == that.left && right == that.right && Objects.equals(endpoints, that.endpoints);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(endpoints, left, right);
+        }
+    }
+
 
     @Test
     public void testStringBuilder() throws IOException, ClassNotFoundException {
