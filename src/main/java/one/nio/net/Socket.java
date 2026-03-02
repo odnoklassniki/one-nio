@@ -156,6 +156,7 @@ public abstract class Socket implements ByteChannel {
     public abstract Socket sslWrap(SslContext context) throws IOException;
     public abstract Socket sslUnwrap();
     public abstract SslContext getSslContext();
+    public void setSslContext(SslContext newContext) throws IOException {}
     public abstract <T> T getSslOption(SslOption<T> option);
 
     public Socket acceptNonBlocking() throws IOException {
