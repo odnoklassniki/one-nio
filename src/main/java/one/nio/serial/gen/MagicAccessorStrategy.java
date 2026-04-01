@@ -83,12 +83,12 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
     }
 
     @Override
-    public void emitWriteObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType) {
+    public void emitWriteObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType) {
         emitInvoke(mv, methodType);
     }
 
     @Override
-    public void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType) {
+    public void emitReadObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType) {
         emitInvoke(mv, methodType);
 
     }

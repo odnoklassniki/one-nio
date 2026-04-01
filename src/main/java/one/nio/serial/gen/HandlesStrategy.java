@@ -38,7 +38,6 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 import static one.nio.serial.AsmUtils.OBJECT_TYPE;
 import static one.nio.serial.gen.DelegateGenerator.isNotSerial;
@@ -48,6 +47,14 @@ import static org.objectweb.asm.Opcodes.*;
 public final class HandlesStrategy extends GenerationStrategy {
 
     private final static String CONSTRUCTOR_HANDLE = "$$$constructor";
+
+    private final static String WRITE_OBJECT_HANDLE = "$$$writeObject";
+
+    private final static String READ_OBJECT_HANDLE = "$$$readObject";
+
+    private boolean emitWriteObjectHandler = false;
+
+    private boolean emitReadObjectHandler = false;
 
     @Override
     public String getBaseClassName() {
@@ -73,7 +80,7 @@ public final class HandlesStrategy extends GenerationStrategy {
         generateVarHandleStaticMethods(cv, className, cls, fds, defaultFields, parentDescriptors);
     }
 
-    private static void generateVarHandleFieldsAndClassInit(ClassWriter cv, Class cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, FieldDescriptor[] parentDescriptors) {
+    private void generateVarHandleFieldsAndClassInit(ClassWriter cv, Class cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, FieldDescriptor[] parentDescriptors) {
         for (FieldDescriptor fd : fds) {
             generateFieldForStaticVarOrMethodHandlerIfNeeded(cv, fd);
         }
@@ -96,10 +103,30 @@ public final class HandlesStrategy extends GenerationStrategy {
             ).visitEnd();
         }
 
+        if (emitWriteObjectHandler) {
+            cv.visitField(
+                    ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                    WRITE_OBJECT_HANDLE,
+                    "Ljava/lang/invoke/MethodHandle;",
+                    null,
+                    null
+            ).visitEnd();
+        }
+
+        if (emitReadObjectHandler) {
+            cv.visitField(
+                    ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                    READ_OBJECT_HANDLE,
+                    "Ljava/lang/invoke/MethodHandle;",
+                    null,
+                    null
+            ).visitEnd();
+        }
+
         generateClassInit(cv, cls, className, fds, defaultFields, parentDescriptors);
     }
 
-    private static void generateClassInit(ClassWriter cv, Class cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, FieldDescriptor[] parentDescriptors) {
+    private void generateClassInit(ClassWriter cv, Class cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, FieldDescriptor[] parentDescriptors) {
         MethodVisitor mv = cv.visitMethod(
                 ACC_STATIC,
                 "<clinit>",
@@ -132,13 +159,23 @@ public final class HandlesStrategy extends GenerationStrategy {
             );
         }
 
+        if (emitWriteObjectHandler) {
+            emitMethodHandleObtain(mv, cls, "writeObject", void.class, ObjectOutputStream.class);
+            mv.visitFieldInsn(PUTSTATIC, className, WRITE_OBJECT_HANDLE, Type.getDescriptor(MethodHandle.class));
+        }
+
+        if (emitReadObjectHandler) {
+            emitMethodHandleObtain(mv, cls, "readObject", void.class, ObjectInputStream.class);
+            mv.visitFieldInsn(PUTSTATIC, className, READ_OBJECT_HANDLE, Type.getDescriptor(MethodHandle.class));
+        }
+
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
     //var handlers get/set + method handler for getter/setter from @Serial annotation
-    private static void initializeFieldAccessorsIfNeeded(Class cls, String className, FieldDescriptor fd, MethodVisitor mv, boolean isDefault) {
+    private void initializeFieldAccessorsIfNeeded(Class cls, String className, FieldDescriptor fd, MethodVisitor mv, boolean isDefault) {
         Field ownField = fd.ownField();
         if (isNotSerial(ownField)) return;
 
@@ -146,14 +183,14 @@ public final class HandlesStrategy extends GenerationStrategy {
         initializeFieldAccessors(cls, className, fd, mv, ownField);
     }
 
-    private static void initializeFieldAccessors(Class cls, String className, FieldDescriptor fd, MethodVisitor mv, Field ownField) {
+    private void initializeFieldAccessors(Class cls, String className, FieldDescriptor fd, MethodVisitor mv, Field ownField) {
         Field field = fd.ownField();
-        DelegateGenerator.loadClassSafe(mv, field.getDeclaringClass());
+        loadClassSafe(mv, field.getDeclaringClass());
 
         mv.visitLdcInsn(field.getName());
         Class<?> fieldType = field.getType();
 
-        DelegateGenerator.loadClassSafe(mv, fieldType);
+        loadClassSafe(mv, fieldType);
 
         mv.visitMethodInsn(
                 INVOKESTATIC,
@@ -326,40 +363,30 @@ public final class HandlesStrategy extends GenerationStrategy {
         }
     }
 
-
     @Override
-    public void emitWriteObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType) {
-        emitMethodHandleCall(mv, clazz, "writeObject", void.class, Object.class, ObjectOutputStream.class);
-    }
-
-    @Override
-    public void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType) {
-        emitMethodHandleCall(mv, clazz, "readObject", void.class, Object.class, ObjectInputStream.class);
-    }
-
-
-    public void emitMethodHandleCall(MethodVisitor mv, Class clazz,  String methodName, Class returnType, Class erasedReturn, Class ...args) {
-        //MethodHandlesReflection.findMHInstanceMethodOrThrow(cls, "writeObject", methodType)
-        emitMethodHandleObtain(mv, clazz, methodName, returnType, args);
-
+    public void emitWriteObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType) {
+        emitWriteObjectHandler = true;
+        mv.visitFieldInsn(GETSTATIC, className, WRITE_OBJECT_HANDLE, Type.getDescriptor(MethodHandle.class));
         mv.visitInsn(DUP_X2);
         mv.visitInsn(POP);
-
-        Type[] types = Stream.concat(Stream.of(erasedReturn), Arrays.stream(args)).map(Type::getType).toArray(Type[]::new);
-        //call method
-        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getType(MethodHandle.class).getInternalName(), "invoke", Type.getMethodDescriptor(Type.getType(void.class), types), false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(MethodHandle.class), "invoke", "(Ljava/lang/Object;Ljava/io/ObjectOutputStream;)V", false);
     }
 
-    private static void emitMethodHandleObtain(MethodVisitor mv, Class clazz, String methodName, Class returnType, Class... args) {
-        DelegateGenerator.loadClassSafe(mv, clazz);
+    @Override
+    public void emitReadObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType) {
+        emitReadObjectHandler = true;
+        mv.visitFieldInsn(GETSTATIC, className, READ_OBJECT_HANDLE, Type.getDescriptor(MethodHandle.class));
+        mv.visitInsn(DUP_X2);
+        mv.visitInsn(POP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(MethodHandle.class), "invoke", "(Ljava/lang/Object;Ljava/io/ObjectInputStream;)V", false);
+    }
+
+
+    private void emitMethodHandleObtain(MethodVisitor mv, Class clazz, String methodName, Class returnType, Class... args) {
+        loadClassSafe(mv, clazz);
         mv.visitLdcInsn(methodName);
 
-        //MethodType.methodType(void.class, ObjectOutputStream.class);
-        if (returnType.isPrimitive()) {
-            loadPrimitiveType(mv, returnType);
-        } else {
-            DelegateGenerator.loadClassSafe(mv, returnType);
-        }
+        loadClassSafe(mv, returnType);
 
         for (Class cl: args) {
             mv.visitLdcInsn(Type.getType(cl));
@@ -373,9 +400,9 @@ public final class HandlesStrategy extends GenerationStrategy {
         mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodHandlesReflection.class).getInternalName(), "findMHInstanceMethodOrThrow", Type.getMethodDescriptor(Type.getType(MethodHandle.class), Type.getType(Class.class), Type.getType(String.class), Type.getType(MethodType.class)), false);
     }
 
-    private static void emitConstructorHandleObtain(MethodVisitor mv, Class clazz, Class... args) {
-        DelegateGenerator.loadClassSafe(mv, clazz);
-        DelegateGenerator.loadClassSafe(mv, Void.TYPE);
+    private void emitConstructorHandleObtain(MethodVisitor mv, Class clazz, Class... args) {
+        loadClassSafe(mv, clazz);
+        loadClassSafe(mv, Void.TYPE);
 
         mv.visitLdcInsn(args.length);
         mv.visitTypeInsn(ANEWARRAY, Type.getType(Class.class).getInternalName());
@@ -383,7 +410,7 @@ public final class HandlesStrategy extends GenerationStrategy {
         for (Class cl: args) {
             mv.visitInsn(DUP);
             mv.visitLdcInsn(index++);
-            DelegateGenerator.loadClassSafe(mv, cl);
+            loadClassSafe(mv, cl);
             mv.visitInsn(AASTORE);
         }
 
@@ -448,8 +475,8 @@ public final class HandlesStrategy extends GenerationStrategy {
     @Override
     public void loadClassSafe(MethodVisitor mv, Class clazz) {
         // TODO: here we should check that `clazz` is also exported
-        if (Modifier.isPublic(clazz.getModifiers())) {
-            mv.visitLdcInsn(Type.getType(clazz));
+        if (isAccessible(clazz)) {
+            super.loadClassSafe(mv, clazz);
         } else {
             mv.visitLdcInsn(clazz.getName());
             mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);

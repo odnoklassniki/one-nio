@@ -51,7 +51,6 @@ import static one.nio.gen.BytecodeGenerator.emitInt;
 import static one.nio.gen.BytecodeGenerator.emitInvoke;
 import static one.nio.gen.BytecodeGenerator.emitLong;
 import static one.nio.gen.BytecodeGenerator.generateDefault;
-import static one.nio.serial.gen.HandlesStrategy.loadPrimitiveType;
 import static org.objectweb.asm.Opcodes.*;
 
 public class DelegateGenerator  {
@@ -93,8 +92,6 @@ public class DelegateGenerator  {
         cv.visit(V1_6, ACC_PUBLIC | ACC_FINAL, className, null, strategy.getBaseClassName(),
                 new String[]{"one/nio/serial/gen/Delegate"});
 
-        strategy.generateStatics(cv, cls, className, fds, defaultFields);
-
         generateConstructor(cv, fds, className);
         generateCalcSize(cv, className, cls, fds);
         generateWrite(cv, className, cls, fds);
@@ -102,6 +99,8 @@ public class DelegateGenerator  {
         generateSkip(cv, fds);
         generateToJson(cv, className, cls, fds);
         generateFromJson(cv, cls, fds, defaultFields, className);
+
+        strategy.generateStatics(cv, cls, className, fds, defaultFields);
 
         cv.visitEnd();
         return cv.toByteArray();
@@ -134,7 +133,7 @@ public class DelegateGenerator  {
         emitTypeCast(mv, Object.class, cls);
         mv.visitVarInsn(ASTORE, 1);
 
-        emitWriteObject(cls, mv);
+        emitWriteObject(cls, className, mv);
 
         int primitiveFieldsSize = 0;
 
@@ -177,7 +176,7 @@ public class DelegateGenerator  {
         emitTypeCast(mv, Object.class, cls);
         mv.visitVarInsn(ASTORE, 1);
 
-        emitWriteObject(cls, mv);
+        emitWriteObject(cls, className, mv);
 
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
@@ -204,13 +203,13 @@ public class DelegateGenerator  {
         mv.visitEnd();
     }
 
-    private void emitWriteObject(Class cls, MethodVisitor mv) {
+    private void emitWriteObject(Class cls, String className, MethodVisitor mv) {
         MethodType methodType = MethodType.methodType(void.class, ObjectOutputStream.class);
         MethodHandleInfo m = MethodHandlesReflection.findInstanceMethod(cls, "writeObject", methodType);
         if (m != null && !Repository.hasOptions(m.getDeclaringClass(), Repository.SKIP_WRITE_OBJECT)) {
             mv.visitVarInsn(ALOAD, 1);
             mv.visitFieldInsn(GETSTATIC, "one/nio/serial/gen/NullObjectOutputStream", "INSTANCE", "Lone/nio/serial/gen/NullObjectOutputStream;");
-            strategy.emitWriteObjectCall(mv, cls, m);
+            strategy.emitWriteObjectCall(mv, className, m);
         }
     }
 
@@ -301,7 +300,7 @@ public class DelegateGenerator  {
                 mv.visitFieldInsn(GETFIELD, className, "fields", "Ljava/util/Map;");
                 mv.visitMethodInsn(INVOKESPECIAL, "one/nio/serial/gen/GetFieldInputStream", "<init>", "(Ljava/lang/Object;Ljava/util/Map;)V", false);
             }
-            strategy.emitReadObjectCall(mv, cls, m);
+            strategy.emitReadObjectCall(mv, className, m);
         }
     }
 
@@ -922,10 +921,6 @@ public class DelegateGenerator  {
     }
 
     public void loadClassSafe(MethodVisitor mv, Class<?> clazz) {
-        if (clazz.isPrimitive()) {
-            loadPrimitiveType(mv, clazz);
-        } else {
-            strategy.loadClassSafe(mv, clazz);
-        }
+        strategy.loadClassSafe(mv, clazz);
     }
 }
