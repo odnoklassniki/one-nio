@@ -16,6 +16,7 @@
 
 package one.nio.serial.gen;
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.FieldDescriptor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -26,7 +27,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.function.Consumer;
 
-import static one.nio.serial.gen.HandlesStrategy.loadPrimitiveType;
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 public abstract class GenerationStrategy {
@@ -51,7 +51,7 @@ public abstract class GenerationStrategy {
 
     public void loadClassSafe(MethodVisitor mv, Class clazz) {
         if (clazz.isPrimitive()) {
-            loadPrimitiveType(mv, clazz);
+            BytecodeGenerator.loadPrimitiveType(mv, clazz);
         } else {
             mv.visitLdcInsn(Type.getType(clazz));;
         }
