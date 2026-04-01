@@ -17,18 +17,16 @@
 package one.nio.serial.gen;
 
 import one.nio.serial.FieldDescriptor;
-import one.nio.serial.Repository;
-import one.nio.util.JavaVersion;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
-import org.slf4j.Logger;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.function.Consumer;
 
+import static one.nio.serial.gen.HandlesStrategy.loadPrimitiveType;
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 public abstract class GenerationStrategy {
@@ -41,9 +39,9 @@ public abstract class GenerationStrategy {
 
     public abstract void emitWriteSerialField(MethodVisitor mv, Class clazz, Field field, String serializerClassName);
 
-    public abstract void emitWriteObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType);
+    public abstract void emitWriteObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType);
 
-    public abstract void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType);
+    public abstract void emitReadObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType);
 
     public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator);
 
@@ -52,7 +50,11 @@ public abstract class GenerationStrategy {
     }
 
     public void loadClassSafe(MethodVisitor mv, Class clazz) {
-        mv.visitLdcInsn(Type.getType(clazz));;
+        if (clazz.isPrimitive()) {
+            loadPrimitiveType(mv, clazz);
+        } else {
+            mv.visitLdcInsn(Type.getType(clazz));;
+        }
     }
 
 }
