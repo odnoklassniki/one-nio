@@ -108,7 +108,7 @@ public class GeneratedSerializer extends Serializer {
 
     @Override
     public byte[] code() {
-        return DelegateGenerator.generate(cls, fds, defaultFields);
+        return new DelegateGenerator().generate(cls, fds, defaultFields);
     }
 
     @Override
