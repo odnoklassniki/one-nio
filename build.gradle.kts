@@ -145,8 +145,9 @@ tasks {
             }
         }
 
-        if (project.hasProperty("one.nio.gen.debug.dump_generated_serializers_as_text")) {
-            systemProperty("one.nio.gen.debug.dump_generated_serializers_as_text", project.property("one.nio.gen.debug.dump_generated_serializers_as_text").toString())
+        val dumpProperty = "one.nio.gen.debug.dump_generated_classes_as_text"
+        if (project.hasProperty(dumpProperty)) {
+            systemProperty(dumpProperty, project.property(dumpProperty).toString())
         }
 
         systemProperty("one.nio.gen.verify_bytecode", true)
