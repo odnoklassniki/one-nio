@@ -33,12 +33,6 @@ import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 public abstract class GenerationStrategy {
 
-    private static final String STRATEGY_OPTION = "one.nio.serial.gen.mode";
-
-    private static final String OLD_MODE = "magic_accessor";
-
-    private static final String NEW_MODE = "method_handles";
-
     public abstract String getBaseClassName();
 
     public abstract void generateStatics(ClassWriter cv, Class cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields);
@@ -52,43 +46,6 @@ public abstract class GenerationStrategy {
     public abstract void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType);
 
     public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator);
-
-
-    public static GenerationStrategy createStrategy() {
-        String option = System.getProperty(STRATEGY_OPTION);
-        GenerationStrategy strategy = null;
-
-        if (option == null) {
-            option = OLD_MODE;
-        }
-
-        Logger logger = Repository.log;
-
-        if (OLD_MODE.equalsIgnoreCase(option) && JavaVersion.isJava24Plus()) {
-            String msg = "One-nio 2.x supports JDK 24+ only in experimental mode, which can be enable by setting the `one.nio.serial.gen.strategy=handles` environment variable. Please refer to the documentation for additional details.";
-            logger.warn(msg);
-            throw new RuntimeException(msg);
-        }
-
-        if (NEW_MODE.equalsIgnoreCase(option) && JavaVersion.isJava8()) {
-            String msg = "One-nio doesn't support the `one.nio.serial.gen.strategy=handles` mode with JDK 8. Please use JDK 9 or higher, or remove the `one.nio.serial.gen.strategy` environment variable.";
-            logger.warn(msg);
-            throw new RuntimeException(msg);
-        }
-
-        if (!NEW_MODE.equalsIgnoreCase(option) && !OLD_MODE.equalsIgnoreCase(option)) {
-            String msg = "Unknown value for `one.nio.serial.gen.mode` option: '" + option + "'. Supported values are '" + OLD_MODE + "' and '" + NEW_MODE + "'.";
-            logger.warn(msg);
-            throw new RuntimeException(msg);
-        }
-
-        logger.info("One-nio uses `" + option + "` strategy for class generation.");
-        if (NEW_MODE.equalsIgnoreCase(option)) {
-            return new HandlesStrategy();
-        } else {
-            return new MagicAccessorStrategy();
-        }
-    }
 
     public void generateCast(MethodVisitor mv, Class dst) {
         mv.visitTypeInsn(CHECKCAST, Type.getInternalName(dst));
