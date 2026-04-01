@@ -339,30 +339,6 @@ public final class HandlesStrategy extends GenerationStrategy {
         return "$" + ((isGetter) ? "get" : "set")  + "_" + getVarHandleName(fd);
     }
 
-    public static void loadPrimitiveType(MethodVisitor mv, Class<?> clazz) {
-        if (clazz == int.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Integer", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == boolean.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Boolean", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == byte.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Byte", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == char.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Character", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == short.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Short", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == float.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Float", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == long.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Long", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == double.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Double", "TYPE", "Ljava/lang/Class;");
-        } else if (clazz == void.class) {
-            mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/Void", "TYPE", "Ljava/lang/Class;");
-        } else {
-            throw new AssertionError("Not supported primitive type: " + clazz);
-        }
-    }
-
     @Override
     public void emitWriteObjectCall(MethodVisitor mv, String className, MethodHandleInfo methodType) {
         emitWriteObjectHandler = true;
