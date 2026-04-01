@@ -18,8 +18,6 @@ package one.nio.serial.gen;
 
 import one.nio.serial.Repository;
 import one.nio.util.JavaVersion;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Type;
 import org.slf4j.Logger;
 abstract class GenerationStrategyFactory {
 
@@ -48,7 +46,6 @@ abstract class GenerationStrategyFactory {
 
     public static GenerationStrategyFactory createStrategyFactory() {
         String option = System.getProperty(STRATEGY_OPTION);
-        GenerationStrategy strategy = null;
 
         if (option == null) {
             option = OLD_MODE;
@@ -57,13 +54,13 @@ abstract class GenerationStrategyFactory {
         Logger logger = Repository.log;
 
         if (OLD_MODE.equalsIgnoreCase(option) && JavaVersion.isJava24Plus()) {
-            String msg = "One-nio 2.x supports JDK 24+ only in experimental mode, which can be enable by setting the `one.nio.serial.gen.strategy=handles` environment variable. Please refer to the documentation for additional details.";
+            String msg = "One-nio 2.x supports JDK 24+ only in experimental mode, which can be enable by setting the `one.nio.serial.gen.strategy=" + NEW_MODE + "` environment variable. Please refer to the documentation for additional details.";
             logger.warn(msg);
             throw new RuntimeException(msg);
         }
 
         if (NEW_MODE.equalsIgnoreCase(option) && JavaVersion.isJava8()) {
-            String msg = "One-nio doesn't support the `one.nio.serial.gen.strategy=handles` mode with JDK 8. Please use JDK 9 or higher, or remove the `one.nio.serial.gen.strategy` environment variable.";
+            String msg = "One-nio doesn't support the `one.nio.serial.gen.strategy=" + NEW_MODE + "` mode with JDK 8. Please use JDK 9 or higher, or remove the `one.nio.serial.gen.strategy` environment variable.";
             logger.warn(msg);
             throw new RuntimeException(msg);
         }
