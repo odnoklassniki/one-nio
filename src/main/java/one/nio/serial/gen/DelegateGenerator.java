@@ -57,7 +57,9 @@ import static org.objectweb.asm.Opcodes.*;
 public class DelegateGenerator  {
     private static final AtomicInteger index = new AtomicInteger();
 
-    private final GenerationStrategy strategy = GenerationStrategy.createStrategy();
+    private static final GenerationStrategyFactory factory = GenerationStrategyFactory.createStrategyFactory();
+
+    private final GenerationStrategy strategy = factory.createStrategy();
 
     public static Delegate instantiate(Class cls, FieldDescriptor[] fds, byte[] code) {
         Map<String, Field> fieldsMap = null;
