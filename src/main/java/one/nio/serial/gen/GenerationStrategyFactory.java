@@ -48,7 +48,11 @@ abstract class GenerationStrategyFactory {
         String option = System.getProperty(STRATEGY_OPTION);
 
         if (option == null) {
-            option = OLD_MODE;
+            if (JavaVersion.isJava24Plus()) {
+                option = NEW_MODE;
+            } else {
+                option = OLD_MODE;
+            }
         }
 
         Logger logger = Repository.log;
