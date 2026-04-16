@@ -301,7 +301,7 @@ public final class HandlesStrategy extends GenerationStrategy {
             } else {
                 mv.visitFieldInsn(Opcodes.GETSTATIC, className, getVarHandleName(ownField), "Ljava/lang/invoke/VarHandle;");
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "getOpaque", descriptor, false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "get", descriptor, false);
             }
 
             mv.visitInsn(Type.getType(fieldType).getOpcode(IRETURN));
@@ -322,7 +322,7 @@ public final class HandlesStrategy extends GenerationStrategy {
             mv.visitFieldInsn(Opcodes.GETSTATIC, className, getVarHandleName(ownField), "Ljava/lang/invoke/VarHandle;");
             mv.visitVarInsn(Opcodes.ALOAD, 0);
             mv.visitVarInsn(Type.getType(fieldType).getOpcode(ILOAD), 1);
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "setOpaque", descriptor, false);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "set", descriptor, false);
         }
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
