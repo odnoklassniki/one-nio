@@ -67,4 +67,62 @@ public class Bpf {
     static native boolean mapRemove(int fd, byte[] key) throws IOException;
 
     static native boolean mapGetNextKey(int fd, byte[] key, byte[] nextKey);
+
+    /* ===================== libbpf-backed multi-program API =====================
+     *
+     * The legacy {@link #progLoad} resolves to libbpf's {@code bpf_prog_load}
+     * which loads one program at a time. For BPF objects with multiple
+     * sections (e.g. tp_btf programs that hook several scheduler tracepoints
+     * from one .o file) we need {@code bpf_object__open_file} +
+     * {@code bpf_object__load}. These natives wrap that path and let Java
+     * iterate programs/maps by name.
+     */
+
+    /** Opens (parses ELF) but does not yet load programs into the kernel. Returns native pointer. */
+    static native long bpfObjectOpen(String path) throws IOException;
+
+    /** Loads all programs/maps from the previously opened object into the kernel. */
+    static native int bpfObjectLoad(long ptr) throws IOException;
+
+    /** Closes the object (calls {@code bpf_object__close}). Idempotent for null. */
+    static native void bpfObjectClose(long ptr);
+
+    /** Returns the file descriptor of the named program, or -1 if not found. */
+    static native int bpfObjectProgFd(long ptr, String name) throws IOException;
+
+    /** Returns the file descriptor of the named map, or -1 if not found. */
+    static native int bpfObjectMapFd(long ptr, String name) throws IOException;
+
+    /**
+     * Auto-attaches the named program (raw_tracepoint, tp_btf, kprobe, etc.).
+     * Returns native pointer to {@code bpf_link} that must be passed to
+     * {@link #bpfLinkDestroy} to detach.
+     */
+    static native long bpfProgAttach(long objPtr, String name) throws IOException;
+
+    /** Detaches a link previously returned by {@link #bpfProgAttach}. Idempotent for 0. */
+    static native void bpfLinkDestroy(long linkPtr);
+
+    /* ===================== ring buffer reader =====================
+     *
+     * Wraps libbpf's {@code ring_buffer__new}/{@code __poll}/{@code __free}.
+     * The native handle stores a reusable Java callback context updated
+     * per-{@link #ringBufPoll} call.
+     */
+
+    /** Creates a new ring buffer consumer over the given map fd. Returns native handle. */
+    static native long ringBufNew(int mapFd) throws IOException;
+
+    /**
+     * Polls ring buffer up to {@code timeoutMs} milliseconds, invoking
+     * {@code consumer.accept(ByteBuffer)} for each available record.
+     * The ByteBuffer is a direct view over the ring buffer page, valid only
+     * for the duration of the call — copy out anything you need.
+     *
+     * Returns the number of records processed, or a negative libbpf errno.
+     */
+    static native int ringBufPoll(long rbPtr, int timeoutMs, BpfRingBuf.EventConsumer consumer) throws IOException;
+
+    /** Frees the ring buffer consumer. Idempotent for 0. */
+    static native void ringBufFree(long rbPtr);
 }

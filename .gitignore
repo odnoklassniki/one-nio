@@ -1,12 +1,4 @@
-*.class
-*.jar
-*.war
-*.ear
-
 /build
-/out
-/lib
-/target
-
+/.gradle
 .idea
 *.iml

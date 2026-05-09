@@ -20,12 +20,12 @@ repositories {
 }
 
 dependencies {
-    implementation(group = "org.ow2.asm", name = "asm", version = "9.8")
-    implementation(group = "org.ow2.asm", name = "asm-util", version = "9.8")
-    implementation(group = "org.slf4j", name = "slf4j-api", version = "1.7.36")
+    implementation("org.ow2.asm:asm:9.8")
+    implementation("org.ow2.asm:asm-util:9.8")
+    implementation("org.slf4j:slf4j-api:1.7.36")
 
-    testImplementation(group = "junit", name = "junit", version = "4.13.2")
-    testRuntimeOnly(group = "org.apache.logging.log4j", name = "log4j-slf4j-impl", version = "2.24.3")
+    testImplementation("junit:junit:4.13.2")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j-impl:2.24.3")
 }
 
 val currentJdk = System.getProperty("java.specification.version").substringAfter(".").toInt()
