@@ -17,6 +17,7 @@
 package one.nio.net;
 
 import one.nio.mem.DirectMemory;
+import one.nio.util.JavaFeatures;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -109,6 +110,15 @@ final class JavaSocket extends SelectableJavaSocket {
 
     @Override
     public final int read(byte[] data, int offset, int count, int flags) throws IOException {
+        if (flags == 0 && timeout > 0 && ch.isBlocking() && JavaFeatures.isVirtualThread()) {
+            // On a virtual thread, read via the blocking input stream (honors SO_TIMEOUT) so the
+            // JDK can unmount the carrier; checkTimeout()'s native Net.poll would pin it instead
+            int n = ch.socket().getInputStream().read(data, offset, count);
+            if (n < 0) {
+                throw new SocketClosedException();
+            }
+            return n;
+        }
         checkTimeout(POLL_READ, timeout);
         int result = ch.read(ByteBuffer.wrap(data, offset, count));
         if (result < 0) {

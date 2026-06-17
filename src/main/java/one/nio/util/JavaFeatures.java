@@ -23,6 +23,7 @@ import java.lang.invoke.MethodType;
 public class JavaFeatures {
     private static final MethodHandle onSpinWait = getOnSpinWait();
     private static final MethodHandle isRecord = getIsRecord();
+    private static final MethodHandle isVirtual = getIsVirtual();
 
     private static MethodHandle getOnSpinWait() {
         try {
@@ -37,6 +38,15 @@ public class JavaFeatures {
         try {
             return MethodHandles.publicLookup().findVirtual(
                     Class.class, "isRecord", MethodType.methodType(boolean.class));
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    private static MethodHandle getIsVirtual() {
+        try {
+            return MethodHandles.publicLookup().findVirtual(
+                    Thread.class, "isVirtual", MethodType.methodType(boolean.class));
         } catch (ReflectiveOperationException e) {
             return null;
         }
@@ -65,6 +75,22 @@ public class JavaFeatures {
         if (isRecord != null) {
             try {
                 return (boolean) isRecord.invokeExact(cls);
+            } catch (Throwable e) {
+                // Never happens
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Calls Thread.isVirtual() on the current thread since Java 21; returns false otherwise
+     *
+     * @return true if the current thread is a virtual thread. It is always false, if the version of the JVM Runtime is less than 21
+     */
+    public static boolean isVirtualThread() {
+        if (isVirtual != null) {
+            try {
+                return (boolean) isVirtual.invokeExact(Thread.currentThread());
             } catch (Throwable e) {
                 // Never happens
             }
