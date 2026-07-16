@@ -99,6 +99,11 @@ final class JavaSocket extends SelectableJavaSocket {
     }
 
     @Override
+    public final int send(ByteBuffer src, int flags, InetSocketAddress address) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public final int readRaw(long buf, int count, int flags) throws IOException {
         checkTimeout(POLL_READ, timeout);
         int result = ch.read(DirectMemory.wrap(buf, count));

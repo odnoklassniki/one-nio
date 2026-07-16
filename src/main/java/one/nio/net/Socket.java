@@ -117,6 +117,7 @@ public abstract class Socket implements ByteChannel {
     public abstract int write(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void writeFully(byte[] data, int offset, int count) throws IOException;
     public abstract int send(ByteBuffer src, int flags, InetAddress address, int port) throws IOException;
+    public abstract int send(ByteBuffer src, int flags, InetSocketAddress address) throws IOException;
     public abstract int readRaw(long buf, int count, int flags) throws IOException;
     public abstract int read(byte[] data, int offset, int count, int flags) throws IOException;
     public abstract void readFully(byte[] data, int offset, int count) throws IOException;

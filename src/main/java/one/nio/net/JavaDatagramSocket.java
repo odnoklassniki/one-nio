@@ -23,6 +23,7 @@ import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.SocketOption;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -92,6 +93,11 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     @Override
     public final int send(ByteBuffer src, int flags, InetAddress address, int port) throws IOException {
         return ch.send(src, new InetSocketAddress(address, port));
+    }
+
+    @Override
+    public final int send(ByteBuffer src, int flags, InetSocketAddress address) throws IOException {
+        return ch.send(src, address);
     }
 
     @Override
@@ -229,6 +235,9 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     public final void setReuseAddr(boolean reuseAddr, boolean reusePort) {
         try {
             ch.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
+            if (isReusePortSupported()) {
+                ch.setOption(SO_REUSEPORT_COMPAT, reusePort);
+            }
         } catch (IOException e) {
             // Ignore
         }
@@ -245,7 +254,13 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
 
     @Override
     public boolean getReusePort() {
-        return false;
+        try {
+            return isReusePortSupported()
+                    ? ch.getOption(SO_REUSEPORT_COMPAT)
+                    : false;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     @Override
@@ -353,5 +368,9 @@ final class JavaDatagramSocket extends SelectableJavaSocket {
     @Override
     public SelectableChannel getSelectableChannel() {
         return ch;
+    }
+
+    private boolean isReusePortSupported() {
+        return SO_REUSEPORT_COMPAT != null ? ch.supportedOptions().contains(SO_REUSEPORT_COMPAT) : false;
     }
 }

@@ -32,8 +32,6 @@ import java.nio.channels.SocketChannel;
 import one.nio.util.JavaInternals;
 
 final class JavaServerSocket extends SelectableJavaSocket {
-    private static final SocketOption<Boolean> SO_REUSEPORT_COMPAT = findReusePortOption();
-
     final ServerSocketChannel ch;
 
     JavaServerSocket() throws IOException {
@@ -92,6 +90,11 @@ final class JavaServerSocket extends SelectableJavaSocket {
 
     @Override
     public final int send(ByteBuffer src, int flags, InetAddress address, int port) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public final int send(ByteBuffer src, int flags, InetSocketAddress address) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -338,16 +341,5 @@ final class JavaServerSocket extends SelectableJavaSocket {
     @Override
     public SelectableChannel getSelectableChannel() {
         return ch;
-    }
-
-    private static SocketOption<Boolean> findReusePortOption() {
-        try {
-            Field reusePortField = JavaInternals.findField(StandardSocketOptions.class, "SO_REUSEPORT");
-            if (reusePortField != null) {
-                return (SocketOption<Boolean>) reusePortField.get(null);
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
     }
 }

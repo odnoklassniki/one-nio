@@ -121,6 +121,14 @@ class NativeSocket extends Socket {
     }
 
     @Override
+    public int send(ByteBuffer src, int flags, InetSocketAddress address) throws IOException {
+        if (address.isUnresolved()) {
+            throw new IOException("Address " + address + " is unresolved");
+        }
+        return sendTo(src, flags, address.getAddress().getAddress(), address.getPort());
+    }
+
+    @Override
     public int send(ByteBuffer data, int flags, String host, int port) throws IOException {
         return sendTo(data, flags, toNativeAddr(host, port), port);
     }
