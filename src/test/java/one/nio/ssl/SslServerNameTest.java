@@ -75,6 +75,8 @@ public class SslServerNameTest {
         System.setProperties(systemProps);
         cert = SslServerNameTest.class.getClassLoader().getResource("ssl/certificate.crt").getFile();
         privKey = SslServerNameTest.class.getClassLoader().getResource("ssl/certificate.key").getFile();
+
+        System.setProperty("jdk.tls.namedGroups", "secp521r1,secp256r1");
     }
 
     @Before
@@ -91,6 +93,7 @@ public class SslServerNameTest {
     public static void tearDownClass() {
         System.clearProperty("javax.net.ssl.trustStore");
         System.clearProperty("javax.net.ssl.trustStorePassword");
+        System.clearProperty("jdk.tls.namedGroups");
     }
 
     @After
