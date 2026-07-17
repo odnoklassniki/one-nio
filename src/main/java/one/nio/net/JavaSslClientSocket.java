@@ -104,6 +104,11 @@ public final class JavaSslClientSocket extends Socket {
     }
 
     @Override
+    public int send(ByteBuffer src, int flags, InetSocketAddress address) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public int readRaw(long buf, int count, int flags) throws IOException {
         return inCh.read(DirectMemory.wrap(buf, count));
     }

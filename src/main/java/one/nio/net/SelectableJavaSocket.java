@@ -27,7 +27,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.SocketOption;
 import java.net.SocketTimeoutException;
+import java.net.StandardSocketOptions;
 import java.nio.channels.SelectableChannel;
 
 import static one.nio.util.JavaInternals.unsafe;
@@ -43,6 +45,7 @@ public abstract class SelectableJavaSocket extends Socket {
 
     static final int POLL_READ = getFieldValue("sun.nio.ch.Net", "POLLIN");
     static final int POLL_WRITE = getFieldValue("sun.nio.ch.Net", "POLLOUT");
+    protected static final SocketOption<Boolean> SO_REUSEPORT_COMPAT = findReusePortOption();
 
     private static MethodHandle getMethodHandle(String cls, String name, Class<?>... params) {
         try {
@@ -89,4 +92,16 @@ public abstract class SelectableJavaSocket extends Socket {
     }
 
     public abstract SelectableChannel getSelectableChannel();
+
+    private static SocketOption<Boolean> findReusePortOption() {
+        try {
+            Field reusePortField = JavaInternals.findField(StandardSocketOptions.class, "SO_REUSEPORT");
+            if (reusePortField != null) {
+                return (SocketOption<Boolean>) reusePortField.get(null);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
 }
