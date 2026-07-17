@@ -17,7 +17,6 @@
 package one.nio.net;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 
 class NativeSslSocket extends NativeSocket {
     NativeSslContext context;
@@ -90,6 +89,9 @@ class NativeSslSocket extends NativeSocket {
                 return sslHandshakeDone();
             case SslOption.CAN_USE_SENDFILE_ID:
                 return sslCanUseSendfile();
+            case SslOption.SERVER_NAME_ID:
+                return sslServerName();
+
         }
         return null;
     }
@@ -137,6 +139,8 @@ class NativeSslSocket extends NativeSocket {
 
     private synchronized native String sslCurrentCipher();
     private synchronized native boolean sslCanUseSendfile();
+
+    private synchronized native String sslServerName();
 
     static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
     static native void sslFree(long ssl);

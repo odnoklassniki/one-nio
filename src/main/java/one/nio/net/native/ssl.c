@@ -1586,3 +1586,14 @@ Java_one_nio_net_NativeSslContext_setKeylog(JNIEnv* env, jobject self, jboolean 
     SSL_CTX_set_keylog_callback(ctx, keylog ? keylog_callback : NULL);
 #endif
 }
+
+JNIEXPORT jstring JNICALL
+Java_one_nio_net_NativeSslSocket_sslServerName(JNIEnv* env, jobject self) {
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
+    if (ssl == NULL) return NULL;
+
+    const char* name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+    if (name == NULL) return NULL;
+
+    return (*env)->NewStringUTF(env, name);
+}
