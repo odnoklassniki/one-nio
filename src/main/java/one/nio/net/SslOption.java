@@ -28,6 +28,7 @@ public class SslOption<T> {
     static final int SESSION_EARLYDATA_ACCEPTED_ID = 9;
     static final int SESSION_HANDSHAKE_DONE_ID = 10;
     static final int CAN_USE_SENDFILE_ID = 11;
+    static final int SERVER_NAME_ID = 12;
 
     public static final SslOption<byte[]> PEER_CERTIFICATE = new SslOption<>(PEER_CERTIFICATE_ID, byte[].class);
     public static final SslOption<Object[]> PEER_CERTIFICATE_CHAIN = new SslOption<>(PEER_CERTIFICATE_CHAIN_ID, Object[].class);
@@ -42,6 +43,7 @@ public class SslOption<T> {
     public static final SslOption<Boolean> SESSION_EARLYDATA_ACCEPTED = new SslOption<>(SESSION_EARLYDATA_ACCEPTED_ID, Boolean.class);
     public static final SslOption<Boolean> SESSION_HANDSHAKE_DONE = new SslOption<>(SESSION_HANDSHAKE_DONE_ID, Boolean.class);
     public static final SslOption<Boolean> CAN_USE_SENDFILE = new SslOption<>(CAN_USE_SENDFILE_ID, Boolean.class);
+    public static final SslOption<String> SERVER_NAME = new SslOption<>(SERVER_NAME_ID, String.class);
 
     final int id;
     final Class<T> type;
