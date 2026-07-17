@@ -152,6 +152,8 @@ tasks {
 
         systemProperty("one.nio.gen.verify_bytecode", true)
 
+        setForkEvery(1)
+
         useJUnit()
         testLogging {
             debug {
