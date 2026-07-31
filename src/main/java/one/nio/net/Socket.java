@@ -167,6 +167,14 @@ public abstract class Socket implements ByteChannel {
         return s;
     }
 
+    public boolean poll() {
+        return true;
+    }
+
+    public boolean pollable() {
+        return false;
+    }
+
     public void connect(String host, int port) throws IOException {
         connect(InetAddress.getByName(host), port);
     }

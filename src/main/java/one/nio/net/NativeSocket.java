@@ -67,6 +67,14 @@ class NativeSocket extends Socket {
     public final native InetSocketAddress getRemoteAddress();
 
     @Override
+    public final native boolean poll();
+
+    @Override
+    public boolean pollable() {
+        return true;
+    }
+
+    @Override
     public Socket sslWrap(SslContext context) throws IOException {
         return new NativeSslSocket(fd, (NativeSslContext) context, false);
     }

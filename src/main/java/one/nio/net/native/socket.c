@@ -16,6 +16,7 @@
 
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <poll.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
@@ -601,6 +602,25 @@ Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer,
         } while (errno == EINTR);
     }
     return 0;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_one_nio_net_NativeSocket_poll(JNIEnv* env, jobject self) {
+    int fd = (*env)->GetIntField(env, self, f_fd);
+    if (fd == -1) {
+        throw_socket_closed(env);
+        return JNI_FALSE;
+    }
+
+    struct pollfd pfd;
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+    int result = poll(&pfd, 1, 0);
+    if (result == -1) {
+        throw_io_exception(env);
+        return JNI_FALSE;
+    }
+    return (result > 0) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jint JNICALL

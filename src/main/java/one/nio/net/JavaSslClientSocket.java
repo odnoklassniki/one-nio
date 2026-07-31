@@ -354,6 +354,20 @@ public final class JavaSslClientSocket extends Socket {
     }
 
     @Override
+    public boolean poll() {
+        try {
+            return inputStream.available() > 0;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean pollable() {
+        return true;
+    }
+
+    @Override
     public void listen(int backlog) throws IOException {
         throw new UnsupportedOperationException();
     }

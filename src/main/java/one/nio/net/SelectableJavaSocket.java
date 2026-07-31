@@ -91,6 +91,25 @@ public abstract class SelectableJavaSocket extends Socket {
         throw new SocketTimeoutException();
     }
 
+    @Override
+    public boolean poll() {
+        if (poll == null || getFD == null) {
+            return false;
+        }
+        try {
+            FileDescriptor fd = (FileDescriptor) getFD.invoke(getSelectableChannel());
+            int result = (int) poll.invokeExact(fd, POLL_READ, 0L);
+            return result > 0;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean pollable() {
+        return true;
+    }
+
     public abstract SelectableChannel getSelectableChannel();
 
     private static SocketOption<Boolean> findReusePortOption() {
