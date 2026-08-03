@@ -167,8 +167,8 @@ public abstract class Socket implements ByteChannel {
         return s;
     }
 
-    public boolean poll() {
-        return true;
+    public boolean poll() throws IOException {
+        throw new UnsupportedOperationException();
     }
 
     public boolean pollable() {

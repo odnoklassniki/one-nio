@@ -67,7 +67,7 @@ class NativeSocket extends Socket {
     public final native InetSocketAddress getRemoteAddress();
 
     @Override
-    public final native boolean poll();
+    public final native boolean poll() throws IOException;
 
     @Override
     public boolean pollable() {

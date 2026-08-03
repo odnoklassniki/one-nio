@@ -92,16 +92,18 @@ public abstract class SelectableJavaSocket extends Socket {
     }
 
     @Override
-    public boolean poll() {
+    public boolean poll() throws IOException {
         if (poll == null || getFD == null) {
-            return false;
+            throw new IllegalStateException("Failed to access sun.nio.ch API");
         }
         try {
             FileDescriptor fd = (FileDescriptor) getFD.invoke(getSelectableChannel());
             int result = (int) poll.invokeExact(fd, POLL_READ, 0L);
             return result > 0;
+        } catch (IOException e) {
+            throw e;
         } catch (Throwable e) {
-            return false;
+            throw new IOException(e);
         }
     }
 
