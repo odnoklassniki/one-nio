@@ -158,6 +158,7 @@ public abstract class Socket implements ByteChannel {
     public abstract Socket sslUnwrap();
     public abstract SslContext getSslContext();
     public abstract <T> T getSslOption(SslOption<T> option);
+    public abstract boolean poll() throws IOException;
 
     public Socket acceptNonBlocking() throws IOException {
         Socket s = accept();
@@ -165,10 +166,6 @@ public abstract class Socket implements ByteChannel {
             s.setBlocking(false);
         }
         return s;
-    }
-
-    public boolean poll() throws IOException {
-        throw new UnsupportedOperationException();
     }
 
     public boolean pollable() {
