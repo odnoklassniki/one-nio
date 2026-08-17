@@ -17,6 +17,7 @@
 package one.nio.net;
 
 import one.nio.util.JavaInternals;
+import one.nio.util.JavaFeatures;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,9 @@ import java.lang.reflect.Method;
 import java.net.SocketOption;
 import java.net.SocketTimeoutException;
 import java.net.StandardSocketOptions;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SelectableChannel;
+import java.util.concurrent.TimeUnit;
 
 import static one.nio.util.JavaInternals.unsafe;
 
@@ -42,6 +45,7 @@ public abstract class SelectableJavaSocket extends Socket {
 
     private static final MethodHandle poll = getMethodHandle("sun.nio.ch.Net", "poll", FileDescriptor.class, int.class, long.class);
     private static final MethodHandle getFD = getMethodHandle("sun.nio.ch.SelChImpl", "getFD");
+    private static final MethodHandle park = getMethodHandle("sun.nio.ch.SelChImpl", "park", int.class, long.class);
 
     static final int POLL_READ = getFieldValue("sun.nio.ch.Net", "POLLIN");
     static final int POLL_WRITE = getFieldValue("sun.nio.ch.Net", "POLLOUT");
@@ -69,6 +73,11 @@ public abstract class SelectableJavaSocket extends Socket {
     }
 
     void checkTimeout(int events, long timeout) throws IOException {
+        if (JavaFeatures.isVirtualThread() && park != null) {
+            checkTimeoutVTOptimized(events, timeout);
+            return;
+        }
+
         if (timeout <= 0 || poll == null || getFD == null) {
             return;
         }
@@ -82,6 +91,43 @@ public abstract class SelectableJavaSocket extends Socket {
                     return;
                 }
             } while ((timeout = endTime - System.currentTimeMillis()) > 0);
+        } catch (IOException e) {
+            throw e;
+        } catch (Throwable e) {
+            return;
+        }
+
+        throw new SocketTimeoutException();
+    }
+
+    private void checkTimeoutVTOptimized(int events, long timeout) throws IOException {
+        if (timeout <= 0 || poll == null || getFD == null || park == null) {
+            return;
+        }
+
+        try {
+            SelectableChannel channel = getSelectableChannel();
+            FileDescriptor fd = (FileDescriptor) getFD.invoke(channel);
+            long endTime = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout);
+            long remainingNanos;
+
+            do {
+                if (Thread.currentThread().isInterrupted()) {
+                    close();
+                    throw new ClosedByInterruptException();
+                }
+
+                // Poll without timeout for prevent pinning VT, timeout will be parked separately
+                int result = (int) poll.invokeExact(fd, events, 0L);
+                if (result > 0) {
+                    return;
+                }
+
+                remainingNanos = endTime - System.nanoTime();
+                if (remainingNanos > 0) {
+                    park.invoke(channel, events, remainingNanos);
+                }
+            } while (remainingNanos > 0);
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
