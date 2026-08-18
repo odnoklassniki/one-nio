@@ -30,7 +30,7 @@ public abstract class Socket implements ByteChannel {
 
     public static final String FORCE_JAVA_SOCKET_PROP = "one.nio.net.force.java.socket";
     public static final boolean USE_NATIVE_SOCKET = NativeLibrary.IS_SUPPORTED && !isForceJavaSocket();
-    
+
     // Protocol family
     public static final int AF_UNIX  = 1;
     public static final int AF_INET  = 2;
@@ -194,10 +194,14 @@ public abstract class Socket implements ByteChannel {
     private static boolean isForceJavaSocket() {
         return "true".equalsIgnoreCase(System.getProperty(FORCE_JAVA_SOCKET_PROP, "false"));
     }
-    
+
     @Deprecated
     public static Socket create() throws IOException {
         return createClientSocket(null);
+    }
+
+    public static Socket create(final boolean useNativeSocket) throws IOException {
+        return createClientSocket(null, useNativeSocket);
     }
 
     public static Socket createClientSocket() throws IOException {
@@ -205,13 +209,30 @@ public abstract class Socket implements ByteChannel {
     }
 
     public static Socket createClientSocket(SslContext sslContext) throws IOException {
-        Socket socket;
-        if (USE_NATIVE_SOCKET) {
-            socket = new NativeSocket(0, SOCK_STREAM);
-        } else {
-            socket = sslContext == null ? new JavaSocket() : new JavaSslClientSocket((JavaSslClientContext) sslContext);
+        return createClientSocket(sslContext, USE_NATIVE_SOCKET);
+    }
+
+    public static Socket createClientSocket(SslContext sslContext, final boolean useNativeSocket) throws IOException {
+        if (useNativeSocket) {
+            if (!NativeLibrary.IS_SUPPORTED) {
+                throw new IOException("Native sockets are not supported");
+            }
+            if (sslContext != null && !(sslContext instanceof NativeSslContext)) {
+                throw new IllegalArgumentException(
+                        "Expected NativeSslContext, got " + sslContext.getClass().getName());
+            }
+            return new NativeSocket(0, SOCK_STREAM);
         }
-        return socket;
+
+        if (sslContext == null) {
+            return new JavaSocket();
+        }
+
+        if (!(sslContext instanceof JavaSslClientContext)) {
+            throw new IllegalArgumentException(
+                    "Expected JavaSslClientContext, got " + sslContext.getClass().getName());
+        }
+        return new JavaSslClientSocket((JavaSslClientContext) sslContext);
     }
 
     public static Socket createServerSocket() throws IOException {
