@@ -19,7 +19,8 @@ package one.nio.net;
 import java.io.IOException;
 
 class NativeSslSocket extends NativeSocket {
-    NativeSslContext context;
+    volatile NativeSslContext context;
+    private volatile NativeSslContext previousContext;
     long ssl;
 
     private volatile boolean isEarlyDataAccepted = false;
@@ -37,6 +38,11 @@ class NativeSslSocket extends NativeSocket {
         if (ssl != 0) {
             sslFree(ssl);
             ssl = 0;
+        }
+        NativeSslContext prev = previousContext;
+        if (prev != null) {
+            prev.close();
+            previousContext = null;
         }
         super.close();
     }
@@ -61,6 +67,22 @@ class NativeSslSocket extends NativeSocket {
     @Override
     public SslContext getSslContext() {
         return context;
+    }
+
+    @Override
+    public void setSslContext(SslContext newContext) throws IOException {
+        NativeSslContext nativeCtx = (NativeSslContext) newContext;
+
+        // Close the context from the PREVIOUS reconfigure.
+        // By now it is safe: at least one full volatile writeread cycle has passed
+        NativeSslContext prev = this.previousContext;
+        if (prev != null) {
+            prev.close();
+        }
+
+        NativeSslContext old = this.context;
+        this.context = nativeCtx;
+        this.previousContext = old; // defer context close to next reconfigure/socket close
     }
 
     @Override
@@ -95,6 +117,7 @@ class NativeSslSocket extends NativeSocket {
         }
         return null;
     }
+
     @Override
     public synchronized native void handshake(String sniHostName) throws IOException;
 
@@ -130,18 +153,24 @@ class NativeSslSocket extends NativeSocket {
     }
 
     private synchronized native byte[] sslPeerCertificate();
+
     private synchronized native Object[] sslPeerCertificateChain();
+
     private synchronized native String sslCertName(int which);
+
     private synchronized native String sslVerifyResult();
 
     private synchronized native boolean sslSessionReused();
+
     private synchronized native int sslSessionTicket();
 
     private synchronized native String sslCurrentCipher();
+
     private synchronized native boolean sslCanUseSendfile();
 
     private synchronized native String sslServerName();
 
     static native long sslNew(int fd, long ctx, boolean serverMode) throws IOException;
+
     static native void sslFree(long ssl);
 }

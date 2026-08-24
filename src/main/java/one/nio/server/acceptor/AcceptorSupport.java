@@ -58,9 +58,11 @@ public class AcceptorSupport {
         socket.setReuseAddr(true, config.reusePort);
         socket.setThinLinearTimeouts(config.thinLto);
 
-        SslContext sslContext = socket.getSslContext();
-        if (sslContext != null && config.ssl != null) {
-            sslContext.configure(config.ssl);
+        SslContext oldContext = socket.getSslContext();
+        if (oldContext != null && config.ssl != null) {
+            SslContext newContext = SslContext.create();
+            newContext.configure(config.ssl);
+            socket.setSslContext(newContext);
         }
     }
 }
