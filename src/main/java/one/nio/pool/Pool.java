@@ -26,14 +26,14 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
     protected int initialCount;
     protected int createdCount;
     protected int maxCount;
-    protected int timeout;
+    protected int borrowTimeout;
     protected int timeouts;
     protected int waitingThreads;
 
-    protected Pool(int initialCount, int maxCount, int timeout) {
+    protected Pool(int initialCount, int maxCount, int borrowTimeout) {
         this.initialCount = initialCount;
         this.maxCount = maxCount;
-        this.timeout = timeout;
+        this.borrowTimeout = borrowTimeout;
     }
 
     public synchronized void close() {
@@ -77,10 +77,10 @@ public abstract class Pool<T> extends LinkedList<T> implements Closeable {
                 // Wait up to timeout ms until there is an object to borrow or an empty place in the pool
                 long currentTime = System.currentTimeMillis();
                 if (timeLimit == 0) {
-                    timeLimit = currentTime + timeout;
+                    timeLimit = currentTime + borrowTimeout;
                 } else if (currentTime >= timeLimit) {
                     timeouts++;
-                    throw new PoolException(name() + " borrowObject timed out");
+                    throw new PoolBorrowTimeoutException(name() + " borrowObject timed out");
                 }
 
                 waitingThreads++;
