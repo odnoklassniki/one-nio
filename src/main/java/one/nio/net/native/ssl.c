@@ -1142,9 +1142,21 @@ Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self, jstring ho
         throw_socket_closed(env);
     } else {
         set_tlsext_host_name(env, ssl, hostName);
-        int result = SSL_do_handshake(ssl);
-        if (result <= 0) {
-            check_ssl_error(env, ssl, result);
+        while (1) {
+            ERR_clear_error();
+            errno = 0;
+            int result = SSL_do_handshake(ssl);
+            if (result > 0) {
+                update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
+                break;
+            }
+
+            int handshake_errno = errno;
+            int error = check_ssl_error(env, ssl, result);
+            if (handshake_errno != EINTR ||
+                    (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE)) {
+                break;
+            }
         }
     }
 }
