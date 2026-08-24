@@ -24,8 +24,8 @@ public interface SocketPoolMXBean {
     int getIdleCount();
     int getMaxCount();
     void setMaxCount(int maxCount);
-    int getTimeout();
-    void setTimeout(int timeout);
+    int getBorrowTimeout();
+    void setBorrowTimeout(int timeout);
     int getReadTimeout();
     void setReadTimeout(int readTimeout);
     int getConnectTimeout();

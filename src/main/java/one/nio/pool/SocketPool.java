@@ -36,11 +36,11 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     public SocketPool(ConnectionString conn) {
         super(conn.getIntParam("clientMinPoolSize", 0) > 0 ? 1 : 0,
               conn.getIntParam("clientMaxPoolSize", 10),
-              conn.getIntParam("timeout", 3000));
-
+              conn.getIntParam("borrowTimeout", (conn.getIntParam("timeout", 3000))));
+        int defaultTimeout = conn.getIntParam("timeout", 3000);
         this.host = conn.getHost();
         this.port = conn.getPort();
-        this.readTimeout = conn.getIntParam("readTimeout", timeout);
+        this.readTimeout = conn.getIntParam("readTimeout", defaultTimeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", 1000);
         this.tos = conn.getIntParam("tos", 0);
         this.fifo = conn.getBooleanParam("fifo", false);
@@ -96,13 +96,13 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     }
 
     @Override
-    public int getTimeout() {
-        return timeout;
+    public int getBorrowTimeout() {
+        return borrowTimeout;
     }
 
     @Override
-    public void setTimeout(int timeout) {
-        this.timeout = timeout;
+    public void setBorrowTimeout(int timeout) {
+        this.borrowTimeout = timeout;
     }
 
     @Override
