@@ -42,8 +42,8 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr* attr, unsigned int s
 
 struct bpf_object;
 
-int (*bpf_prog_load)(const char *file, enum bpf_prog_type type,
-                     struct bpf_object **pobj, int *prog_fd);
+int (*bpf_prog_load)(const char* file, enum bpf_prog_type type,
+                     struct bpf_object** pobj, int* prog_fd);
 
 
 JNIEXPORT jint JNICALL
@@ -238,7 +238,10 @@ Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyte
 	memset(&attr, 0, sizeof(attr));
 	attr.test.prog_fd = prog_fd;
 
-	jbyte *b_ctx_in=NULL, *b_data_in=NULL, *b_ctx_out=NULL, *b_data_out=NULL;
+	jbyte* b_ctx_in = NULL;
+	jbyte* b_data_in = NULL;
+	jbyte* b_ctx_out = NULL;
+	jbyte* b_data_out = NULL;
 
 
     if (ctx_in != NULL) {
@@ -516,4 +519,293 @@ Java_one_nio_os_bpf_Bpf_objGetNextId(JNIEnv* env, jclass cls, int objType, int s
     }
 
     return -1;
+}
+
+/* =========================================================================
+ * libbpf-backed multi-program API + ring buffer reader.
+ *
+ * libbpf is dlopen'd lazily on first use (same pattern bpf_prog_load uses
+ * above), and all exported functions resolve through a small symbol table.
+ * If libbpf isn't present we throw UnsupportedOperationException — same as
+ * the rest of one-nio's BPF surface.
+ * ========================================================================= */
+
+struct bpf_program;
+struct bpf_link;
+struct bpf_map;
+struct bpf_object_open_opts;
+struct ring_buffer;
+struct ring_buffer_opts;
+
+typedef int (*ring_buffer_sample_fn)(void* ctx, void* data, size_t size);
+
+static struct bpf_object*  (*p_bpf_object__open_file)(const char*, const struct bpf_object_open_opts*);
+static int                 (*p_bpf_object__load)(struct bpf_object*);
+static void                (*p_bpf_object__close)(struct bpf_object*);
+static struct bpf_program* (*p_bpf_object__find_program_by_name)(const struct bpf_object*, const char*);
+static int                 (*p_bpf_program__fd)(const struct bpf_program*);
+static struct bpf_link*    (*p_bpf_program__attach)(const struct bpf_program*);
+static int                 (*p_bpf_link__destroy)(struct bpf_link*);
+static struct bpf_map*     (*p_bpf_object__find_map_by_name)(const struct bpf_object*, const char*);
+static int                 (*p_bpf_map__fd)(const struct bpf_map*);
+
+static struct ring_buffer* (*p_ring_buffer__new)(int, ring_buffer_sample_fn, void*, const struct ring_buffer_opts*);
+static int                 (*p_ring_buffer__poll)(struct ring_buffer*, int);
+static void                (*p_ring_buffer__free)(struct ring_buffer*);
+
+static int libbpf_loaded = 0;
+
+static int load_libbpf_full(JNIEnv* env) {
+    if (libbpf_loaded) return 1;
+
+    void* h = dlopen("libbpf.so", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) h = dlopen("libbpf.so.1", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) h = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) {
+        throw_by_name(env, "java/lang/UnsupportedOperationException",
+                      "Failed to load libbpf.so / libbpf.so.0 / libbpf.so.1");
+        return 0;
+    }
+
+#define LBP_SYM(NAME) do {                                                  \
+        p_##NAME = dlsym(h, #NAME);                                          \
+        if (!p_##NAME) {                                                     \
+            throw_by_name(env, "java/lang/UnsupportedOperationException",   \
+                          "libbpf symbol not found: " #NAME);                \
+            return 0;                                                        \
+        }                                                                    \
+    } while (0)
+
+    LBP_SYM(bpf_object__open_file);
+    LBP_SYM(bpf_object__load);
+    LBP_SYM(bpf_object__close);
+    LBP_SYM(bpf_object__find_program_by_name);
+    LBP_SYM(bpf_program__fd);
+    LBP_SYM(bpf_program__attach);
+    LBP_SYM(bpf_link__destroy);
+    LBP_SYM(bpf_object__find_map_by_name);
+    LBP_SYM(bpf_map__fd);
+    LBP_SYM(ring_buffer__new);
+    LBP_SYM(ring_buffer__poll);
+    LBP_SYM(ring_buffer__free);
+#undef LBP_SYM
+
+    libbpf_loaded = 1;
+    return 1;
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_os_bpf_Bpf_bpfObjectOpen(JNIEnv* env, jclass cls, jstring path) {
+    if (!load_libbpf_full(env)) {
+        return 0;
+    }
+    if (path == NULL) {
+        throw_illegal_argument(env);
+        return 0;
+    }
+
+    const char* c_path = (*env)->GetStringUTFChars(env, path, NULL);
+    struct bpf_object* obj = p_bpf_object__open_file(c_path, NULL);
+    int e = errno;
+    (*env)->ReleaseStringUTFChars(env, path, c_path);
+
+    if (obj == NULL || (long)obj < 0) {
+        throw_io_exception_code(env, e ? e : EINVAL);
+        return 0;
+    }
+    return (jlong)(uintptr_t)obj;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_bpf_Bpf_bpfObjectLoad(JNIEnv* env, jclass cls, jlong ptr) {
+    if (!load_libbpf_full(env)) {
+        return -1;
+    }
+    int rc = p_bpf_object__load((struct bpf_object*)(uintptr_t)ptr);
+    if (rc < 0) {
+        throw_io_exception_code(env, -rc ? -rc : errno);
+        return rc;
+    }
+    return 0;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_os_bpf_Bpf_bpfObjectClose(JNIEnv* env, jclass cls, jlong ptr) {
+    if (ptr == 0 || !libbpf_loaded) {
+        return;
+    }
+    p_bpf_object__close((struct bpf_object*)(uintptr_t)ptr);
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_bpf_Bpf_bpfObjectProgFd(JNIEnv* env, jclass cls, jlong ptr, jstring name) {
+    if (!load_libbpf_full(env)) return -1;
+    if (name == NULL) {
+        throw_illegal_argument(env);
+        return -1;
+    }
+
+    const char* c_name = (*env)->GetStringUTFChars(env, name, NULL);
+    struct bpf_program* prog = p_bpf_object__find_program_by_name(
+            (struct bpf_object*)(uintptr_t)ptr, c_name);
+    (*env)->ReleaseStringUTFChars(env, name, c_name);
+
+    return (prog != NULL) ? p_bpf_program__fd(prog) : -1;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_bpf_Bpf_bpfObjectMapFd(JNIEnv* env, jclass cls, jlong ptr, jstring name) {
+    if (!load_libbpf_full(env)) {
+        return -1;
+    }
+    if (name == NULL) {
+        throw_illegal_argument(env);
+        return -1;
+    }
+
+    const char* c_name = (*env)->GetStringUTFChars(env, name, NULL);
+    struct bpf_map* map = p_bpf_object__find_map_by_name(
+            (struct bpf_object*)(uintptr_t)ptr, c_name);
+
+    (*env)->ReleaseStringUTFChars(env, name, c_name);
+
+    return (map != NULL) ? p_bpf_map__fd(map) : -1;
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_os_bpf_Bpf_bpfProgAttach(JNIEnv* env, jclass cls, jlong objPtr, jstring name) {
+    if (!load_libbpf_full(env)) {
+        return 0;
+    }
+    if (name == NULL) {
+        throw_illegal_argument(env);
+        return 0;
+    }
+
+    const char* c_name = (*env)->GetStringUTFChars(env, name, NULL);
+    struct bpf_program* prog = p_bpf_object__find_program_by_name(
+            (struct bpf_object*)(uintptr_t)objPtr, c_name);
+    if (prog == NULL) {
+        (*env)->ReleaseStringUTFChars(env, name, c_name);
+        throw_io_exception_code(env, ENOENT);
+        return 0;
+    }
+    struct bpf_link* link = p_bpf_program__attach(prog);
+    int e = errno;
+    (*env)->ReleaseStringUTFChars(env, name, c_name);
+
+    if (link == NULL || (long)link < 0) {
+        throw_io_exception_code(env, e ? e : EINVAL);
+        return 0;
+    }
+    return (jlong)(uintptr_t)link;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_os_bpf_Bpf_bpfLinkDestroy(JNIEnv* env, jclass cls, jlong ptr) {
+    if (ptr == 0 || !libbpf_loaded) {
+        return;
+    }
+    p_bpf_link__destroy((struct bpf_link*)(uintptr_t)ptr);
+}
+
+/* ===== ring buffer ===== */
+
+struct rb_handle {
+    struct ring_buffer* rb;
+    JNIEnv* env;
+    jobject consumer;
+    jmethodID accept;
+    int had_exception;
+};
+
+static int rb_sample_cb(void* ctx, void* data, size_t size) {
+    struct rb_handle* h = (struct rb_handle*)ctx;
+    if (h->had_exception) {
+        return -1;
+    }
+    JNIEnv* env = h->env;
+
+    jobject buf = (*env)->NewDirectByteBuffer(env, data, (jlong)size);
+    if (buf == NULL) {
+        h->had_exception = 1;
+        return -1;
+    }
+    (*env)->CallVoidMethod(env, h->consumer, h->accept, buf);
+    if ((*env)->ExceptionCheck(env)) {
+        h->had_exception = 1;
+        (*env)->DeleteLocalRef(env, buf);
+        return -1;
+    }
+    (*env)->DeleteLocalRef(env, buf);
+    return 0;
+}
+
+JNIEXPORT jlong JNICALL
+Java_one_nio_os_bpf_Bpf_ringBufNew(JNIEnv* env, jclass cls, jint mapFd) {
+    if (!load_libbpf_full(env)) {
+        return 0;
+    }
+
+    struct rb_handle* h = calloc(1, sizeof(*h));
+    if (!h) {
+        throw_io_exception_code(env, ENOMEM);
+        return 0;
+    }
+    h->rb = p_ring_buffer__new(mapFd, rb_sample_cb, h, NULL);
+    if (h->rb == NULL || (long)h->rb < 0) {
+        int e = errno;
+        free(h);
+        throw_io_exception_code(env, e ? e : EINVAL);
+        return 0;
+    }
+    return (jlong)(uintptr_t)h;
+}
+
+JNIEXPORT jint JNICALL
+Java_one_nio_os_bpf_Bpf_ringBufPoll(JNIEnv* env, jclass cls, jlong rbPtr, jint timeoutMs, jobject consumer) {
+    if (!load_libbpf_full(env)) {
+        return -1;
+    }
+    struct rb_handle* h = (struct rb_handle*)(uintptr_t)rbPtr;
+    if (h == NULL || h->rb == NULL) {
+        throw_illegal_argument(env);
+        return -1;
+    }
+    if (consumer == NULL) {
+        throw_illegal_argument(env);
+        return -1;
+    }
+
+    jclass consCls = (*env)->GetObjectClass(env, consumer);
+    jmethodID accept = (*env)->GetMethodID(env, consCls, "accept", "(Ljava/nio/ByteBuffer;)V");
+    (*env)->DeleteLocalRef(env, consCls);
+    if (accept == NULL) {
+        return -1;  /* GetMethodID already threw NoSuchMethodError */
+    }
+
+    h->env = env;
+    h->consumer = consumer;
+    h->accept = accept;
+    h->had_exception = 0;
+
+    int n = p_ring_buffer__poll(h->rb, timeoutMs);
+
+    h->env = NULL;
+    h->consumer = NULL;
+    h->accept = NULL;
+
+    return h->had_exception ? -1 : n;;
+}
+
+JNIEXPORT void JNICALL
+Java_one_nio_os_bpf_Bpf_ringBufFree(JNIEnv* env, jclass cls, jlong rbPtr) {
+    if (rbPtr == 0 || !libbpf_loaded) {
+        return;
+    }
+    struct rb_handle* h = (struct rb_handle*)(uintptr_t)rbPtr;
+    if (h->rb) {
+        p_ring_buffer__free(h->rb);
+    }
+    free(h);
 }
