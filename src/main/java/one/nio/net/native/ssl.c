@@ -1124,6 +1124,7 @@ static void set_tlsext_host_name(JNIEnv* env, SSL* ssl, jstring hostName) {
          const char *value = (*env) -> GetStringUTFChars(env, hostName, NULL);
          // set sni if hostname not ipv4/ipv6
          if (inet_pton(AF_INET, value, &ipv4) != 1 && inet_pton(AF_INET6, value, &ipv6) != 1) {
+             ERR_clear_error();
              int result = SSL_set_tlsext_host_name(ssl, value);
              (*env)->ReleaseStringUTFChars(env, hostName, value);
              if (result <= 0) {
@@ -1172,6 +1173,7 @@ Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, 
         if (!SSL_is_init_finished(ssl)) {
             while (1) {
                 size_t written;
+                ERR_clear_error();
                 int result = SSL_write_early_data(ssl, (void*)(intptr_t)buf, count, &written);
                 if (result == 1) {
                     return written;
@@ -1182,6 +1184,7 @@ Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, 
         }
 #endif
         while (1) {
+            ERR_clear_error();
             int result = SSL_write(ssl, (void*)(intptr_t)buf, count);
             update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
             if (result > 0) {
@@ -1209,6 +1212,7 @@ Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray dat
         if (!SSL_is_init_finished(ssl)) {
             while (1) {
                 size_t written;
+                ERR_clear_error();
                 int result = SSL_write_early_data(ssl, (void*)(intptr_t)buf, count, &written);
                 if (result == 1) {
                     return written;
@@ -1219,6 +1223,7 @@ Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray dat
         }
 #endif
         while (1) {
+            ERR_clear_error();
             int result = SSL_write(ssl, (void*)(intptr_t)buf, count);
             update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
             if (result > 0) {
@@ -1238,6 +1243,7 @@ Java_one_nio_net_NativeSslSocket_sendFile0(JNIEnv* env, jobject self, jint sourc
         throw_socket_closed(env);
     } else if (count != 0) {
         while (1) {
+            ERR_clear_error();
             int result = SSL_sendfile(ssl, sourceFD, (off_t)offset, count, 0);
             update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
             if (result > 0) {
@@ -1268,6 +1274,7 @@ Java_one_nio_net_NativeSslSocket_writeFully(JNIEnv* env, jobject self, jbyteArra
             int to_write = count <= MAX_STACK_BUF ? count : MAX_STACK_BUF;
             (*env)->GetByteArrayRegion(env, data, offset, to_write, buf);
 
+            ERR_clear_error();
             int result = SSL_write(ssl, (void*)(intptr_t)buf, to_write);
             update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
             if (result > 0) {
@@ -1289,6 +1296,7 @@ static int ssl_socket_readRaw_early_data(JNIEnv* env, jobject self, SSL* ssl, jl
     while (1) {
         size_t bytes_read = 0;
         int result;
+        ERR_clear_error();
         int ed_status = SSL_read_early_data(ssl, (void*)buf, count, &bytes_read);
 
         switch (ed_status) {
@@ -1327,6 +1335,7 @@ Java_one_nio_net_NativeSslSocket_readRaw(JNIEnv* env, jobject self, jlong buf, j
         bool early_data = ssl_flags & SF_EARLY_DATA_ENABLED;
         if (!early_data || ssl_flags & SF_EARLY_DATA_FINISHED) {
             while (1) {
+                ERR_clear_error();
                 int result = SSL_read(ssl, (void*)(intptr_t)buf, count);
                 update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
                 if (result > 0) {
@@ -1349,6 +1358,7 @@ static int ssl_socket_read_early_data(JNIEnv* env, jobject self, SSL* ssl, jbyte
     while (1) {
         size_t bytes_read = 0;
         int result;
+        ERR_clear_error();
         int ed_status = SSL_read_early_data(ssl, (void*)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, &bytes_read);
 
         switch (ed_status) {
@@ -1390,6 +1400,7 @@ Java_one_nio_net_NativeSslSocket_read(JNIEnv* env, jobject self, jbyteArray data
         bool early_data = ssl_flags & SF_EARLY_DATA_ENABLED;
         if (!early_data || ssl_flags & SF_EARLY_DATA_FINISHED) {
             while (1) {
+                ERR_clear_error();
                 int result = SSL_read(ssl, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF);
                 update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
                 if (result > 0) {
@@ -1414,6 +1425,7 @@ Java_one_nio_net_NativeSslSocket_readFully(JNIEnv* env, jobject self, jbyteArray
         throw_socket_closed(env);
     } else {
         while (count > 0) {
+            ERR_clear_error();
             int result = SSL_read(ssl, buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF);
             update_NativeSslSocket_isHandshakeDone_field(env, self, ssl);
             if (result > 0) {
