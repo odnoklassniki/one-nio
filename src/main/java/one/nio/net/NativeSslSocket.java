@@ -18,9 +18,15 @@ package one.nio.net;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 class NativeSslSocket extends NativeSocket {
     NativeSslContext context;
     long ssl;
+
+    private static final Logger log = LoggerFactory.getLogger(NativeSslSocket.class);
+    private static final NativeLogger jniLogger = () -> log;
 
     private volatile boolean isEarlyDataAccepted = false;
     private volatile boolean isHandshakeDone = false;

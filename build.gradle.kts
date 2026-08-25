@@ -199,6 +199,23 @@ tasks.compileJava {
     }
 }
 
+tasks.register<JavaExec>("runHttpServerTest") {
+    group = "Execution"
+    description = "Run one.nio.http.HttpServerTest.main()"
+
+    dependsOn("testClasses")
+
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("one.nio.http.HttpServerTest")
+    if (project.hasProperty("args")) {
+        args(project.property("args"))
+    }
+    jvmArgs(
+        "-Dorg.apache.logging.log4j.simplelog.StatusLogger.level=DEBUG",
+        "-Dlog4j2.configurationFile=log4j2.properties"
+    )
+}
+
 license {
     include("**/*.java")
     exclude("**/lz4/*.java")

@@ -51,6 +51,7 @@ enum SSLFlags {
     SF_NEW_TICKET     = SF_HAS_TICKET | SF_HAS_OLD_TICKET,
     SF_EARLY_DATA_ENABLED = 16,
     SF_EARLY_DATA_FINISHED = 32,
+    SF_FATAL_ALERT         = 64,
 };
 
 enum SSLCacheMode {
@@ -86,6 +87,10 @@ typedef struct {
 } SNIContexts;
 
 typedef struct {
+    void (*log)(const char* level, const char* fmt, ...);
+} JniLogger;
+
+typedef struct {
     pthread_rwlock_t lock;
     char* pass;
     TicketArray tickets;
@@ -93,6 +98,8 @@ typedef struct {
     OCSPResponse ocsp;
     SNIContexts sni;
     jboolean debug;
+    JniLogger sslContextLogger;
+    JniLogger sslSocketLogger;
 } AppData;
 
 static jfieldID f_ctx;
@@ -116,6 +123,17 @@ static jmethodID m_addSession;
 static jmethodID m_getSession;
 static jmethodID m_removeSession;
 
+static jclass c_NativeSslContext;
+static jfieldID f_NativeSslContext_jniLogger;
+static jclass c_NativeSslSocket;
+static jfieldID f_NativeSslSocket_jniLogger;
+
+static jclass c_NativeLogger;
+static jmethodID m_NativeLogger_log;
+
+
+
+
 // openssl dhparam -C 2048
 static unsigned char dh2048_p[] = {
     0xF5, 0x03, 0x6F, 0xFC, 0xA7, 0xFD, 0xC7, 0xD2, 0x69, 0xD8, 0xED, 0x73, 0x7D, 0x4D, 0x2A, 0x05,
@@ -137,6 +155,8 @@ static unsigned char dh2048_p[] = {
 };
 static unsigned char dh2048_g[] = { 0x02 };
 
+static char* ssl_get_peer_ip(const SSL* ssl, char* buf, size_t len);
+static char* ssl_get_host_ip_port(const SSL* ssl, char* buf, size_t len);
 
 extern void throw_socket_closed_cached(JNIEnv* env);
 extern jobject sockaddr_to_java(JNIEnv* env, struct sockaddr_storage* sa, socklen_t len);
@@ -151,6 +171,11 @@ static void throw_ssl_exception(JNIEnv* env) {
 
 static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
     char buf[64];
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    JniLogger* sslSocketLogger = &appData->sslSocketLogger;
+    char serverIP[64], clientIP[64];
+    char error[256];
+
     int err = SSL_get_error(ssl, ret);
     switch (err) {
         case SSL_ERROR_NONE:
@@ -159,19 +184,35 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
             throw_socket_closed_cached(env);
             return 0;
         case SSL_ERROR_SYSCALL:
-        {
-            unsigned long e = ERR_peek_error();
-            if (e && !ERR_SYSTEM_ERROR(e)) {
-                throw_ssl_exception(env);
-            } else if (ret == 0 || errno == 0) {
-                // OpenSSL 1.0 and 1.1 return different error code in case of "dirty" connection close
-                throw_socket_closed_cached(env);
-            } else {
-                throw_io_exception(env);
+            {
+                unsigned long e = ERR_peek_error();
+                if (e && !ERR_SYSTEM_ERROR(e)) {
+                    sslSocketLogger->log("ERROR", "fd:(%d) SSL_ERROR_SYSCALL %s in state: %s[%s], client: %s, server: %s",
+                          SSL_get_fd(ssl),
+                          ERR_error_string(ERR_peek_error(), error),
+                          SSL_state_string(ssl),
+                          SSL_state_string_long(ssl),
+                          ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+                          ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+                    );
+                    throw_ssl_exception(env);
+                } else if (ret == 0 || errno == 0) {
+                    // OpenSSL 1.0 and 1.1 return different error code in case of "dirty" connection close
+                    throw_socket_closed_cached(env);
+                } else {
+                    throw_io_exception(env);
+                }
+                return 0;
             }
-            return 0;
-        }
         case SSL_ERROR_SSL:
+            sslSocketLogger->log("ERROR", "fd:(%d) SSL_ERROR_SSL '%s' in state: %s[%s], client: %s, server: %s",
+                  SSL_get_fd(ssl),
+                  ERR_error_string(ERR_peek_error(), error),
+                  SSL_state_string(ssl),
+                  SSL_state_string_long(ssl),
+                  ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+                  ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+            );
             // workaround for SSL_sendfile() OpenSSL issue #23722 [ https://github.com/openssl/openssl/issues/23722 ]
             {
                 int reason = ERR_GET_REASON(ERR_peek_error());
@@ -229,16 +270,115 @@ static char* ssl_get_peer_ip(const SSL* ssl, char* buf, size_t len) {
     return buf;
 }
 
+static char* ssl_get_host_ip_port(const SSL* ssl, char* buf, size_t len) {
+    int fd = SSL_get_fd(ssl);
+    if (fd == -1) {
+        return NULL;
+    }
+
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(addr);
+    if (getsockname(fd, (struct sockaddr*)&addr, &addrlen) != 0) {
+        return NULL;
+    }
+
+    char ip[INET6_ADDRSTRLEN];
+    int port;
+
+    if (addr.ss_family == AF_INET) {
+        struct sockaddr_in* addr4 = (struct sockaddr_in*)&addr;
+        if (inet_ntop(AF_INET, &addr4->sin_addr, ip, sizeof(ip)) == NULL) {
+            return NULL;
+        }
+        port = ntohs(addr4->sin_port);
+    } else if (addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* addr6 = (struct sockaddr_in6*)&addr;
+        if (inet_ntop(AF_INET6, &addr6->sin6_addr, ip, sizeof(ip)) == NULL) {
+            return NULL;
+        }
+        port = ntohs(addr6->sin6_port);
+    } else {
+        return NULL;
+    }
+
+    snprintf(buf, len, "%s:%d", ip, port);
+    return buf;
+}
+
 static void ssl_debug(const SSL* ssl, const char* fmt, ...) {
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    JniLogger* jniLogger = &appData->sslContextLogger;
+    char serverIP[64], clientIP[64];
+    char message[512];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+
+    jniLogger->log("DEBUG", "ssl_debug: %s,  client: %s, server: %s",
+           message,
+           ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+           ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+    );
+}
+
+static void noop_log(const char* level, const char* fmt, ...) {}
+
+static void jni_ssl_context_log(const char* level, const char* fmt, ...) {
+    JNIEnv* env;
+    if (JNI_OK != (*global_vm)->GetEnv(global_vm, (void**)&env, JNI_VERSION_1_8)) {
+        return;
+    }
+
     char message[512];
     va_list args;
     va_start(args, fmt);
     vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
 
-    char buf[128];
-    printf("ssl_debug [%s]: %s\n", ssl_get_peer_ip(ssl, buf, sizeof(buf)), message);
-    fflush(stdout);
+    jstring jlevel = (*env)->NewStringUTF(env, level);
+    jstring jmsg = (*env)->NewStringUTF(env, message);
+
+    jobject jniLogger = (*env)->GetStaticObjectField(env, c_NativeSslContext, f_NativeSslContext_jniLogger);
+    if (jniLogger == NULL) {
+        return;
+    }
+    (*env)->CallObjectMethod(env, jniLogger, m_NativeLogger_log, jlevel, jmsg);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+    }
+    (*env)->DeleteLocalRef(env, jniLogger);
+    (*env)->DeleteLocalRef(env, jlevel);
+    (*env)->DeleteLocalRef(env, jmsg);
+}
+
+static void jni_ssl_socket_log(const char* level, const char* fmt, ...) {
+    JNIEnv* env;
+    if (JNI_OK != (*global_vm)->GetEnv(global_vm, (void**)&env, JNI_VERSION_1_8)) {
+        return;
+    }
+
+    char message[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+
+    jstring jlevel = (*env)->NewStringUTF(env, level);
+    jstring jmsg = (*env)->NewStringUTF(env, message);
+
+    jobject jniLogger = (*env)->GetStaticObjectField(env, c_NativeSslSocket, f_NativeSslSocket_jniLogger);
+    if (jniLogger == NULL) {
+        return;
+    }
+    (*env)->CallObjectMethod(env, jniLogger, m_NativeLogger_log, jlevel, jmsg);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+    }
+    (*env)->DeleteLocalRef(env, jniLogger);
+    (*env)->DeleteLocalRef(env, jlevel);
+    (*env)->DeleteLocalRef(env, jmsg);
 }
 
 static long get_session_counter(SSL_CTX* ctx, int key) {
@@ -293,6 +433,13 @@ static AppData* create_app_data() {
     }
     return appData;
 }
+
+static void init_app_data(AppData* appData) {
+    appData->sslContextLogger.log = noop_log;
+    appData->sslSocketLogger.log = noop_log;
+}
+
+
 
 static void free_app_data(AppData* appData) {
     pthread_rwlock_destroy(&appData->lock);
@@ -369,9 +516,7 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
         }
     }
 
-    if (appData->debug) {
-        ssl_debug(ssl, "ticket_key_callback: new_session=%d, result=%d", new_session, result);
-    }
+    ssl_debug(ssl, "ticket_key_callback: new_session=%d, result=%d", new_session, result);
 
     pthread_rwlock_unlock(&appData->lock);
     return result;
@@ -386,9 +531,7 @@ static int alpn_callback(SSL* ssl, const unsigned char** out, unsigned char* out
 
     int status = SSL_select_next_proto((unsigned char**)out, outlen, appData->alpn.data, appData->alpn.len, in, inlen);
 
-    if (appData->debug) {
-        ssl_debug(ssl, "alpn_callback: status=%d", status);
-    }
+    ssl_debug(ssl, "alpn_callback: status=%d", status);
 
     return status == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_NOACK;
 }
@@ -410,9 +553,7 @@ static int ocsp_callback(SSL* ssl, void* arg) {
         result = SSL_TLSEXT_ERR_OK;
     }
 
-    if (appData->debug) {
-        ssl_debug(ssl, "ocsp_callback: result=%d", result);
-    }
+    ssl_debug(ssl, "ocsp_callback: result=%d", result);
 
     pthread_rwlock_unlock(&appData->lock);
     return result;
@@ -428,9 +569,7 @@ static int sni_callback(SSL* ssl, int* unused, void* arg) {
     if (names != NULL) {
         const char* servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 
-        if (appData->debug) {
-            ssl_debug(ssl, "sni_callback: servername=%s", servername);
-        }
+        ssl_debug(ssl, "sni_callback: servername=%s", servername);
 
         if (servername != NULL) {
             int servername_len = strlen(servername);
@@ -455,7 +594,15 @@ static int sni_callback(SSL* ssl, int* unused, void* arg) {
 }
 
 static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    JniLogger* jniLogger = &appData->sslContextLogger;
+    char serverIP[64], clientIP[64];
+
     if (cb == SSL_CB_HANDSHAKE_START) {
+         jniLogger->log("DEBUG", "SSL handshake started, client: %s, server: %s",
+                ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+                ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+         );
 #ifndef SSL_OP_NO_RENEGOTIATION
         // Reject any renegotiation by replacing actual socket with a dummy
         intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
@@ -467,6 +614,49 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
         intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
         if (flags & SF_SERVER) {
             SSL_set_app_data((SSL*)ssl, (char*)(flags | SF_HANDSHAKED));
+        }
+    } else if (cb & SSL_CB_ALERT) {
+        jniLogger->log("INFO", "SSL alert type:'%s', description:'%s' in state: %s[%s], client: %s, server: %s",
+            SSL_alert_type_string_long(ret),
+            SSL_alert_desc_string_long(ret),
+            SSL_state_string(ssl),
+            SSL_state_string_long(ssl),
+            ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+            ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+        );
+        int severity = ret >> 8;
+        if (severity == SSL3_AL_FATAL) {
+            intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
+            SSL_set_app_data((SSL*)ssl, (char*)(flags | SF_FATAL_ALERT));
+        }
+
+    } else if (cb & SSL_CB_EXIT) {
+        if (ret > 0) {
+            jniLogger->log("DEBUG", "SSL handshake done version=%s, cypher=%s, reused=%s, client: %s, server: %s",
+                   SSL_get_version(ssl),
+                   SSL_get_cipher_name(ssl),
+                   SSL_session_reused(ssl) ? "yes" : "no",
+                   ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+                   ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+            );
+        } else if (ret == 0) {
+            long verificationResult = SSL_get_verify_result(ssl);
+            jniLogger->log("ERROR", "SSL handshake failed, verification:'%s', client: %s, server: %s",
+                   X509_verify_cert_error_string(verificationResult),
+                   ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+                   ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+            );
+        } else {
+            char error[256];
+            long e = ERR_peek_error();
+            if (e == 0) {
+                return;
+            }
+            jniLogger->log("ERROR", "SSL handshake failed, %s, client: %s, server: %s",
+                  ERR_error_string(e, error),
+                  ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+                  ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+           );
         }
     }
 }
@@ -522,6 +712,16 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
     m_addSession =    (*env)->GetMethodID(env, c_SslSessionCache, "addSession", "([B[B)V");
     m_getSession =    (*env)->GetMethodID(env, c_SslSessionCache, "getSession", "([B)[B");
     m_removeSession = (*env)->GetMethodID(env, c_SslSessionCache, "removeSession", "([B)V");
+
+    c_NativeSslContext = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/NativeSslContext"));
+    f_NativeSslContext_jniLogger = (*env)->GetStaticFieldID(env, c_NativeSslContext, "jniLogger", "Lone/nio/net/NativeLogger;");
+
+    c_NativeSslSocket = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/NativeSslSocket"));
+    f_NativeSslSocket_jniLogger = (*env)->GetStaticFieldID(env, c_NativeSslSocket, "jniLogger", "Lone/nio/net/NativeLogger;");
+
+    c_NativeLogger = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/NativeLogger"));
+    m_NativeLogger_log = (*env)->GetMethodID(env, c_NativeLogger, "log", "(Ljava/lang/String;Ljava/lang/String;)V");
+
 }
 
 static int new_session_cb(SSL* ssl, SSL_SESSION* ssl_session) {
@@ -558,6 +758,12 @@ static int new_session_cb(SSL* ssl, SSL_SESSION* ssl_session) {
 
 
     (*env)->CallObjectMethod(env, sslSessionCache, m_addSession, sessionId, session);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+    }
+    (*env)->DeleteLocalRef(env, sslSessionCache);
+    (*env)->DeleteLocalRef(env, sessionId);
+    (*env)->DeleteLocalRef(env, session);
     return 0;
 }
 
@@ -580,6 +786,10 @@ static SSL_SESSION* get_session_cb(SSL* ssl, const unsigned char* session_id, in
     (*env)->SetByteArrayRegion(env, sessionId, 0, session_id_len, (jbyte*)session_id);
 
     jbyteArray session = (*env)->CallObjectMethod(env, sslSessionCache, m_getSession, sessionId);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+        return NULL;
+    }
     if (session == NULL) {
         return NULL;
     }
@@ -592,6 +802,8 @@ static SSL_SESSION* get_session_cb(SSL* ssl, const unsigned char* session_id, in
     const unsigned char* ptr = (const unsigned char*)b_session;
     SSL_SESSION* ssl_session = d2i_SSL_SESSION(NULL, &ptr, session_len);
     (*env)->ReleaseByteArrayElements(env, session, b_session, JNI_ABORT);
+    (*env)->DeleteLocalRef(env, sslSessionCache);
+    (*env)->DeleteLocalRef(env, sessionId);
     return ssl_session;
 }
 
@@ -611,6 +823,11 @@ static void remove_session_cb(SSL_CTX* ssl, SSL_SESSION* ssl_session) {
     if (sessionId != NULL) {
         (*env)->SetByteArrayRegion(env, sessionId, 0, session_id_len, (jbyte*)session_id);
         (*env)->CallObjectMethod(env, sslSessionCache, m_removeSession, sessionId);
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionClear(env);
+        }
+        (*env)->DeleteLocalRef(env, sslSessionCache);
+        (*env)->DeleteLocalRef(env, sessionId);
     }
 }
 
@@ -621,6 +838,7 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
         throw_by_name(env, "javax/net/ssl/SSLException", "Cannot allocate SSL app data");
         return 0;
     }
+    init_app_data(appData);
 
     SSL_CTX* ctx = SSL_CTX_new(TLS_method());
     if (ctx == NULL) {
@@ -658,6 +876,8 @@ Java_one_nio_net_NativeSslContext_setDebug(JNIEnv* env, jobject self, jboolean d
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     AppData* appData = SSL_CTX_get_app_data(ctx);
     appData->debug = debug;
+    appData->sslContextLogger = (JniLogger){ .log = debug ? jni_ssl_context_log : noop_log };
+    appData->sslSocketLogger = (JniLogger){ .log = debug ? jni_ssl_socket_log : noop_log };
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1111,8 +1331,24 @@ Java_one_nio_net_NativeSslSocket_sslNew(JNIEnv* env, jclass cls, jint fd, jlong 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) {
     SSL* ssl = (SSL*)(intptr_t)sslptr;
+    AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
+    JniLogger* jniLogger = &appData->sslContextLogger;
+    char serverIP[64], clientIP[64];
+
+    jniLogger->log("DEBUG", "Closing SSL session in state: %s[%s], client: %s, server: %s",
+           SSL_state_string(ssl),
+           SSL_state_string_long(ssl),
+           ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+           ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+    );
     if (!SSL_in_init(ssl)) {
         SSL_shutdown(ssl);
+    } else {
+        jniLogger->log("ERROR", "SSL session is closed (due to handshake %s), client: %s, server: %s",
+               (intptr_t)SSL_get_app_data(ssl) & SF_FATAL_ALERT ? "failed" : "timed out",
+               ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
+               ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
+        );
     }
     SSL_free(ssl);
 }
@@ -1599,6 +1835,11 @@ static void keylog_callback(const SSL *ssl, const char *line) {
         jobject isa = sockaddr_to_java(env, &sa, len);
         jstring key_line = (*env)->NewStringUTF(env, line);
         (*env)->CallStaticVoidMethod(env, c_KeylogHolder, m_log, key_line, isa);
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionClear(env);
+        }
+        (*env)->DeleteLocalRef(env, key_line);
+        (*env)->DeleteLocalRef(env, isa);
     }
 }
 #endif
