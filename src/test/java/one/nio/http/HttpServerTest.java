@@ -19,10 +19,14 @@ package one.nio.http;
 import one.nio.net.Socket;
 import one.nio.net.SslOption;
 import one.nio.util.Utf8;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 public class HttpServerTest extends HttpServer {
+
+    private static final Logger log = LoggerFactory.getLogger(HttpServerTest.class);
 
     public HttpServerTest(HttpServerConfig config) throws IOException {
         super(config);
@@ -114,6 +118,7 @@ public class HttpServerTest extends HttpServer {
         }
 
         HttpServerTest server = new HttpServerTest(config);
+        log.debug("Starting HTTP server...");
         server.start();
     }
 }

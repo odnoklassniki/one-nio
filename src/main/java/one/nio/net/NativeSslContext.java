@@ -26,10 +26,13 @@ import javax.net.ssl.SSLException;
 import one.nio.mgt.Management;
 import one.nio.util.ByteArrayBuilder;
 import one.nio.util.Utf8;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class NativeSslContext extends SslContext {
     private static final AtomicInteger counter = new AtomicInteger();
-
+    private static final Logger log = LoggerFactory.getLogger(NativeSslContext.class);
+    private static final NativeLogger jniLogger = () -> log;
 
     private static class CompressionAlgorithms {
         // Possible compression values from RFC8879 (Refer to openssl/tls1.h)
