@@ -31,6 +31,8 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SocketChannel;
 
 final class JavaSocket extends SelectableJavaSocket {
+    private static final int MAX_HEAP_WRITE_SIZE = 64 * 1024;
+
     final SocketChannel ch;
     int timeout;
 
@@ -85,7 +87,15 @@ final class JavaSocket extends SelectableJavaSocket {
     @Override
     public final int write(byte[] data, int offset, int count, int flags) throws IOException {
         checkTimeout(POLL_WRITE, timeout);
-        return ch.write(ByteBuffer.wrap(data, offset, count));
+
+        ByteBuffer buffer = ByteBuffer.wrap(data, offset, count);
+        // ch.write allocates an additional direct buffer for the remaining payload
+        // and cache it per thread, so writes unpredictable increase off-heap memory usage
+        // to prevent this we limit each write to 64 KiB - the same chunk size used by NativeSocket
+        if (buffer.remaining() > MAX_HEAP_WRITE_SIZE) {
+            buffer.limit(buffer.position() + MAX_HEAP_WRITE_SIZE);
+        }
+        return ch.write(buffer);
     }
 
     @Override
