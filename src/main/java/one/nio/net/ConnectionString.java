@@ -103,14 +103,16 @@ public class ConnectionString {
         int addrEnd = p >= 0 && p < queryString ? p : queryString;
 
         p = connectionString.lastIndexOf(':', addrEnd);
-        if (p >= addrStart && p < addrEnd) {
+
+        int ipV6End = connectionString.lastIndexOf(']', addrEnd); // special case for: "http://[a:b:c]"
+        if (p >= addrStart && p < addrEnd && p > ipV6End) {
             this.host = connectionString.substring(addrStart, p);
             this.port = Integer.parseInt(connectionString.substring(p + 1, addrEnd));
         } else {
             this.host = connectionString.substring(addrStart, addrEnd);
             this.port = WELL_KNOWN_PORTS.getOrDefault(this.protocol, 0);
         }
-        this.path = connectionString.substring(addrEnd);
+        this.path = connectionString.substring(addrEnd, queryString);
     }
 
     public String getProtocol() {
@@ -256,6 +258,11 @@ public class ConnectionString {
         }
         if (path != null) {
             sb.append(path);
+        }
+        char paramSeparator = '?';
+        for (Map.Entry<String, String> e : params.entrySet()) {
+            sb.append(paramSeparator).append(e.getKey()).append('=').append(e.getValue());
+            paramSeparator = '&';
         }
         return sb.toString();
     }
