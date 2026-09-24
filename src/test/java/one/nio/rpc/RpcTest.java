@@ -16,19 +16,14 @@
 
 package one.nio.rpc;
 
-import one.nio.config.ConfigParser;
-import one.nio.net.ConnectionString;
-import one.nio.net.SocketUtil;
 import one.nio.rpc.stream.BidiStream;
 import one.nio.serial.sample.Message;
 import one.nio.serial.sample.Sample;
-import one.nio.server.ServerConfig;
+
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.Serializable;
-import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -39,22 +34,9 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
-public class RpcTest {
-    private static RpcServer<TestService> server;
-    private static TestService client;
-
-    @BeforeClass
-    public static void setup() throws Exception {
-        int availablePort = SocketUtil.getFreePort();
-        ServerConfig config = ConfigParser.parse("acceptors:\n - port: " + availablePort, ServerConfig.class);
-        server = new RpcServer<>(config, new TestServiceImpl());
-        server.start();
-
-        client = (TestService) Proxy.newProxyInstance(
-                RpcTest.class.getClassLoader(),
-                new Class[]{TestService.class},
-                new RpcClient(new ConnectionString("127.0.0.1:" + availablePort)));
-    }
+public abstract class RpcTest {
+    protected static RpcServer<TestService> server;
+    protected static TestService client;
 
     @AfterClass
     public static void destroy() {
@@ -98,7 +80,7 @@ public class RpcTest {
     }
 
 
-    interface TestService {
+    protected interface TestService {
         Map<Long, Message> getMessagesByIds(Set<Long> ids);
         BidiStream<Number, Stats> openNumberStream();
     }
@@ -138,7 +120,7 @@ public class RpcTest {
         }
     }
 
-    static class Stats implements Serializable {
+    protected static class Stats implements Serializable {
         final BigInteger sum;
         final BigDecimal avg;
         final long min;

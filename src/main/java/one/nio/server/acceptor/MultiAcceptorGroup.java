@@ -106,7 +106,7 @@ public class MultiAcceptorGroup {
     private MultiAcceptSession createMultiAcceptSession(AcceptorConfig config, int sessionIdx) throws IOException {
         Socket serverSocket = AcceptorSupport.createServerSocket(config);
         serverSocket.setBlocking(false);
-        serverSocket.bind(config.address, config.port, config.backlog);
+        AcceptorSupport.bind(serverSocket, config);
         return new MultiAcceptSession(serverSocket, config.backlog, this, sessionIdx);
     }
 }

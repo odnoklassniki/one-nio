@@ -318,6 +318,25 @@ public class ConnectionStringTest {
         assertTrue(conn.getParams().isEmpty());
     }
 
+    @Test
+    public void unixSocketTest() {
+        ConnectionString conn = new ConnectionString("unix:/var/run/app.socket");
+        assertTrue(conn.isUnixSocket());
+        assertEquals("/var/run/app.socket", conn.getHost());
+        assertEquals(-1, conn.getPort());
+        assertTrue(conn.getParams().isEmpty());
+    }
+
+    @Test
+    public void unixSocketWithProtocolTest() {
+        ConnectionString conn = new ConnectionString("proto://unix:/var/run/one-nio.socket");
+        assertTrue(conn.isUnixSocket());
+        assertEquals("proto", conn.getProtocol());
+        assertEquals("/var/run/one-nio.socket", conn.getHost());
+        assertEquals(-1, conn.getPort());
+        assertTrue(conn.getParams().isEmpty());
+    }
+
     public static void main(String[] args) throws Exception {
         ConnectionString conn = new ConnectionString(args[0]);
         System.out.println("Starting server on host=" + conn.getHost() + ", port=" + conn.getPort());

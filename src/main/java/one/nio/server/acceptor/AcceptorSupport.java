@@ -17,6 +17,12 @@
 package one.nio.server.acceptor;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 import one.nio.net.Socket;
 import one.nio.net.SslContext;
@@ -26,7 +32,12 @@ public class AcceptorSupport {
     private AcceptorSupport() {}
 
     public static Socket createServerSocket(AcceptorConfig config) throws IOException {
-        Socket serverSocket = Socket.createServerSocket();
+        Socket serverSocket;
+        if (isUnixSocket(config)) {
+            serverSocket = Socket.createUnixSocket(Socket.SOCK_STREAM);
+        } else {
+            serverSocket = Socket.createServerSocket();
+        }
         if (config.ssl != null) {
             SslContext sslContext = SslContext.create();
             sslContext.configure(config.ssl);
@@ -62,5 +73,25 @@ public class AcceptorSupport {
         if (sslContext != null && config.ssl != null) {
             sslContext.configure(config.ssl);
         }
+    }
+
+    public static void bind(Socket socket, AcceptorConfig config) throws IOException {
+        if (isUnixSocket(config)) {
+            Path socketPath = Paths.get(config.address);
+            Path dirPath = socketPath.getParent();
+            Files.createDirectories(dirPath);
+            Files.deleteIfExists(socketPath);
+            socket.bind(config.address, Socket.NO_PORT, config.backlog);
+            if (config.permissions != null) {
+                Set<PosixFilePermission> perms = PosixFilePermissions.fromString(config.permissions);
+                Files.setPosixFilePermissions(socketPath, perms);
+            }
+        } else {
+            socket.bind(config.address, config.port, config.backlog);
+        }
+    }
+
+    private static boolean isUnixSocket(AcceptorConfig config) {
+        return config.address.startsWith("/");
     }
 }

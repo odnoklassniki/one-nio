@@ -51,7 +51,7 @@ final class AcceptorThread extends Thread {
         this.server = server;
 
         Socket serverSocket = AcceptorSupport.createServerSocket(config);
-        serverSocket.bind(address, port, backlog);
+        AcceptorSupport.bind(serverSocket, config);
         this.serverSocket = serverSocket;
     }
 
