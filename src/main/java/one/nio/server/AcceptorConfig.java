@@ -23,8 +23,25 @@ import one.nio.net.SslConfig;
 @Config
 public class AcceptorConfig {
     public int threads = 1;
+    /**
+     * Address to connect to.
+     * <p>
+     * Supported address families:
+     * <p> - AF_INET - IPv4 addresses.
+     * <p> - AF_INET6 - IPv6 addresses.
+     * <p> - AF_UNIX - Unix Domain Socket addresses.
+     * Expected in absolute path format e.g. {@code "/var/run/app.socket"}
+     */
     public String address = "0.0.0.0";
     public int port;
+    /**
+     * Posix File Permissions for Unix Domain Socket.
+     * <p>
+     * {@code null} means do not change permissions.
+     *
+     * @see java.nio.file.attribute.PosixFilePermissions#fromString(String)
+     */
+    public String permissions = null;
     @Converter(method = "size")
     public int recvBuf;
     @Converter(method = "size")

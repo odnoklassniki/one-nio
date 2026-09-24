@@ -58,6 +58,7 @@ import java.util.regex.Pattern;
  * </ul>
  */
 public class ConnectionString {
+    public static final String UNIX_PREFIX = "unix:";
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\{(.+)\\}");
     private static final Map<String, Integer> WELL_KNOWN_PORTS = new HashMap<>();
 
@@ -69,6 +70,7 @@ public class ConnectionString {
 
     protected String protocol;
     protected String host;
+    protected boolean unixSocket;
     protected int port;
     protected String path;
     protected Map<String, String> params;
@@ -99,6 +101,14 @@ public class ConnectionString {
             this.params = Collections.emptyMap();
         }
 
+        if (connectionString.startsWith(UNIX_PREFIX, addrStart)) {
+            host = connectionString.substring(addrStart + UNIX_PREFIX.length(), queryString);
+            port = Socket.NO_PORT;
+            unixSocket = true;
+            path = "";
+            return;
+        }
+
         p = connectionString.indexOf('/', addrStart);
         int addrEnd = p >= 0 && p < queryString ? p : queryString;
 
@@ -113,6 +123,10 @@ public class ConnectionString {
             this.port = WELL_KNOWN_PORTS.getOrDefault(this.protocol, 0);
         }
         this.path = connectionString.substring(addrEnd, queryString);
+    }
+
+    public boolean isUnixSocket() {
+        return unixSocket;
     }
 
     public String getProtocol() {

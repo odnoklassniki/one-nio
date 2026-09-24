@@ -16,6 +16,10 @@
 
 package one.nio.pool;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+
 import one.nio.mgt.Management;
 import one.nio.net.SslClientContextFactory;
 import one.nio.net.ConnectionString;
@@ -26,6 +30,7 @@ import one.nio.net.SslContext;
 public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
     protected String host;
     protected int port;
+    protected final File socketFile;
     protected int readTimeout;
     protected int connectTimeout;
     protected int tos;
@@ -39,7 +44,8 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
               conn.getIntParam("borrowTimeout", (conn.getIntParam("timeout", 3000))));
         int defaultTimeout = conn.getIntParam("timeout", 3000);
         this.host = conn.getHost();
-        this.port = conn.getPort();
+        this.socketFile = conn.isUnixSocket() ? Paths.get(conn.getHost()).toAbsolutePath().toFile() : null;
+        this.port = conn.isUnixSocket() ? Socket.NO_PORT : conn.getPort();
         this.readTimeout = conn.getIntParam("readTimeout", defaultTimeout);
         this.connectTimeout = conn.getIntParam("connectTimeout", 1000);
         this.tos = conn.getIntParam("tos", 0);
@@ -153,6 +159,22 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
 
     @Override
     public Socket createObject() throws PoolException {
+        if (socketFile != null) {
+            return createUnixSocket();
+        } else {
+            return createInetSocket();
+        }
+    }
+
+    protected Socket createUnixSocket() throws PoolException {
+        try {
+            return Socket.connectUnix(socketFile);
+        } catch (IOException e) {
+            throw new PoolException(String.format("Cannot connect to %s", socketFile), e);
+        }
+    }
+
+    protected Socket createInetSocket() throws PoolException {
         Socket socket = null;
         try {
             socket = Socket.createClientSocket(sslContext);
