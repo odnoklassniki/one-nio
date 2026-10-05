@@ -20,6 +20,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 
+import javax.management.ObjectName;
+
 import one.nio.mgt.Management;
 import one.nio.net.SslClientContextFactory;
 import one.nio.net.ConnectionString;
@@ -56,7 +58,7 @@ public class SocketPool extends Pool<Socket> implements SocketPoolMXBean {
         initialize();
 
         if (conn.getBooleanParam("jmx", false)) {
-            Management.registerMXBean(this, "one.nio.pool:type=SocketPool,host=" + host + ",port=" + port);
+            Management.registerMXBean(this, "one.nio.pool:type=SocketPool,host=" + ObjectName.quote(host) + ",port=" + port);
         }
     }
 
