@@ -23,6 +23,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,28 +42,99 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr* attr, unsigned int s
 }
 
 struct bpf_object;
+struct bpf_program;
 
 int (*bpf_prog_load)(const char* file, enum bpf_prog_type type,
                      struct bpf_object** pobj, int* prog_fd);
 
+static pthread_mutex_t bpf_prog_load_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* libbpf 1.x removed the legacy bpf_prog_load(), so it is emulated on top of the object API */
+static struct bpf_object* (*bpf_object__open_file)(const char* path, const void* opts);
+static struct bpf_program* (*bpf_object__next_program)(const struct bpf_object* obj, struct bpf_program* prog);
+static int (*bpf_program__set_type)(struct bpf_program* prog, enum bpf_prog_type type);
+static int (*bpf_program__set_expected_attach_type)(struct bpf_program* prog, enum bpf_attach_type type);
+static int (*bpf_object__load)(struct bpf_object* obj);
+static int (*bpf_program__fd)(const struct bpf_program* prog);
+static void (*bpf_object__close)(struct bpf_object* obj);
+
+static int bpf_prog_load_v1(const char* file, enum bpf_prog_type type,
+                            struct bpf_object** pobj, int* prog_fd) {
+    struct bpf_object* obj = bpf_object__open_file(file, NULL);
+    if (obj == NULL) {
+        return errno > 0 ? -errno : -EINVAL;
+    }
+
+    struct bpf_program* first_prog = bpf_object__next_program(obj, NULL);
+    if (type != BPF_PROG_TYPE_UNSPEC) {
+        struct bpf_program* prog;
+        for (prog = first_prog; prog != NULL; prog = bpf_object__next_program(obj, prog)) {
+            bpf_program__set_type(prog, type);
+            bpf_program__set_expected_attach_type(prog, 0);
+        }
+    }
+
+    int res = first_prog != NULL ? bpf_object__load(obj) : -ENOENT;
+    if (res == 0) {
+        res = bpf_program__fd(first_prog);
+    }
+    if (res < 0) {
+        bpf_object__close(obj);
+        return res;
+    }
+
+    /* As with the legacy call, obj stays open: it owns the returned fd */
+    *pobj = obj;
+    *prog_fd = res;
+    return 0;
+}
+
+static int resolve_bpf_prog_load(JNIEnv* env) {
+    void* libbpf = dlopen("libbpf.so", RTLD_LAZY | RTLD_GLOBAL);
+    if (libbpf == NULL) {
+        libbpf = dlopen("libbpf.so.1", RTLD_LAZY | RTLD_GLOBAL);
+    }
+    if (libbpf == NULL) {
+        libbpf = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    }
+    if (libbpf == NULL) {
+        throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so, libbpf.so.1 or libbpf.so.0");
+        return -1;
+    }
+
+    /* libbpf 0.x: since 0.6 the plain name is a different function, the legacy one is versioned */
+    bpf_prog_load = dlvsym(libbpf, "bpf_prog_load", "LIBBPF_0.0.1");
+    if (bpf_prog_load != NULL) {
+        return 0;
+    }
+
+    bpf_object__open_file = dlsym(libbpf, "bpf_object__open_file");
+    bpf_object__next_program = dlsym(libbpf, "bpf_object__next_program");
+    bpf_program__set_type = dlsym(libbpf, "bpf_program__set_type");
+    bpf_program__set_expected_attach_type = dlsym(libbpf, "bpf_program__set_expected_attach_type");
+    bpf_object__load = dlsym(libbpf, "bpf_object__load");
+    bpf_program__fd = dlsym(libbpf, "bpf_program__fd");
+    bpf_object__close = dlsym(libbpf, "bpf_object__close");
+    if (bpf_object__open_file == NULL || bpf_object__next_program == NULL || bpf_program__set_type == NULL
+        || bpf_program__set_expected_attach_type == NULL || bpf_object__load == NULL
+        || bpf_program__fd == NULL || bpf_object__close == NULL) {
+        dlclose(libbpf);
+        throw_by_name(env, "java/lang/UnsupportedOperationException", "libbpf.so bpf_prog_load method not found");
+        return -1;
+    }
+
+    bpf_prog_load = bpf_prog_load_v1;
+    return 0;
+}
+
 
 JNIEXPORT jint JNICALL
 Java_one_nio_os_bpf_Bpf_progLoad(JNIEnv* env, jclass cls, jstring pathname, jint type) {
-    if (bpf_prog_load == NULL) {
-        void* libbpf = dlopen("libbpf.so", RTLD_LAZY | RTLD_GLOBAL);
-        if (libbpf == NULL) {
-            libbpf = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
-            if (libbpf == NULL) {
-                throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so or libbpf.so.0");
-                return -EINVAL;
-            }
-        }
-        bpf_prog_load = dlsym(libbpf, "bpf_prog_load");
-        if (bpf_prog_load == NULL) {
-            dlclose(libbpf);
-            throw_by_name(env, "java/lang/UnsupportedOperationException", "libbpf.so bpf_prog_load method not found");
-            return -EINVAL;
-        }
+    pthread_mutex_lock(&bpf_prog_load_lock);
+    int err = bpf_prog_load == NULL ? resolve_bpf_prog_load(env) : 0;
+    pthread_mutex_unlock(&bpf_prog_load_lock);
+    if (err) {
+        return -EINVAL;
     }
 
     if (pathname == NULL) {
