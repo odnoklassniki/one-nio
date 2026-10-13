@@ -1,4 +1,4 @@
-[![one-nio](https://maven-badges.herokuapp.com/maven-central/ru.odnoklassniki/one-nio/badge.svg)](https://maven-badges.herokuapp.com/maven-central/ru.odnoklassniki/one-nio) [![Javadocs](http://www.javadoc.io/badge/ru.odnoklassniki/one-nio.svg)](http://www.javadoc.io/doc/ru.odnoklassniki/one-nio)
+[![Maven Central](https://img.shields.io/maven-central/v/ru.odnoklassniki/one-nio.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/ru.odnoklassniki/one-nio)) [![Javadocs](http://www.javadoc.io/badge/ru.odnoklassniki/one-nio.svg)](http://www.javadoc.io/doc/ru.odnoklassniki/one-nio)
 
 # one-nio
 
