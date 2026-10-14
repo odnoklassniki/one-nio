@@ -253,7 +253,7 @@ public class DelegateGenerator  {
                 mv.visitVarInsn(ALOAD, 1);
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature(), false);
                 mv.visitInsn(srcType.convertTo(FieldType.Void));
-                if (isRecord) {
+                if (isRecord && ownField != null) {
                     generateDefault(mv, ownField);
                     storeRecordArgument(mv, recordParamsOffset, ownField, fd);
                 }
@@ -423,7 +423,7 @@ public class DelegateGenerator  {
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
             if (isNotSerial(ownField)) {
-                if (isRecord) {
+                if (isRecord && ownField != null) {
                     generateDefault(mv, ownField);
                     storeRecordArgument(mv, recordParamsOffset, ownField, fd);
                 }
