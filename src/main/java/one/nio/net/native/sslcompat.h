@@ -21,7 +21,7 @@
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 
 // The following symbols will be overridden if linked against libssl.so.11
-#define WEAK  __attribute__((weak))
+#define WEAK __attribute__((weak))
 
 #undef OPENSSL_init_ssl
 #undef OPENSSL_init_crypto
@@ -46,8 +46,8 @@ int SSL_in_init(SSL* ssl) WEAK;
 long SSL_CTX_set_options(SSL_CTX* ctx, long options) WEAK;
 long SSL_CTX_clear_options(SSL_CTX* ctx, long options) WEAK;
 void SSL_CTX_set_alpn_select_cb(SSL_CTX* ctx,
-    int (*cb)(SSL* ssl, const unsigned char** out, unsigned char* outlen,
-              const unsigned char* in, unsigned int inlen, void* arg), void* arg) WEAK;
+    int (*cb)(SSL* ssl, const unsigned char** out, unsigned char* outlen, const unsigned char* in, unsigned int inlen, void* arg),
+    void* arg) WEAK;
 
 int OPENSSL_sk_num(const OPENSSL_STACK* st) WEAK;
 void* OPENSSL_sk_value(const OPENSSL_STACK* st, int i) WEAK;

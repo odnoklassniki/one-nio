@@ -32,6 +32,12 @@ jobs:
           sudo apt install gcc \
           apt install libssl-dev \
 
+      - name: Check native C formatting
+        run: |
+          python3 -m venv "$RUNNER_TEMP/clang-format"
+          "$RUNNER_TEMP/clang-format/bin/python" -m pip install --disable-pip-version-check clang-format==22.1.8
+          CLANG_FORMAT="$RUNNER_TEMP/clang-format/bin/clang-format" CLANG_FORMAT_VERSION=22.1.8 ./bin/format-c --check
+
       - name: Build and publish with Gradle
         uses: gradle/gradle-build-action@ac2d340dc04d9e1113182899e983b5400c17cda1
         with:

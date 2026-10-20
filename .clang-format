@@ -1,0 +1,21 @@
+BasedOnStyle: LLVM
+Language: C
+IndentWidth: 4
+ColumnLimit: 0
+SortIncludes: Never
+AllowShortFunctionsOnASingleLine: None
+PointerAlignment: Left
+# disable automatic packing / flattening
+BinPackArguments: false
+BinPackParameters: false
+
+# Do not align wrapped arguments to the opening bracket.
+AlignAfterOpenBracket: false
+
+# Keep opening braces on the same line, including braced switch cases.
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+
+# Preserve the existing JNI signature breaks while keeping ordinary return types inline.
+BreakAfterReturnType: None

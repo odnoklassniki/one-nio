@@ -26,12 +26,12 @@ static inline void* cast(jlong value) {
 
 JNIEXPORT jlong JNICALL
 Java_one_nio_os_Mem_mmap(JNIEnv* env, jclass cls, jlong start, jlong length, jint prot, jint flags, jint fd, jlong offset) {
-    return (jlong)(intptr_t) mmap(cast(start), length, prot, flags, fd, offset);
+    return (jlong)(intptr_t)mmap(cast(start), length, prot, flags, fd, offset);
 }
 
 JNIEXPORT jlong JNICALL
 Java_one_nio_os_Mem_mremap(JNIEnv* env, jclass cls, jlong oldAddress, jlong oldSize, jlong newSize, jint flags) {
-    return (jlong)(intptr_t) mremap(cast(oldAddress), oldSize, newSize, flags);
+    return (jlong)(intptr_t)mremap(cast(oldAddress), oldSize, newSize, flags);
 }
 
 JNIEXPORT jint JNICALL

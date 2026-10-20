@@ -19,7 +19,6 @@
 #define MAX_STACK_BUF 65536
 #define SIG_WAKEUP (__SIGRTMAX - 2)
 
-
 jfieldID cache_field(JNIEnv* env, const char* holder, const char* field, const char* signature);
 
 int array_equals(JNIEnv* env, jbyteArray array, void* buf, int buflen);
