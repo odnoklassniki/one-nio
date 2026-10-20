@@ -169,6 +169,18 @@ tasks {
     }
 }
 
+tasks.register<Exec>("checkNativeFormat") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Checks formatting of native C sources and headers"
+    workingDir = rootProject.projectDir
+    commandLine(rootProject.file("bin/format-c").absolutePath, "--check")
+    environment("CLANG_FORMAT_VERSION", "22.1.8")
+}
+
+tasks.named("check") {
+    dependsOn("checkNativeFormat")
+}
+
 val nativeBuildDir = layout.buildDirectory.dir("classes/java/main").get()
 
 tasks.register<Exec>("compileNative") {

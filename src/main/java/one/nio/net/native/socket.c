@@ -32,7 +32,6 @@
 #include <jni.h>
 #include "jni_util.h"
 
-
 static int use_IPv6 = 0;
 static jfieldID f_fd;
 static jfieldID f_cmsgType;
@@ -115,8 +114,7 @@ jobject sockaddr_to_java(JNIEnv* env, struct sockaddr_storage* sa, socklen_t len
             // IPv4-mapped address
             return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createIPv4Address, ntohl(a[3]), port);
         }
-        return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createIPv6Address,
-                                              ntohl(a[0]), ntohl(a[1]), ntohl(a[2]), ntohl(a[3]), port);
+        return (*env)->CallStaticObjectMethod(env, c_AddressHolder, m_createIPv6Address, ntohl(a[0]), ntohl(a[1]), ntohl(a[2]), ntohl(a[3]), port);
     }
 
     if (sa->ss_family == AF_UNIX && len > sizeof(sa_family_t)) {
@@ -187,7 +185,6 @@ void throw_socket_closed_cached(JNIEnv* env) {
     (*env)->Throw(env, t_SocketClosedException);
 }
 
-
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean preferIPv4) {
     struct rlimit max_files;
@@ -223,7 +220,7 @@ Java_one_nio_net_NativeSocket_initNatives(JNIEnv* env, jclass cls, jboolean pref
 
     // Allocate table for thread pointer per file descriptor
     getrlimit(RLIMIT_NOFILE, &max_files);
-    fd_table = (pthread_t*) calloc(max_files.rlim_max, sizeof(pthread_t));
+    fd_table = (pthread_t*)calloc(max_files.rlim_max, sizeof(pthread_t));
 
     // Setup dummy signal handler for SIG_WAKEUP, the signal is used to interrupt blocking I/O
     sa.sa_handler = wakeup_handler;
@@ -347,7 +344,8 @@ Java_one_nio_net_NativeSocket_write(JNIEnv* env, jobject self, jbyteArray data, 
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        if (count > MAX_STACK_BUF) count = MAX_STACK_BUF;
+        if (count > MAX_STACK_BUF)
+            count = MAX_STACK_BUF;
         (*env)->GetByteArrayRegion(env, data, offset, count, buf);
 
         do {
@@ -489,15 +487,15 @@ Java_one_nio_net_NativeSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_sendTo0(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count,
-                                      jint flags, jobject address, jint port) {
+Java_one_nio_net_NativeSocket_sendTo0(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count, jint flags, jobject address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     jbyte buf[MAX_STACK_BUF];
 
     if (fd == -1) {
         throw_socket_closed(env);
     } else if (count != 0) {
-        if (count > MAX_STACK_BUF) count = MAX_STACK_BUF;
+        if (count > MAX_STACK_BUF)
+            count = MAX_STACK_BUF;
         (*env)->GetByteArrayRegion(env, data, offset, count, buf);
 
         struct sockaddr_storage sa;
@@ -520,8 +518,7 @@ Java_one_nio_net_NativeSocket_sendTo0(JNIEnv* env, jobject self, jbyteArray data
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_sendTo1(JNIEnv* env, jobject self, jlong buffer, jint count,
-                                      jint flags, jobject address, jint port) {
+Java_one_nio_net_NativeSocket_sendTo1(JNIEnv* env, jobject self, jlong buffer, jint count, jint flags, jobject address, jint port) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
@@ -546,8 +543,7 @@ Java_one_nio_net_NativeSocket_sendTo1(JNIEnv* env, jobject self, jlong buffer, j
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_recvFrom0(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count,
-                                        jint flags, jobject holder) {
+Java_one_nio_net_NativeSocket_recvFrom0(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count, jint flags, jobject holder) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     jbyte buf[MAX_STACK_BUF];
 
@@ -557,8 +553,7 @@ Java_one_nio_net_NativeSocket_recvFrom0(JNIEnv* env, jobject self, jbyteArray da
         do {
             struct sockaddr_storage sa;
             socklen_t len = sizeof(sa);
-            int result = recvfrom(fd, (void*)(intptr_t)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF,
-                                  flags, (struct sockaddr*)&sa, &len);
+            int result = recvfrom(fd, (void*)(intptr_t)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, flags, (struct sockaddr*)&sa, &len);
 
             if (result > 0 || (result == 0 && is_udp_socket(fd))) {
                 (*env)->SetByteArrayRegion(env, data, offset, result, buf);
@@ -577,8 +572,7 @@ Java_one_nio_net_NativeSocket_recvFrom0(JNIEnv* env, jobject self, jbyteArray da
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer, jint count,
-                                        jint flags, jobject holder) {
+Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer, jint count, jint flags, jobject holder) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     if (fd == -1) {
         throw_socket_closed(env);
@@ -604,8 +598,7 @@ Java_one_nio_net_NativeSocket_recvFrom1(JNIEnv* env, jobject self, jlong buffer,
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_sendMsg0(JNIEnv* env, jobject self, jbyteArray data,
-                                       jint cmsgType, jintArray cmsgData, jint flags) {
+Java_one_nio_net_NativeSocket_sendMsg0(JNIEnv* env, jobject self, jbyteArray data, jint cmsgType, jintArray cmsgData, jint flags) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     jbyte data_buf[MAX_STACK_BUF - 4096];
     struct {
@@ -660,8 +653,7 @@ Java_one_nio_net_NativeSocket_sendMsg0(JNIEnv* env, jobject self, jbyteArray dat
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_net_NativeSocket_recvMsg0(JNIEnv* env, jobject self, jbyteArray data,
-                                       jobject jmsg, jint flags) {
+Java_one_nio_net_NativeSocket_recvMsg0(JNIEnv* env, jobject self, jbyteArray data, jobject jmsg, jint flags) {
     int fd = (*env)->GetIntField(env, self, f_fd);
     jbyte data_buf[MAX_STACK_BUF - 4096];
     struct {
@@ -782,7 +774,7 @@ Java_one_nio_net_NativeSocket_getTimeout(JNIEnv* env, jobject self) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setKeepAlive(JNIEnv* env, jobject self, jboolean keepAlive) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int value = (int) keepAlive;
+    int value = (int)keepAlive;
     setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof(value));
 }
 
@@ -795,7 +787,7 @@ Java_one_nio_net_NativeSocket_getKeepAlive(JNIEnv* env, jobject self) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setNoDelay(JNIEnv* env, jobject self, jboolean noDelay) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int value = (int) noDelay;
+    int value = (int)noDelay;
     setsockopt(fd, SOL_TCP, TCP_NODELAY, &value, sizeof(value));
 }
 
@@ -821,7 +813,7 @@ Java_one_nio_net_NativeSocket_getTcpFastOpen(JNIEnv* env, jobject self) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setDeferAccept(JNIEnv* env, jobject self, jboolean deferAccept) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int value = (int) deferAccept;
+    int value = (int)deferAccept;
     setsockopt(fd, SOL_TCP, TCP_DEFER_ACCEPT, &value, sizeof(value));
 }
 
@@ -834,9 +826,9 @@ Java_one_nio_net_NativeSocket_getDeferAccept(JNIEnv* env, jobject self) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setReuseAddr(JNIEnv* env, jobject self, jboolean reuseAddr, jboolean reusePort) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int value = (int) reuseAddr;
+    int value = (int)reuseAddr;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
-    value = (int) reusePort;
+    value = (int)reusePort;
     setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
 }
 
@@ -903,7 +895,7 @@ Java_one_nio_net_NativeSocket_getNotsentLowat(JNIEnv* env, jobject self) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSocket_setThinLinearTimeouts(JNIEnv* env, jobject self, jboolean thinLto) {
     int fd = (*env)->GetIntField(env, self, f_fd);
-    int value = (int) thinLto;
+    int value = (int)thinLto;
     setsockopt(fd, SOL_TCP, TCP_THIN_LINEAR_TIMEOUTS, &value, sizeof(value));
 }
 
@@ -920,7 +912,8 @@ Java_one_nio_net_NativeSocket_getOption(JNIEnv* env, jobject self, jint level, j
     socklen_t len = sizeof(buf);
     if (getsockopt(fd, level, option, buf, &len) == 0) {
         jbyteArray result = (*env)->NewByteArray(env, len);
-        if (result != NULL) (*env)->SetByteArrayRegion(env, result, 0, len, buf);
+        if (result != NULL)
+            (*env)->SetByteArrayRegion(env, result, 0, len, buf);
         return result;
     }
     return NULL;

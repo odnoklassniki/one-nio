@@ -22,8 +22,7 @@
 
 // See NativeSelector.java
 #define EPOLL_HEADER_SIZE 16
-#define EPOLL_MAX_EVENTS  1000
-
+#define EPOLL_MAX_EVENTS 1000
 
 // Returns monotonic timestamp similar to System.nanoTime()
 static inline jlong nanoTime() {
@@ -31,7 +30,6 @@ static inline jlong nanoTime() {
     clock_gettime(CLOCK_MONOTONIC, &tp);
     return (jlong)tp.tv_sec * 1000000000 + tp.tv_nsec;
 }
-
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSelector_epollCreate(JNIEnv* env, jclass cls) {
@@ -57,9 +55,9 @@ JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSelector_epollClose(JNIEnv* env, jclass cls, jint epfd) {
     static int wakeup_socket = -1;
 
-     if (wakeup_socket == -1) {
-         wakeup_socket = socket(PF_INET, SOCK_DGRAM, 0);
-     }
+    if (wakeup_socket == -1) {
+        wakeup_socket = socket(PF_INET, SOCK_DGRAM, 0);
+    }
 
     // Wake up any pending epoll_wait by registring ready-to-write UDP socket
     Java_one_nio_net_NativeSelector_epollCtl(env, cls, epfd, EPOLL_CTL_ADD, wakeup_socket, -1, EPOLLOUT);

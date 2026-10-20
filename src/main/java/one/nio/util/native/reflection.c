@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 static jvmtiEnv* jvmti = NULL;
 
 JNIEXPORT jboolean JNICALL
@@ -26,7 +25,7 @@ Java_one_nio_util_NativeReflection_initJVMTI(JNIEnv* env, jclass self) {
     JavaVM* vm;
     jsize vm_count;
     if (JNI_GetCreatedJavaVMs(&vm, 1, &vm_count) == 0 && vm_count > 0) {
-        (*vm)->GetEnv(vm, (void**)&jvmti, JVMTI_VERSION_1_0);            
+        (*vm)->GetEnv(vm, (void**)&jvmti, JVMTI_VERSION_1_0);
     }
     return jvmti != NULL ? JNI_TRUE : JNI_FALSE;
 }
@@ -166,11 +165,13 @@ Java_one_nio_util_NativeReflection_openModules(JNIEnv* env, jclass self) {
 
         // Get all module packages as one string: "[java.lang, java.io, ...]"
         jobject packages = (*env)->CallObjectMethod(env, modules[i], getPackages);
-        jstring str = (jstring) (*env)->CallObjectMethod(env, packages, toString);
-        if (str == NULL) continue;
+        jstring str = (jstring)(*env)->CallObjectMethod(env, packages, toString);
+        if (str == NULL)
+            continue;
 
-        char* c_str = (char*) (*env)->GetStringUTFChars(env, str, NULL);
-        if (c_str == NULL) continue;
+        char* c_str = (char*)(*env)->GetStringUTFChars(env, str, NULL);
+        if (c_str == NULL)
+            continue;
 
         // Export and open every package to the unnamed module
         char* saveptr = NULL;
@@ -184,7 +185,7 @@ Java_one_nio_util_NativeReflection_openModules(JNIEnv* env, jclass self) {
         (*env)->ReleaseStringUTFChars(env, str, c_str);
     }
 
-    (*jvmti)->Deallocate(jvmti, (unsigned char*) modules);
+    (*jvmti)->Deallocate(jvmti, (unsigned char*)modules);
 
 #else
 

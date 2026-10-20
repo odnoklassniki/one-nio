@@ -32,7 +32,6 @@
 #include <jni.h>
 #include "../../net/native/jni_util.h"
 
-
 static inline __u64 ptr_to_u64(const void* ptr) {
     return (__u64)(uintptr_t)ptr;
 }
@@ -44,8 +43,7 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr* attr, unsigned int s
 struct bpf_object;
 struct bpf_program;
 
-int (*bpf_prog_load)(const char* file, enum bpf_prog_type type,
-                     struct bpf_object** pobj, int* prog_fd);
+int (*bpf_prog_load)(const char* file, enum bpf_prog_type type, struct bpf_object** pobj, int* prog_fd);
 
 static pthread_mutex_t bpf_prog_load_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -58,8 +56,7 @@ static int (*bpf_object__load)(struct bpf_object* obj);
 static int (*bpf_program__fd)(const struct bpf_program* prog);
 static void (*bpf_object__close)(struct bpf_object* obj);
 
-static int bpf_prog_load_v1(const char* file, enum bpf_prog_type type,
-                            struct bpf_object** pobj, int* prog_fd) {
+static int bpf_prog_load_v1(const char* file, enum bpf_prog_type type, struct bpf_object** pobj, int* prog_fd) {
     struct bpf_object* obj = bpf_object__open_file(file, NULL);
     if (obj == NULL) {
         return errno > 0 ? -errno : -EINVAL;
@@ -115,9 +112,7 @@ static int resolve_bpf_prog_load(JNIEnv* env) {
     bpf_object__load = dlsym(libbpf, "bpf_object__load");
     bpf_program__fd = dlsym(libbpf, "bpf_program__fd");
     bpf_object__close = dlsym(libbpf, "bpf_object__close");
-    if (bpf_object__open_file == NULL || bpf_object__next_program == NULL || bpf_program__set_type == NULL
-        || bpf_program__set_expected_attach_type == NULL || bpf_object__load == NULL
-        || bpf_program__fd == NULL || bpf_object__close == NULL) {
+    if (bpf_object__open_file == NULL || bpf_object__next_program == NULL || bpf_program__set_type == NULL || bpf_program__set_expected_attach_type == NULL || bpf_object__load == NULL || bpf_program__fd == NULL || bpf_object__close == NULL) {
         dlclose(libbpf);
         throw_by_name(env, "java/lang/UnsupportedOperationException", "libbpf.so bpf_prog_load method not found");
         return -1;
@@ -126,7 +121,6 @@ static int resolve_bpf_prog_load(JNIEnv* env) {
     bpf_prog_load = bpf_prog_load_v1;
     return 0;
 }
-
 
 JNIEXPORT jint JNICALL
 Java_one_nio_os_bpf_Bpf_progLoad(JNIEnv* env, jclass cls, jstring pathname, jint type) {
@@ -219,7 +213,7 @@ Java_one_nio_os_bpf_Bpf_mapGetInfo(JNIEnv* env, jclass cls, int bpf_fd, jintArra
 
     (*env)->SetIntArrayRegion(env, result, 0, 6, (int*)&info);
 
-    return info.name[0] ? (*env)->NewStringUTF(env, info.name) : NULL; 
+    return info.name[0] ? (*env)->NewStringUTF(env, info.name) : NULL;
 }
 
 JNIEXPORT jstring JNICALL
@@ -240,10 +234,10 @@ Java_one_nio_os_bpf_Bpf_progGetInfo(JNIEnv* env, jclass cls, int bpf_fd, jintArr
 
     (*env)->SetIntArrayRegion(env, result, 0, 2, (int*)&info);
 
-    return info.name[0] ? (*env)->NewStringUTF(env, info.name) : NULL; 
+    return info.name[0] ? (*env)->NewStringUTF(env, info.name) : NULL;
 }
 
-#define DEFAULT_MAP_IDS 64 
+#define DEFAULT_MAP_IDS 64
 
 static int __bpf_prog_get_map_ids(int bpf_fd, int* map_ids, int* num_maps) {
     struct bpf_prog_info info = {};
@@ -298,56 +292,53 @@ Java_one_nio_os_bpf_Bpf_progGetMapIds(JNIEnv* env, jclass cls, int bpf_fd) {
 }
 
 JNIEXPORT void JNICALL
-Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyteArray data_in, jint len_data_in, jbyteArray data_out,
-                                    jbyteArray ctx_in, jint len_ctx_in, jbyteArray ctx_out, jintArray retvals /* data_size_out,ctx_size_out,duration,retval */) {
+Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyteArray data_in, jint len_data_in, jbyteArray data_out, jbyteArray ctx_in, jint len_ctx_in, jbyteArray ctx_out, jintArray retvals /* data_size_out,ctx_size_out,duration,retval */) {
 
 // want to keep support for compilation on CentOS 7 / RHEL 7 legacy system, BPF testing support added in Kernel 4.12
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 
-	union bpf_attr attr;
-	int res;
+    union bpf_attr attr;
+    int res;
 
-	memset(&attr, 0, sizeof(attr));
-	attr.test.prog_fd = prog_fd;
+    memset(&attr, 0, sizeof(attr));
+    attr.test.prog_fd = prog_fd;
 
-	jbyte* b_ctx_in = NULL;
-	jbyte* b_data_in = NULL;
-	jbyte* b_ctx_out = NULL;
-	jbyte* b_data_out = NULL;
-
+    jbyte* b_ctx_in = NULL;
+    jbyte* b_data_in = NULL;
+    jbyte* b_ctx_out = NULL;
+    jbyte* b_data_out = NULL;
 
     if (ctx_in != NULL) {
-    	attr.test.ctx_size_in = len_ctx_in;
-    	b_ctx_in = (*env)->GetByteArrayElements(env, ctx_in, NULL);
-    	attr.test.ctx_in = ptr_to_u64(b_ctx_in);
+        attr.test.ctx_size_in = len_ctx_in;
+        b_ctx_in = (*env)->GetByteArrayElements(env, ctx_in, NULL);
+        attr.test.ctx_in = ptr_to_u64(b_ctx_in);
     }
     if (data_in != NULL) {
-    	attr.test.data_size_in = len_data_in;
-    	b_data_in = (*env)->GetByteArrayElements(env, data_in, NULL);
-    	attr.test.data_in = ptr_to_u64(b_data_in);
+        attr.test.data_size_in = len_data_in;
+        b_data_in = (*env)->GetByteArrayElements(env, data_in, NULL);
+        attr.test.data_in = ptr_to_u64(b_data_in);
     }
     if (ctx_out != NULL) {
-    	attr.test.ctx_size_out = (*env)->GetArrayLength(env, ctx_out);
-    	b_ctx_out = (*env)->GetByteArrayElements(env, ctx_out, NULL);
-    	attr.test.ctx_out = ptr_to_u64(b_ctx_out);
+        attr.test.ctx_size_out = (*env)->GetArrayLength(env, ctx_out);
+        b_ctx_out = (*env)->GetByteArrayElements(env, ctx_out, NULL);
+        attr.test.ctx_out = ptr_to_u64(b_ctx_out);
     }
     if (data_out != NULL) {
-    	attr.test.data_size_out = (*env)->GetArrayLength(env, data_out);
-    	b_data_out = (*env)->GetByteArrayElements(env, data_out, NULL);
-    	attr.test.data_out = ptr_to_u64(b_data_out);
+        attr.test.data_size_out = (*env)->GetArrayLength(env, data_out);
+        b_data_out = (*env)->GetByteArrayElements(env, data_out, NULL);
+        attr.test.data_out = ptr_to_u64(b_data_out);
     }
 
-	res = sys_bpf(BPF_PROG_TEST_RUN, &attr, sizeof(attr));
+    res = sys_bpf(BPF_PROG_TEST_RUN, &attr, sizeof(attr));
 
-	if (retvals != NULL) {
+    if (retvals != NULL) {
         const jint b_result[] = {
             attr.test.data_size_out,
             attr.test.ctx_size_out,
             attr.test.duration,
-            attr.test.retval
-        };
-        (*env)->SetIntArrayRegion(env, retvals, 0, sizeof(b_result)/sizeof(int), b_result);
-	}
+            attr.test.retval};
+        (*env)->SetIntArrayRegion(env, retvals, 0, sizeof(b_result) / sizeof(int), b_result);
+    }
 
     if (ctx_in != NULL) {
         (*env)->ReleaseByteArrayElements(env, ctx_in, b_ctx_in, JNI_ABORT);
@@ -366,7 +357,7 @@ Java_one_nio_os_bpf_Bpf_progTestRun(JNIEnv* env, jclass cls, jint prog_fd, jbyte
         throw_io_exception(env);
     }
 #else
-     throw_by_name(env, "java/lang/UnsupportedOperationException", "Library compiled on kernel version without BPF testing support.");
+    throw_by_name(env, "java/lang/UnsupportedOperationException", "Library compiled on kernel version without BPF testing support.");
 #endif
 }
 
@@ -413,7 +404,7 @@ Java_one_nio_os_bpf_Bpf_rawTracepointOpen(JNIEnv* env, jclass cls, jint prog_fd,
 
     (*env)->ReleaseStringUTFChars(env, name, c_name);
 
-    return fd;  
+    return fd;
 #else
     throw_by_name(env, "java/lang/UnsupportedOperationException", "Library compiled without raw tracepoint support");
     return -EINVAL;
@@ -421,8 +412,7 @@ Java_one_nio_os_bpf_Bpf_rawTracepointOpen(JNIEnv* env, jclass cls, jint prog_fd,
 }
 
 JNIEXPORT jint JNICALL
-Java_one_nio_os_bpf_Bpf_mapCreate(JNIEnv* env, jclass cls, jint type, jint key_size, jint value_size,
-                                  jint max_entries, jstring name, jint flags, jint inner_map_fd) {
+Java_one_nio_os_bpf_Bpf_mapCreate(JNIEnv* env, jclass cls, jint type, jint key_size, jint value_size, jint max_entries, jstring name, jint flags, jint inner_map_fd) {
     union bpf_attr attr;
     memset(&attr, 0, sizeof(attr));
     attr.map_type = type;
@@ -495,7 +485,7 @@ Java_one_nio_os_bpf_Bpf_mapUpdate(JNIEnv* env, jclass cls, jint fd, jbyteArray k
 
     int res = sys_bpf(BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
     if (res != 0 && errno != EEXIST && errno != ENOENT) {
-        throw_io_exception(env); 
+        throw_io_exception(env);
     }
 
     (*env)->ReleaseByteArrayElements(env, key, b_key, JNI_ABORT);
@@ -512,7 +502,7 @@ Java_one_nio_os_bpf_Bpf_mapRemove(JNIEnv* env, jclass cls, jint fd, jbyteArray k
     }
 
     jbyte* b_key = (*env)->GetByteArrayElements(env, key, NULL);
-    
+
     union bpf_attr attr;
     memset(&attr, 0, sizeof(attr));
     attr.map_fd = fd;
@@ -548,7 +538,7 @@ Java_one_nio_os_bpf_Bpf_mapGetNextKey(JNIEnv* env, jclass cls, jint fd, jbyteArr
 
     int res = sys_bpf(BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
     if (res < 0 && errno != ENOENT) {
-        throw_io_exception(env); 
+        throw_io_exception(env);
     }
 
     if (b_key != NULL) {
@@ -570,15 +560,15 @@ Java_one_nio_os_bpf_Bpf_objGetNextId(JNIEnv* env, jclass cls, int objType, int s
 
     int cmd = -1;
     switch (objType) {
-        case 0:
-            cmd = BPF_PROG_GET_NEXT_ID;
-            break;
-        case 1:
-            cmd = BPF_MAP_GET_NEXT_ID;
-            break;
-        default:
-            throw_illegal_argument(env);
-            return -1;
+    case 0:
+        cmd = BPF_PROG_GET_NEXT_ID;
+        break;
+    case 1:
+        cmd = BPF_MAP_GET_NEXT_ID;
+        break;
+    default:
+        throw_illegal_argument(env);
+        return -1;
     }
 
     int res = sys_bpf(cmd, &attr, sizeof(attr));
@@ -611,41 +601,43 @@ struct ring_buffer_opts;
 
 typedef int (*ring_buffer_sample_fn)(void* ctx, void* data, size_t size);
 
-static struct bpf_object*  (*p_bpf_object__open_file)(const char*, const struct bpf_object_open_opts*);
-static int                 (*p_bpf_object__load)(struct bpf_object*);
-static void                (*p_bpf_object__close)(struct bpf_object*);
+static struct bpf_object* (*p_bpf_object__open_file)(const char*, const struct bpf_object_open_opts*);
+static int (*p_bpf_object__load)(struct bpf_object*);
+static void (*p_bpf_object__close)(struct bpf_object*);
 static struct bpf_program* (*p_bpf_object__find_program_by_name)(const struct bpf_object*, const char*);
-static int                 (*p_bpf_program__fd)(const struct bpf_program*);
-static struct bpf_link*    (*p_bpf_program__attach)(const struct bpf_program*);
-static int                 (*p_bpf_link__destroy)(struct bpf_link*);
-static struct bpf_map*     (*p_bpf_object__find_map_by_name)(const struct bpf_object*, const char*);
-static int                 (*p_bpf_map__fd)(const struct bpf_map*);
+static int (*p_bpf_program__fd)(const struct bpf_program*);
+static struct bpf_link* (*p_bpf_program__attach)(const struct bpf_program*);
+static int (*p_bpf_link__destroy)(struct bpf_link*);
+static struct bpf_map* (*p_bpf_object__find_map_by_name)(const struct bpf_object*, const char*);
+static int (*p_bpf_map__fd)(const struct bpf_map*);
 
 static struct ring_buffer* (*p_ring_buffer__new)(int, ring_buffer_sample_fn, void*, const struct ring_buffer_opts*);
-static int                 (*p_ring_buffer__poll)(struct ring_buffer*, int);
-static void                (*p_ring_buffer__free)(struct ring_buffer*);
+static int (*p_ring_buffer__poll)(struct ring_buffer*, int);
+static void (*p_ring_buffer__free)(struct ring_buffer*);
 
 static int libbpf_loaded = 0;
 
 static int load_libbpf_full(JNIEnv* env) {
-    if (libbpf_loaded) return 1;
+    if (libbpf_loaded)
+        return 1;
 
     void* h = dlopen("libbpf.so", RTLD_LAZY | RTLD_GLOBAL);
-    if (!h) h = dlopen("libbpf.so.1", RTLD_LAZY | RTLD_GLOBAL);
-    if (!h) h = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h)
+        h = dlopen("libbpf.so.1", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h)
+        h = dlopen("libbpf.so.0", RTLD_LAZY | RTLD_GLOBAL);
     if (!h) {
-        throw_by_name(env, "java/lang/UnsupportedOperationException",
-                      "Failed to load libbpf.so / libbpf.so.0 / libbpf.so.1");
+        throw_by_name(env, "java/lang/UnsupportedOperationException", "Failed to load libbpf.so / libbpf.so.0 / libbpf.so.1");
         return 0;
     }
 
-#define LBP_SYM(NAME) do {                                                  \
-        p_##NAME = dlsym(h, #NAME);                                          \
-        if (!p_##NAME) {                                                     \
-            throw_by_name(env, "java/lang/UnsupportedOperationException",   \
-                          "libbpf symbol not found: " #NAME);                \
-            return 0;                                                        \
-        }                                                                    \
+#define LBP_SYM(NAME)                                                                                         \
+    do {                                                                                                      \
+        p_##NAME = dlsym(h, #NAME);                                                                           \
+        if (!p_##NAME) {                                                                                      \
+            throw_by_name(env, "java/lang/UnsupportedOperationException", "libbpf symbol not found: " #NAME); \
+            return 0;                                                                                         \
+        }                                                                                                     \
     } while (0)
 
     LBP_SYM(bpf_object__open_file);
@@ -711,7 +703,8 @@ Java_one_nio_os_bpf_Bpf_bpfObjectClose(JNIEnv* env, jclass cls, jlong ptr) {
 
 JNIEXPORT jint JNICALL
 Java_one_nio_os_bpf_Bpf_bpfObjectProgFd(JNIEnv* env, jclass cls, jlong ptr, jstring name) {
-    if (!load_libbpf_full(env)) return -1;
+    if (!load_libbpf_full(env))
+        return -1;
     if (name == NULL) {
         throw_illegal_argument(env);
         return -1;
@@ -719,7 +712,7 @@ Java_one_nio_os_bpf_Bpf_bpfObjectProgFd(JNIEnv* env, jclass cls, jlong ptr, jstr
 
     const char* c_name = (*env)->GetStringUTFChars(env, name, NULL);
     struct bpf_program* prog = p_bpf_object__find_program_by_name(
-            (struct bpf_object*)(uintptr_t)ptr, c_name);
+        (struct bpf_object*)(uintptr_t)ptr, c_name);
     (*env)->ReleaseStringUTFChars(env, name, c_name);
 
     return (prog != NULL) ? p_bpf_program__fd(prog) : -1;
@@ -737,7 +730,7 @@ Java_one_nio_os_bpf_Bpf_bpfObjectMapFd(JNIEnv* env, jclass cls, jlong ptr, jstri
 
     const char* c_name = (*env)->GetStringUTFChars(env, name, NULL);
     struct bpf_map* map = p_bpf_object__find_map_by_name(
-            (struct bpf_object*)(uintptr_t)ptr, c_name);
+        (struct bpf_object*)(uintptr_t)ptr, c_name);
 
     (*env)->ReleaseStringUTFChars(env, name, c_name);
 
@@ -756,7 +749,7 @@ Java_one_nio_os_bpf_Bpf_bpfProgAttach(JNIEnv* env, jclass cls, jlong objPtr, jst
 
     const char* c_name = (*env)->GetStringUTFChars(env, name, NULL);
     struct bpf_program* prog = p_bpf_object__find_program_by_name(
-            (struct bpf_object*)(uintptr_t)objPtr, c_name);
+        (struct bpf_object*)(uintptr_t)objPtr, c_name);
     if (prog == NULL) {
         (*env)->ReleaseStringUTFChars(env, name, c_name);
         throw_io_exception_code(env, ENOENT);
@@ -853,7 +846,7 @@ Java_one_nio_os_bpf_Bpf_ringBufPoll(JNIEnv* env, jclass cls, jlong rbPtr, jint t
     jmethodID accept = (*env)->GetMethodID(env, consCls, "accept", "(Ljava/nio/ByteBuffer;)V");
     (*env)->DeleteLocalRef(env, consCls);
     if (accept == NULL) {
-        return -1;  /* GetMethodID already threw NoSuchMethodError */
+        return -1; /* GetMethodID already threw NoSuchMethodError */
     }
 
     h->env = env;
@@ -867,7 +860,8 @@ Java_one_nio_os_bpf_Bpf_ringBufPoll(JNIEnv* env, jclass cls, jlong rbPtr, jint t
     h->consumer = NULL;
     h->accept = NULL;
 
-    return h->had_exception ? -1 : n;;
+    return h->had_exception ? -1 : n;
+    ;
 }
 
 JNIEXPORT void JNICALL

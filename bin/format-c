@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+formatter=${CLANG_FORMAT:-clang-format}
+
+if ! command -v "$formatter" >/dev/null 2>&1; then
+    echo "clang-format not found: $formatter" >&2
+    exit 1
+fi
+if [[ -n ${CLANG_FORMAT_VERSION:-} && $("$formatter" --version) != *"$CLANG_FORMAT_VERSION"* ]]; then
+    echo "clang-format $CLANG_FORMAT_VERSION is required for this check" >&2
+    exit 1
+fi
+
+check=false
+changed=false
+while (( $# > 0 )); do
+    case $1 in
+        --check) check=true; shift ;;
+        --changed) changed=true; shift ;;
+        --help)
+            echo "Usage: bin/format-c [--check] [--changed] [C files or headers ...]"
+            echo "--changed formats only lines changed from HEAD (tracked files)."
+            echo "Without file arguments, selects all tracked C sources and headers."
+            exit 0 ;;
+        --) shift; break ;;
+        -*) echo "Unknown option: $1" >&2; exit 2 ;;
+        *) break ;;
+    esac
+done
+
+cd "$root"
+for file in "$@"; do
+    case $file in
+        src/*.[ch]) ;;
+        *) echo "Expected a C source or header in src/: $file" >&2; exit 2 ;;
+    esac
+done
+
+if [[ $changed == true ]]; then
+    if ! command -v git-clang-format >/dev/null 2>&1; then
+        echo "git-clang-format not found" >&2
+        exit 1
+    fi
+    if (( $# == 0 )); then
+        set -- src
+    fi
+    options=(--binary "$formatter" --style=file --extensions c,h)
+    if [[ $check == true ]]; then
+        options+=(--diff)
+    else
+        options+=(--force)
+    fi
+    if git-clang-format "${options[@]}" HEAD -- "$@"; then
+        result=0
+    else
+        result=$?
+    fi
+    if [[ $check == false && $result == 1 ]]; then
+        exit 0
+    fi
+    exit "$result"
+fi
+
+if (( $# > 0 )); then
+    if [[ $check == true ]]; then
+        "$formatter" --dry-run --Werror "$@"
+    else
+        "$formatter" -i "$@"
+    fi
+else
+    if [[ $check == true ]]; then
+        git ls-files -z -- '*.c' '*.h' | xargs -0 "$formatter" --dry-run --Werror
+    else
+        git ls-files -z -- '*.c' '*.h' | xargs -0 "$formatter" -i
+    fi
+fi

@@ -18,7 +18,6 @@
 #include <string.h>
 #include <jni.h>
 
-
 jfieldID cache_field(JNIEnv* env, const char* holder, const char* field, const char* signature) {
     jclass cls = (*env)->FindClass(env, holder);
     return (*env)->GetFieldID(env, cls, field, signature);
@@ -61,33 +60,33 @@ void throw_illegal_argument_msg(JNIEnv* env, const char* msg) {
 
 void throw_io_exception_code(JNIEnv* env, int error_code) {
     switch (error_code) {
-        case ETIMEDOUT:
-        case EINPROGRESS:
-        case EWOULDBLOCK:
-            throw_by_name(env, "java/net/SocketTimeoutException", "Connection timed out");
-            break;
-        case ECONNABORTED:
-        case ECONNRESET:
-            throw_by_name(env, "java/net/SocketException", "Connection reset");
-            break;
-        case EPIPE:
-            throw_by_name(env, "java/net/SocketException", "Broken pipe");
-            break;
-        case ECONNREFUSED:
-            throw_by_name(env, "java/net/ConnectException", "Connection refused");
-            break;
-        case EADDRINUSE:
-            throw_by_name(env, "java/net/BindException", "Address already in use");
-            break;
-        case EHOSTUNREACH:
-            throw_by_name(env, "java/net/NoRouteToHostException", "Host is unreachable");
-            break;
-        case ENETUNREACH:
-            throw_by_name(env, "java/net/NoRouteToHostException", "Network is unreachable");
-            break;
-        default:
-            throw_by_name(env, "java/io/IOException", strerror(error_code));
-            break;
+    case ETIMEDOUT:
+    case EINPROGRESS:
+    case EWOULDBLOCK:
+        throw_by_name(env, "java/net/SocketTimeoutException", "Connection timed out");
+        break;
+    case ECONNABORTED:
+    case ECONNRESET:
+        throw_by_name(env, "java/net/SocketException", "Connection reset");
+        break;
+    case EPIPE:
+        throw_by_name(env, "java/net/SocketException", "Broken pipe");
+        break;
+    case ECONNREFUSED:
+        throw_by_name(env, "java/net/ConnectException", "Connection refused");
+        break;
+    case EADDRINUSE:
+        throw_by_name(env, "java/net/BindException", "Address already in use");
+        break;
+    case EHOSTUNREACH:
+        throw_by_name(env, "java/net/NoRouteToHostException", "Host is unreachable");
+        break;
+    case ENETUNREACH:
+        throw_by_name(env, "java/net/NoRouteToHostException", "Network is unreachable");
+        break;
+    default:
+        throw_by_name(env, "java/io/IOException", strerror(error_code));
+        break;
     }
 }
 

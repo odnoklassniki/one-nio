@@ -27,8 +27,7 @@
 #include <jni.h>
 #include "../../net/native/jni_util.h"
 
-#define STARTS_WITH(str, prefix)  (strncmp(str, prefix, sizeof(prefix) - 1) == 0)
-
+#define STARTS_WITH(str, prefix) (strncmp(str, prefix, sizeof(prefix) - 1) == 0)
 
 static const int ioctl_cmd[] = {
     PERF_EVENT_IOC_RESET,
@@ -40,8 +39,7 @@ static const int ioctl_cmd[] = {
     PERF_EVENT_IOC_SET_FILTER,
     PERF_EVENT_IOC_ID,
     PERF_EVENT_IOC_SET_BPF,
-    PERF_EVENT_IOC_PAUSE_OUTPUT
-};
+    PERF_EVENT_IOC_PAUSE_OUTPUT};
 
 static inline unsigned int get_uint_param(const char* op) {
     return (unsigned int)strtoul(strchr(op, '=') + 1, NULL, 10);
@@ -95,10 +93,8 @@ static unsigned long parse_perf_options(JNIEnv* env, jstring options, struct per
     return flags;
 }
 
-
 JNIEXPORT jint JNICALL
-Java_one_nio_os_perf_Perf_openEvent(JNIEnv* env, jclass cls, jint pid, jint cpu, jint type, jlong config,
-                                    jint breakpoint, jint group, jstring options) {
+Java_one_nio_os_perf_Perf_openEvent(JNIEnv* env, jclass cls, jint pid, jint cpu, jint type, jlong config, jint breakpoint, jint group, jstring options) {
     struct perf_event_attr attr = {0};
     attr.size = sizeof(attr);
     attr.type = type;
@@ -163,7 +159,7 @@ Java_one_nio_os_perf_Perf_getValue(JNIEnv* env, jclass cls, jint fd, jlongArray 
         return;
     }
 
-    jlong buf[length]; 
+    jlong buf[length];
 
     size_t bytes_read = read(fd, buf, sizeof(buf));
     if (bytes_read < length * sizeof(jlong)) {

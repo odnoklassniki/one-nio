@@ -23,7 +23,6 @@
 #include <openssl/ssl.h>
 #include "sslcompat.h"
 
-
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 
 // Locking functions are used on OpenSSL 1.0.x, but not on 1.1.0
@@ -67,7 +66,6 @@ static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value* lock, const
     }
 }
 
-
 // OPENSSL_init_ssl() exists in OpenSSL 1.1.0
 // Earlier libssl uses SSL_library_init() and it also requires locking callbacks
 
@@ -102,13 +100,11 @@ int OPENSSL_init_crypto(unsigned long long opts, const void* settings) {
     return 1;
 }
 
-
 // SSLv23_method() was renamed to TLS_method() in OpenSSL 1.1.0
 
 const SSL_METHOD* TLS_method() {
     return SSLv23_method();
 }
-
 
 // DH structure is opaque since OpenSSL 1.1.0
 
@@ -118,13 +114,11 @@ int DH_set0_pqg(DH* dh, BIGNUM* p, BIGNUM* q, BIGNUM* g) {
     dh->g = g;
 }
 
-
 // SSL_in_init() is a macro in OpenSSL 1.0.x, but is a separate function in OpenSSL 1.1.0
 
 int SSL_in_init(SSL* ssl) {
     return SSL_state(ssl) & SSL_ST_INIT;
 }
-
 
 // SSL_CTX_set_options() is a macro in OpenSSL 1.0.x, but is a separate function in OpenSSL 1.1.0
 
@@ -136,12 +130,11 @@ long SSL_CTX_clear_options(SSL_CTX* ctx, long options) {
     return SSL_CTX_ctrl(ctx, SSL_CTRL_CLEAR_OPTIONS, options, NULL);
 }
 
-
 // SSL_CTX_set_alpn_select_cb is missing in OpenSSL 1.0.1
 
 void SSL_CTX_set_alpn_select_cb(SSL_CTX* ctx,
-    int (*cb)(SSL* ssl, const unsigned char** out, unsigned char* outlen,
-              const unsigned char* in, unsigned int inlen, void* arg), void* arg) {
+    int (*cb)(SSL* ssl, const unsigned char** out, unsigned char* outlen, const unsigned char* in, unsigned int inlen, void* arg),
+    void* arg) {
     fprintf(stderr, "[WARNING] symbol not found: SSL_CTX_set_alpn_select_cb. ALPN disabled\n");
 }
 

@@ -40,22 +40,21 @@
 #include <jni.h>
 #include "jni_util.h"
 
-
-#define MAX_COUNTERS  32
+#define MAX_COUNTERS 32
 
 enum SSLFlags {
-    SF_SERVER         = 1,
-    SF_HANDSHAKED     = 2,
-    SF_HAS_TICKET     = 4,
+    SF_SERVER = 1,
+    SF_HANDSHAKED = 2,
+    SF_HAS_TICKET = 4,
     SF_HAS_OLD_TICKET = 8,
-    SF_NEW_TICKET     = SF_HAS_TICKET | SF_HAS_OLD_TICKET,
+    SF_NEW_TICKET = SF_HAS_TICKET | SF_HAS_OLD_TICKET,
     SF_EARLY_DATA_ENABLED = 16,
     SF_EARLY_DATA_FINISHED = 32,
-    SF_FATAL_ALERT         = 64,
+    SF_FATAL_ALERT = 64,
 };
 
 enum SSLCacheMode {
-    CACHE_MODE_NONE     = 0,
+    CACHE_MODE_NONE = 0,
     CACHE_MODE_INTERNAL = 1,
     CACHE_MODE_EXTERNAL = 2,
 };
@@ -131,10 +130,8 @@ static jfieldID f_NativeSslSocket_jniLogger;
 static jclass c_NativeLogger;
 static jmethodID m_NativeLogger_log;
 
-
-
-
 // openssl dhparam -C 2048
+// clang-format off
 static unsigned char dh2048_p[] = {
     0xF5, 0x03, 0x6F, 0xFC, 0xA7, 0xFD, 0xC7, 0xD2, 0x69, 0xD8, 0xED, 0x73, 0x7D, 0x4D, 0x2A, 0x05,
     0xD9, 0x48, 0x47, 0x9E, 0xA9, 0xDF, 0xCD, 0x9E, 0x15, 0xB5, 0xD9, 0x4F, 0x6D, 0x80, 0x65, 0xFD,
@@ -153,7 +150,8 @@ static unsigned char dh2048_p[] = {
     0x21, 0xCD, 0x2B, 0xC8, 0xC8, 0xF9, 0xD5, 0x76, 0x16, 0x08, 0xAD, 0xAC, 0x38, 0xD1, 0xAF, 0x7F,
     0x0E, 0xDC, 0x20, 0xB8, 0x86, 0x9B, 0x15, 0x6D, 0xC0, 0x83, 0x9A, 0x11, 0x79, 0x04, 0x20, 0xD3
 };
-static unsigned char dh2048_g[] = { 0x02 };
+// clang-format on
+static unsigned char dh2048_g[] = {0x02};
 
 static char* ssl_get_peer_ip(const SSL* ssl, char* buf, size_t len);
 static char* ssl_get_host_ip_port(const SSL* ssl, char* buf, size_t len);
@@ -178,75 +176,60 @@ static int check_ssl_error(JNIEnv* env, SSL* ssl, int ret) {
 
     int err = SSL_get_error(ssl, ret);
     switch (err) {
-        case SSL_ERROR_NONE:
-            return 0;
-        case SSL_ERROR_ZERO_RETURN:
-            throw_socket_closed_cached(env);
-            return 0;
-        case SSL_ERROR_SYSCALL:
-            {
-                unsigned long e = ERR_peek_error();
-                if (e && !ERR_SYSTEM_ERROR(e)) {
-                    sslSocketLogger->log("ERROR", "fd:(%d) SSL_ERROR_SYSCALL %s in state: %s[%s], client: %s, server: %s",
-                          SSL_get_fd(ssl),
-                          ERR_error_string(ERR_peek_error(), error),
-                          SSL_state_string(ssl),
-                          SSL_state_string_long(ssl),
-                          ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-                          ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-                    );
-                    throw_ssl_exception(env);
-                } else if (ret == 0 || errno == 0) {
-                    // OpenSSL 1.0 and 1.1 return different error code in case of "dirty" connection close
-                    throw_socket_closed_cached(env);
-                } else {
-                    throw_io_exception(env);
-                }
-                return 0;
-            }
-        case SSL_ERROR_SSL:
-            sslSocketLogger->log("ERROR", "fd:(%d) SSL_ERROR_SSL '%s' in state: %s[%s], client: %s, server: %s",
-                  SSL_get_fd(ssl),
-                  ERR_error_string(ERR_peek_error(), error),
-                  SSL_state_string(ssl),
-                  SSL_state_string_long(ssl),
-                  ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-                  ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-            );
-            // workaround for SSL_sendfile() OpenSSL issue #23722 [ https://github.com/openssl/openssl/issues/23722 ]
-            {
-                int reason = ERR_GET_REASON(ERR_peek_error());
-                if ((errno == EPIPE || errno == ECONNRESET) && reason == SSL_R_UNINITIALIZED) {
-                    throw_io_exception(env);
-                    return 0;
-                }
-                // TBD: this workaround needs to be checked against the #23722 fix. Potentially, different issue.
-                if (errno == EWOULDBLOCK && reason == SSL_R_UNINITIALIZED) {
-                    return SSL_ERROR_WANT_WRITE;
-                }
-                if (errno > 0 && reason == SSL_R_UNINITIALIZED) {
-                    throw_io_exception_code(env, errno);
-                    return 0;
-                }
-            }
+    case SSL_ERROR_NONE:
+        return 0;
+    case SSL_ERROR_ZERO_RETURN:
+        throw_socket_closed_cached(env);
+        return 0;
+    case SSL_ERROR_SYSCALL: {
+        unsigned long e = ERR_peek_error();
+        if (e && !ERR_SYSTEM_ERROR(e)) {
+            sslSocketLogger->log("ERROR", "fd:(%d) SSL_ERROR_SYSCALL %s in state: %s[%s], client: %s, server: %s", SSL_get_fd(ssl), ERR_error_string(ERR_peek_error(), error), SSL_state_string(ssl), SSL_state_string_long(ssl), ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
             throw_ssl_exception(env);
-            return 0;
-        case SSL_ERROR_WANT_READ:
-        case SSL_ERROR_WANT_WRITE: {
-            int fd = SSL_get_fd(ssl);
-            if (fd == preclosed_socket) {
-                throw_socket_closed(env);
-                return 0;
-            } else if (errno != 0 && is_io_exception(fd)) {
+        } else if (ret == 0 || errno == 0) {
+            // OpenSSL 1.0 and 1.1 return different error code in case of "dirty" connection close
+            throw_socket_closed_cached(env);
+        } else {
+            throw_io_exception(env);
+        }
+        return 0;
+    }
+    case SSL_ERROR_SSL:
+        sslSocketLogger->log("ERROR", "fd:(%d) SSL_ERROR_SSL '%s' in state: %s[%s], client: %s, server: %s", SSL_get_fd(ssl), ERR_error_string(ERR_peek_error(), error), SSL_state_string(ssl), SSL_state_string_long(ssl), ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
+        // workaround for SSL_sendfile() OpenSSL issue #23722 [ https://github.com/openssl/openssl/issues/23722 ]
+        {
+            int reason = ERR_GET_REASON(ERR_peek_error());
+            if ((errno == EPIPE || errno == ECONNRESET) && reason == SSL_R_UNINITIALIZED) {
                 throw_io_exception(env);
                 return 0;
             }
-            return err;
+            // TBD: this workaround needs to be checked against the #23722 fix. Potentially, different issue.
+            if (errno == EWOULDBLOCK && reason == SSL_R_UNINITIALIZED) {
+                return SSL_ERROR_WANT_WRITE;
+            }
+            if (errno > 0 && reason == SSL_R_UNINITIALIZED) {
+                throw_io_exception_code(env, errno);
+                return 0;
+            }
         }
-        default:
-            snprintf(buf, sizeof(buf), "Unexpected SSL error code (%d)", err);
-            throw_by_name(env, "javax/net/ssl/SSLException", buf);
+        throw_ssl_exception(env);
+        return 0;
+    case SSL_ERROR_WANT_READ:
+    case SSL_ERROR_WANT_WRITE: {
+        int fd = SSL_get_fd(ssl);
+        if (fd == preclosed_socket) {
+            throw_socket_closed(env);
             return 0;
+        } else if (errno != 0 && is_io_exception(fd)) {
+            throw_io_exception(env);
+            return 0;
+        }
+        return err;
+    }
+    default:
+        snprintf(buf, sizeof(buf), "Unexpected SSL error code (%d)", err);
+        throw_by_name(env, "javax/net/ssl/SSLException", buf);
+        return 0;
     }
 }
 
@@ -316,14 +299,11 @@ static void ssl_debug(const SSL* ssl, const char* fmt, ...) {
     vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
 
-    jniLogger->log("DEBUG", "ssl_debug: %s,  client: %s, server: %s",
-           message,
-           ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-           ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-    );
+    jniLogger->log("DEBUG", "ssl_debug: %s,  client: %s, server: %s", message, ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
 }
 
-static void noop_log(const char* level, const char* fmt, ...) {}
+static void noop_log(const char* level, const char* fmt, ...) {
+}
 
 static void jni_ssl_context_log(const char* level, const char* fmt, ...) {
     JNIEnv* env;
@@ -383,32 +363,32 @@ static void jni_ssl_socket_log(const char* level, const char* fmt, ...) {
 
 static long get_session_counter(SSL_CTX* ctx, int key) {
     switch (key) {
-        case 0:
-            return SSL_CTX_sess_number(ctx);
-        case 1:
-            return SSL_CTX_sess_connect(ctx);
-        case 2:
-            return SSL_CTX_sess_connect_good(ctx);
-        case 3:
-            return SSL_CTX_sess_connect_renegotiate(ctx);
-        case 4:
-            return SSL_CTX_sess_accept(ctx);
-        case 5:
-            return SSL_CTX_sess_accept_good(ctx);
-        case 6:
-            return SSL_CTX_sess_accept_renegotiate(ctx);
-        case 7:
-            return SSL_CTX_sess_hits(ctx);
-        case 8:
-            return SSL_CTX_sess_cb_hits(ctx);
-        case 9:
-            return SSL_CTX_sess_misses(ctx);
-        case 10:
-            return SSL_CTX_sess_timeouts(ctx);
-        case 11:
-            return SSL_CTX_sess_cache_full(ctx);
-        default:
-            return 0;
+    case 0:
+        return SSL_CTX_sess_number(ctx);
+    case 1:
+        return SSL_CTX_sess_connect(ctx);
+    case 2:
+        return SSL_CTX_sess_connect_good(ctx);
+    case 3:
+        return SSL_CTX_sess_connect_renegotiate(ctx);
+    case 4:
+        return SSL_CTX_sess_accept(ctx);
+    case 5:
+        return SSL_CTX_sess_accept_good(ctx);
+    case 6:
+        return SSL_CTX_sess_accept_renegotiate(ctx);
+    case 7:
+        return SSL_CTX_sess_hits(ctx);
+    case 8:
+        return SSL_CTX_sess_cb_hits(ctx);
+    case 9:
+        return SSL_CTX_sess_misses(ctx);
+    case 10:
+        return SSL_CTX_sess_timeouts(ctx);
+    case 11:
+        return SSL_CTX_sess_cache_full(ctx);
+    default:
+        return 0;
     }
 }
 
@@ -438,8 +418,6 @@ static void init_app_data(AppData* appData) {
     appData->sslContextLogger.log = noop_log;
     appData->sslSocketLogger.log = noop_log;
 }
-
-
 
 static void free_app_data(AppData* appData) {
     pthread_rwlock_destroy(&appData->lock);
@@ -480,8 +458,7 @@ static int pass_callback(char* buf, int size, int rwflag, void* userdata) {
     return result;
 }
 
-static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned char* iv,
-                               EVP_CIPHER_CTX* evp_ctx, HMAC_CTX* hmac_ctx, int new_session) {
+static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned char* iv, EVP_CIPHER_CTX* evp_ctx, HMAC_CTX* hmac_ctx, int new_session) {
     AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
     if (appData == NULL || pthread_rwlock_rdlock(&appData->lock) != 0) {
         return -1;
@@ -522,8 +499,7 @@ static int ticket_key_callback(SSL* ssl, unsigned char key_name[16], unsigned ch
     return result;
 }
 
-static int alpn_callback(SSL* ssl, const unsigned char** out, unsigned char* outlen,
-                         const unsigned char* in, unsigned int inlen, void* arg) {
+static int alpn_callback(SSL* ssl, const unsigned char** out, unsigned char* outlen, const unsigned char* in, unsigned int inlen, void* arg) {
     AppData* appData = SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl));
     if (appData == NULL || appData->alpn.data == NULL) {
         return SSL_TLSEXT_ERR_NOACK;
@@ -577,7 +553,7 @@ static int sni_callback(SSL* ssl, int* unused, void* arg) {
             for (i = 0; names[0] != 0; i++) {
                 int names_len = strlen(names);
                 if (strcmp(servername, names) == 0 || (names[0] == '*' && servername_len >= (names_len - 1) &&
-                    strcmp(servername + servername_len - (names_len - 1), names + 1) == 0)) {
+                                                          strcmp(servername + servername_len - (names_len - 1), names + 1) == 0)) {
                     SSL_CTX* newctx = (SSL_CTX*)(intptr_t)appData->sni.contexts[i];
                     SSL_set_SSL_CTX(ssl, newctx);
                     SSL_set_verify(ssl, SSL_CTX_get_verify_mode(newctx), NULL);
@@ -599,10 +575,7 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
     char serverIP[64], clientIP[64];
 
     if (cb == SSL_CB_HANDSHAKE_START) {
-         jniLogger->log("DEBUG", "SSL handshake started, client: %s, server: %s",
-                ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-                ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-         );
+        jniLogger->log("DEBUG", "SSL handshake started, client: %s, server: %s", ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
 #ifndef SSL_OP_NO_RENEGOTIATION
         // Reject any renegotiation by replacing actual socket with a dummy
         intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
@@ -616,14 +589,7 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
             SSL_set_app_data((SSL*)ssl, (char*)(flags | SF_HANDSHAKED));
         }
     } else if (cb & SSL_CB_ALERT) {
-        jniLogger->log("INFO", "SSL alert type:'%s', description:'%s' in state: %s[%s], client: %s, server: %s",
-            SSL_alert_type_string_long(ret),
-            SSL_alert_desc_string_long(ret),
-            SSL_state_string(ssl),
-            SSL_state_string_long(ssl),
-            ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-            ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-        );
+        jniLogger->log("INFO", "SSL alert type:'%s', description:'%s' in state: %s[%s], client: %s, server: %s", SSL_alert_type_string_long(ret), SSL_alert_desc_string_long(ret), SSL_state_string(ssl), SSL_state_string_long(ssl), ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
         int severity = ret >> 8;
         if (severity == SSL3_AL_FATAL) {
             intptr_t flags = (intptr_t)SSL_get_app_data(ssl);
@@ -632,38 +598,23 @@ static void ssl_info_callback(const SSL* ssl, int cb, int ret) {
 
     } else if (cb & SSL_CB_EXIT) {
         if (ret > 0) {
-            jniLogger->log("DEBUG", "SSL handshake done version=%s, cypher=%s, reused=%s, client: %s, server: %s",
-                   SSL_get_version(ssl),
-                   SSL_get_cipher_name(ssl),
-                   SSL_session_reused(ssl) ? "yes" : "no",
-                   ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-                   ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-            );
+            jniLogger->log("DEBUG", "SSL handshake done version=%s, cypher=%s, reused=%s, client: %s, server: %s", SSL_get_version(ssl), SSL_get_cipher_name(ssl), SSL_session_reused(ssl) ? "yes" : "no", ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
         } else if (ret == 0) {
             long verificationResult = SSL_get_verify_result(ssl);
-            jniLogger->log("ERROR", "SSL handshake failed, verification:'%s', client: %s, server: %s",
-                   X509_verify_cert_error_string(verificationResult),
-                   ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-                   ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-            );
+            jniLogger->log("ERROR", "SSL handshake failed, verification:'%s', client: %s, server: %s", X509_verify_cert_error_string(verificationResult), ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
         } else {
             char error[256];
             long e = ERR_peek_error();
             if (e == 0) {
                 return;
             }
-            jniLogger->log("ERROR", "SSL handshake failed, %s, client: %s, server: %s",
-                  ERR_error_string(e, error),
-                  ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-                  ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-           );
+            jniLogger->log("ERROR", "SSL handshake failed, %s, client: %s, server: %s", ERR_error_string(e, error), ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
         }
     }
 }
 
 static void update_NativeSslSocket_isHandshakeDone_field(JNIEnv* env, jobject self, SSL* ssl);
 static void update_NativeSslSocket_isEarlyDataAccepted_field(JNIEnv* env, jobject self, SSL* ssl);
-
 
 static jbyteArray X509_cert_to_jbyteArray(JNIEnv* env, X509* cert) {
     jbyteArray result = NULL;
@@ -696,7 +647,7 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
     f_ctx = cache_field(env, "one/nio/net/NativeSslContext", "ctx", "J");
     f_ssl = cache_field(env, "one/nio/net/NativeSslSocket", "ssl", "J");
     f_isEarlyDataAccepted = cache_field(env, "one/nio/net/NativeSslSocket", "isEarlyDataAccepted", "Z");
-    f_isHandshakeDone     = cache_field(env, "one/nio/net/NativeSslSocket", "isHandshakeDone", "Z");
+    f_isHandshakeDone = cache_field(env, "one/nio/net/NativeSslSocket", "isHandshakeDone", "Z");
 
     preclosed_socket = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -707,10 +658,10 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
     c_SslSessionCacheSingleton = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/SslSessionCache$Singleton"));
     c_SslSessionCache = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/SslSessionCache"));
 
-    m_getInstance =   (*env)->GetStaticMethodID(env, c_SslSessionCacheSingleton, "getInstance", "()Lone/nio/net/SslSessionCache;");
+    m_getInstance = (*env)->GetStaticMethodID(env, c_SslSessionCacheSingleton, "getInstance", "()Lone/nio/net/SslSessionCache;");
     m_clearInstance = (*env)->GetStaticMethodID(env, c_SslSessionCacheSingleton, "clearInstance", "()V");
-    m_addSession =    (*env)->GetMethodID(env, c_SslSessionCache, "addSession", "([B[B)V");
-    m_getSession =    (*env)->GetMethodID(env, c_SslSessionCache, "getSession", "([B)[B");
+    m_addSession = (*env)->GetMethodID(env, c_SslSessionCache, "addSession", "([B[B)V");
+    m_getSession = (*env)->GetMethodID(env, c_SslSessionCache, "getSession", "([B)[B");
     m_removeSession = (*env)->GetMethodID(env, c_SslSessionCache, "removeSession", "([B)V");
 
     c_NativeSslContext = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/NativeSslContext"));
@@ -721,7 +672,6 @@ Java_one_nio_net_NativeSslContext_init(JNIEnv* env, jclass cls) {
 
     c_NativeLogger = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "one/nio/net/NativeLogger"));
     m_NativeLogger_log = (*env)->GetMethodID(env, c_NativeLogger, "log", "(Ljava/lang/String;Ljava/lang/String;)V");
-
 }
 
 static int new_session_cb(SSL* ssl, SSL_SESSION* ssl_session) {
@@ -755,7 +705,6 @@ static int new_session_cb(SSL* ssl, SSL_SESSION* ssl_session) {
     unsigned char* ptr = (unsigned char*)b_session;
     i2d_SSL_SESSION(ssl_session, &ptr);
     (*env)->ReleaseByteArrayElements(env, session, b_session, 0);
-
 
     (*env)->CallObjectMethod(env, sslSessionCache, m_addSession, sessionId, session);
     if ((*env)->ExceptionCheck(env)) {
@@ -848,9 +797,7 @@ Java_one_nio_net_NativeSslContext_ctxNew(JNIEnv* env, jclass cls) {
     }
 
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE |
-                        SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
-                        SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_COMPRESSION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
     // Disable read-ahead until premature socket close is fixed
     // SSL_CTX_set_read_ahead(ctx, 1);
@@ -876,8 +823,8 @@ Java_one_nio_net_NativeSslContext_setDebug(JNIEnv* env, jobject self, jboolean d
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     AppData* appData = SSL_CTX_get_app_data(ctx);
     appData->debug = debug;
-    appData->sslContextLogger = (JniLogger){ .log = debug ? jni_ssl_context_log : noop_log };
-    appData->sslSocketLogger = (JniLogger){ .log = debug ? jni_ssl_socket_log : noop_log };
+    appData->sslContextLogger = (JniLogger){.log = debug ? jni_ssl_context_log : noop_log};
+    appData->sslSocketLogger = (JniLogger){.log = debug ? jni_ssl_socket_log : noop_log};
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1043,7 +990,8 @@ Java_one_nio_net_NativeSslContext_setCA(JNIEnv* env, jobject self, jstring caFil
         }
 
         (*env)->ReleaseStringUTFChars(env, caFile, filename);
-        if (!success) throw_ssl_exception(env);
+        if (!success)
+            throw_ssl_exception(env);
     }
 }
 
@@ -1241,19 +1189,19 @@ Java_one_nio_net_NativeSslContext_setCacheMode(JNIEnv* env, jobject self, jint m
     SSL_CTX_sess_set_remove_cb(ctx, mode == CACHE_MODE_EXTERNAL ? remove_session_cb : NULL);
 
     switch (mode) {
-        case CACHE_MODE_NONE:
-            (*env)->CallStaticObjectMethod(env, c_SslSessionCacheSingleton, m_clearInstance);
-            SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
-            break;
-        case CACHE_MODE_INTERNAL:
-            (*env)->CallStaticObjectMethod(env, c_SslSessionCacheSingleton, m_clearInstance);
-            SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER);
-            break;
-        case CACHE_MODE_EXTERNAL:
-            SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
-            break;
-        default:
-            throw_illegal_argument_msg(env, "Unknown cache mode value");
+    case CACHE_MODE_NONE:
+        (*env)->CallStaticObjectMethod(env, c_SslSessionCacheSingleton, m_clearInstance);
+        SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+        break;
+    case CACHE_MODE_INTERNAL:
+        (*env)->CallStaticObjectMethod(env, c_SslSessionCacheSingleton, m_clearInstance);
+        SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER);
+        break;
+    case CACHE_MODE_EXTERNAL:
+        SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
+        break;
+    default:
+        throw_illegal_argument_msg(env, "Unknown cache mode value");
     }
 }
 
@@ -1324,7 +1272,8 @@ Java_one_nio_net_NativeSslSocket_sslNew(JNIEnv* env, jclass cls, jint fd, jlong 
     }
 
     throw_ssl_exception(env);
-    if (ssl != NULL) SSL_free(ssl);
+    if (ssl != NULL)
+        SSL_free(ssl);
     return 0;
 }
 
@@ -1335,46 +1284,37 @@ Java_one_nio_net_NativeSslSocket_sslFree(JNIEnv* env, jclass cls, jlong sslptr) 
     JniLogger* jniLogger = &appData->sslContextLogger;
     char serverIP[64], clientIP[64];
 
-    jniLogger->log("DEBUG", "Closing SSL session in state: %s[%s], client: %s, server: %s",
-           SSL_state_string(ssl),
-           SSL_state_string_long(ssl),
-           ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-           ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-    );
+    jniLogger->log("DEBUG", "Closing SSL session in state: %s[%s], client: %s, server: %s", SSL_state_string(ssl), SSL_state_string_long(ssl), ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
     if (!SSL_in_init(ssl)) {
         SSL_shutdown(ssl);
     } else {
-        jniLogger->log("ERROR", "SSL session is closed (due to handshake %s), client: %s, server: %s",
-               (intptr_t)SSL_get_app_data(ssl) & SF_FATAL_ALERT ? "failed" : "timed out",
-               ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)),
-               ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP))
-        );
+        jniLogger->log("ERROR", "SSL session is closed (due to handshake %s), client: %s, server: %s", (intptr_t)SSL_get_app_data(ssl) & SF_FATAL_ALERT ? "failed" : "timed out", ssl_get_peer_ip(ssl, clientIP, sizeof(clientIP)), ssl_get_host_ip_port(ssl, serverIP, sizeof(serverIP)));
     }
     SSL_free(ssl);
 }
 
 static void set_tlsext_host_name(JNIEnv* env, SSL* ssl, jstring hostName) {
-     if (hostName != NULL) {
-         struct in_addr ipv4;
-         struct in6_addr ipv6;
-         const char *value = (*env) -> GetStringUTFChars(env, hostName, NULL);
-         // set sni if hostname not ipv4/ipv6
-         if (inet_pton(AF_INET, value, &ipv4) != 1 && inet_pton(AF_INET6, value, &ipv6) != 1) {
-             ERR_clear_error();
-             int result = SSL_set_tlsext_host_name(ssl, value);
-             (*env)->ReleaseStringUTFChars(env, hostName, value);
-             if (result <= 0) {
-                 check_ssl_error(env, ssl, result);
-             }
-         } else {
-             (*env)->ReleaseStringUTFChars(env, hostName, value);
-         }
-     }
+    if (hostName != NULL) {
+        struct in_addr ipv4;
+        struct in6_addr ipv6;
+        const char* value = (*env)->GetStringUTFChars(env, hostName, NULL);
+        // set sni if hostname not ipv4/ipv6
+        if (inet_pton(AF_INET, value, &ipv4) != 1 && inet_pton(AF_INET6, value, &ipv6) != 1) {
+            ERR_clear_error();
+            int result = SSL_set_tlsext_host_name(ssl, value);
+            (*env)->ReleaseStringUTFChars(env, hostName, value);
+            if (result <= 0) {
+                check_ssl_error(env, ssl, result);
+            }
+        } else {
+            (*env)->ReleaseStringUTFChars(env, hostName, value);
+        }
+    }
 }
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self, jstring hostName) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         throw_socket_closed(env);
     } else {
@@ -1391,7 +1331,7 @@ Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self, jstring ho
             int handshake_errno = errno;
             int error = check_ssl_error(env, ssl, result);
             if (handshake_errno != EINTR ||
-                    (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE)) {
+                (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE)) {
                 break;
             }
         }
@@ -1400,7 +1340,7 @@ Java_one_nio_net_NativeSslSocket_handshake(JNIEnv* env, jobject self, jstring ho
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         throw_socket_closed(env);
         return 0;
@@ -1434,14 +1374,15 @@ Java_one_nio_net_NativeSslSocket_writeRaw(JNIEnv* env, jobject self, jlong buf, 
 
 JNIEXPORT int JNICALL
 Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count, jint flags) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     jbyte buf[MAX_STACK_BUF];
 
     if (ssl == NULL) {
         throw_socket_closed(env);
         return 0;
     } else {
-        if (count > MAX_STACK_BUF) count = MAX_STACK_BUF;
+        if (count > MAX_STACK_BUF)
+            count = MAX_STACK_BUF;
         (*env)->GetByteArrayRegion(env, data, offset, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, buf);
 
 #if (OPENSSL_VERSION_MAJOR >= 3)
@@ -1474,7 +1415,7 @@ Java_one_nio_net_NativeSslSocket_write(JNIEnv* env, jobject self, jbyteArray dat
 JNIEXPORT jlong JNICALL
 Java_one_nio_net_NativeSslSocket_sendFile0(JNIEnv* env, jobject self, jint sourceFD, jlong offset, jlong count) {
 #if (OPENSSL_VERSION_MAJOR >= 3)
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         throw_socket_closed(env);
     } else if (count != 0) {
@@ -1497,10 +1438,9 @@ Java_one_nio_net_NativeSslSocket_sendFile0(JNIEnv* env, jobject self, jint sourc
 #endif
 }
 
-
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslSocket_writeFully(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     jbyte buf[MAX_STACK_BUF];
 
     if (ssl == NULL) {
@@ -1536,22 +1476,22 @@ static int ssl_socket_readRaw_early_data(JNIEnv* env, jobject self, SSL* ssl, jl
         int ed_status = SSL_read_early_data(ssl, (void*)buf, count, &bytes_read);
 
         switch (ed_status) {
-            case SSL_READ_EARLY_DATA_FINISH:
-                SSL_set_app_data(ssl, (char*)(ssl_flags | SF_EARLY_DATA_FINISHED));
-            case SSL_READ_EARLY_DATA_SUCCESS:
+        case SSL_READ_EARLY_DATA_FINISH:
+            SSL_set_app_data(ssl, (char*)(ssl_flags | SF_EARLY_DATA_FINISHED));
+        case SSL_READ_EARLY_DATA_SUCCESS:
+            update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
+            return bytes_read;
+        case SSL_READ_EARLY_DATA_ERROR:
+            if ((result = check_ssl_error(env, ssl, ed_status)) != SSL_ERROR_WANT_READ || errno != EINTR) {
                 update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
-                return bytes_read;
-            case SSL_READ_EARLY_DATA_ERROR:
-                if ((result = check_ssl_error(env, ssl, ed_status)) != SSL_ERROR_WANT_READ || errno != EINTR) {
-                    update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
-                    return result == SSL_ERROR_WANT_WRITE ? -1 : 0;
-                }
-            default: {
-                char error[64];
-                snprintf(error, sizeof(error), "Unexpected Early data status (%d)", ed_status);
-                update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
-                throw_by_name(env, "javax/net/ssl/SSLException", error);
+                return result == SSL_ERROR_WANT_WRITE ? -1 : 0;
             }
+        default: {
+            char error[64];
+            snprintf(error, sizeof(error), "Unexpected Early data status (%d)", ed_status);
+            update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
+            throw_by_name(env, "javax/net/ssl/SSLException", error);
+        }
         }
     }
 #else
@@ -1562,7 +1502,7 @@ static int ssl_socket_readRaw_early_data(JNIEnv* env, jobject self, SSL* ssl, jl
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSslSocket_readRaw(JNIEnv* env, jobject self, jlong buf, jint count, jint flags) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         throw_socket_closed(env);
         return 0;
@@ -1598,23 +1538,23 @@ static int ssl_socket_read_early_data(JNIEnv* env, jobject self, SSL* ssl, jbyte
         int ed_status = SSL_read_early_data(ssl, (void*)buf, count <= MAX_STACK_BUF ? count : MAX_STACK_BUF, &bytes_read);
 
         switch (ed_status) {
-            case SSL_READ_EARLY_DATA_FINISH:
-                SSL_set_app_data(ssl, (char*)(ssl_flags | SF_EARLY_DATA_FINISHED));
-            case SSL_READ_EARLY_DATA_SUCCESS:
-                (*env)->SetByteArrayRegion(env, data, offset, bytes_read, buf);
+        case SSL_READ_EARLY_DATA_FINISH:
+            SSL_set_app_data(ssl, (char*)(ssl_flags | SF_EARLY_DATA_FINISHED));
+        case SSL_READ_EARLY_DATA_SUCCESS:
+            (*env)->SetByteArrayRegion(env, data, offset, bytes_read, buf);
+            update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
+            return bytes_read;
+        case SSL_READ_EARLY_DATA_ERROR:
+            if ((result = check_ssl_error(env, ssl, ed_status)) != SSL_ERROR_WANT_READ || errno != EINTR) {
                 update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
-                return bytes_read;
-            case SSL_READ_EARLY_DATA_ERROR:
-                if ((result = check_ssl_error(env, ssl, ed_status)) != SSL_ERROR_WANT_READ || errno != EINTR) {
-                    update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
-                    return result == SSL_ERROR_WANT_WRITE ? -1 : 0;
-                }
-            default: {
-                char error[64];
-                snprintf(error, sizeof(error), "Unexpected Early data status (%d)", ed_status);
-                update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
-                throw_by_name(env, "javax/net/ssl/SSLException", error);
+                return result == SSL_ERROR_WANT_WRITE ? -1 : 0;
             }
+        default: {
+            char error[64];
+            snprintf(error, sizeof(error), "Unexpected Early data status (%d)", ed_status);
+            update_NativeSslSocket_isEarlyDataAccepted_field(env, self, ssl);
+            throw_by_name(env, "javax/net/ssl/SSLException", error);
+        }
         }
     }
 #else
@@ -1625,7 +1565,7 @@ static int ssl_socket_read_early_data(JNIEnv* env, jobject self, SSL* ssl, jbyte
 
 JNIEXPORT int JNICALL
 Java_one_nio_net_NativeSslSocket_read(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     jbyte buf[MAX_STACK_BUF];
 
     if (ssl == NULL) {
@@ -1654,7 +1594,7 @@ Java_one_nio_net_NativeSslSocket_read(JNIEnv* env, jobject self, jbyteArray data
 
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslSocket_readFully(JNIEnv* env, jobject self, jbyteArray data, jint offset, jint count) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     jbyte buf[MAX_STACK_BUF];
 
     if (ssl == NULL) {
@@ -1677,7 +1617,7 @@ Java_one_nio_net_NativeSslSocket_readFully(JNIEnv* env, jobject self, jbyteArray
 
 JNIEXPORT jbyteArray JNICALL
 Java_one_nio_net_NativeSslSocket_sslPeerCertificate(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         return NULL;
     }
@@ -1695,7 +1635,7 @@ Java_one_nio_net_NativeSslSocket_sslPeerCertificate(JNIEnv* env, jobject self) {
 
 JNIEXPORT jobjectArray JNICALL
 Java_one_nio_net_NativeSslSocket_sslPeerCertificateChain(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         return NULL;
     }
@@ -1727,7 +1667,7 @@ Java_one_nio_net_NativeSslSocket_sslPeerCertificateChain(JNIEnv* env, jobject se
 
 JNIEXPORT jstring JNICALL
 Java_one_nio_net_NativeSslSocket_sslCertName(JNIEnv* env, jobject self, jint which) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         return NULL;
     }
@@ -1743,8 +1683,7 @@ Java_one_nio_net_NativeSslSocket_sslCertName(JNIEnv* env, jobject self, jint whi
     if (name != NULL) {
         BIO* mem = BIO_new(BIO_s_mem());
         if (mem != NULL) {
-            X509_NAME_print_ex(mem, name, 0, XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_FN_SN |
-                                             (ASN1_STRFLGS_RFC2253 & ~ASN1_STRFLGS_ESC_MSB));
+            X509_NAME_print_ex(mem, name, 0, XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_FN_SN | (ASN1_STRFLGS_RFC2253 & ~ASN1_STRFLGS_ESC_MSB));
             char zero = 0;
             BIO_write(mem, &zero, 1);
 
@@ -1764,7 +1703,7 @@ Java_one_nio_net_NativeSslSocket_sslCertName(JNIEnv* env, jobject self, jint whi
 
 JNIEXPORT jstring JNICALL
 Java_one_nio_net_NativeSslSocket_sslVerifyResult(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         return NULL;
     }
@@ -1780,18 +1719,16 @@ Java_one_nio_net_NativeSslSocket_sslVerifyResult(JNIEnv* env, jobject self) {
 
 JNIEXPORT jboolean JNICALL
 Java_one_nio_net_NativeSslSocket_sslSessionReused(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     return ssl != NULL && SSL_session_reused(ssl) ? JNI_TRUE : JNI_FALSE;
 }
 
 static void update_NativeSslSocket_isEarlyDataAccepted_field(JNIEnv* env, jobject self, SSL* ssl) {
 #ifdef SSL_EARLY_DATA_ACCEPTED
-    jboolean isEarlyDataAccepted = ssl != NULL
-                && SSL_get_early_data_status(ssl) == SSL_EARLY_DATA_ACCEPTED ? JNI_TRUE : JNI_FALSE;
+    jboolean isEarlyDataAccepted = ssl != NULL && SSL_get_early_data_status(ssl) == SSL_EARLY_DATA_ACCEPTED ? JNI_TRUE : JNI_FALSE;
     (*env)->SetBooleanField(env, self, f_isEarlyDataAccepted, isEarlyDataAccepted);
 #endif
 }
-
 
 static void update_NativeSslSocket_isHandshakeDone_field(JNIEnv* env, jobject self, SSL* ssl) {
     jboolean isHandshakeDone = ssl != NULL && SSL_is_init_finished(ssl) ? JNI_TRUE : JNI_FALSE;
@@ -1800,19 +1737,19 @@ static void update_NativeSslSocket_isHandshakeDone_field(JNIEnv* env, jobject se
 
 JNIEXPORT jint JNICALL
 Java_one_nio_net_NativeSslSocket_sslSessionTicket(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     return ssl == NULL ? 0 : ((intptr_t)SSL_get_app_data(ssl) & SF_NEW_TICKET) >> 2;
 }
 
 JNIEXPORT jboolean JNICALL
 Java_one_nio_net_NativeSslSocket_sslCanUseSendfile(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     return ssl != NULL && BIO_get_ktls_send(SSL_get_wbio(ssl)) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jstring JNICALL
 Java_one_nio_net_NativeSslSocket_sslCurrentCipher(JNIEnv* env, jobject self) {
-    SSL* ssl = (SSL*)(intptr_t) (*env)->GetLongField(env, self, f_ssl);
+    SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
     if (ssl == NULL) {
         return NULL;
     }
@@ -1822,7 +1759,7 @@ Java_one_nio_net_NativeSslSocket_sslCurrentCipher(JNIEnv* env, jobject self) {
 }
 
 #if (OPENSSL_VERSION_MAJOR >= 3)
-static void keylog_callback(const SSL *ssl, const char *line) {
+static void keylog_callback(const SSL* ssl, const char* line) {
     JNIEnv* env;
     if (JNI_OK != (*global_vm)->GetEnv(global_vm, (void**)&env, JNI_VERSION_1_8)) {
         return;
@@ -1847,7 +1784,7 @@ static void keylog_callback(const SSL *ssl, const char *line) {
 JNIEXPORT void JNICALL
 Java_one_nio_net_NativeSslContext_setKeylog(JNIEnv* env, jobject self, jboolean keylog) {
 #if (OPENSSL_VERSION_MAJOR >= 3)
-    SSL_CTX* ctx = (SSL_CTX*)(intptr_t) (*env)->GetLongField(env, self, f_ctx);
+    SSL_CTX* ctx = (SSL_CTX*)(intptr_t)(*env)->GetLongField(env, self, f_ctx);
     SSL_CTX_set_keylog_callback(ctx, keylog ? keylog_callback : NULL);
 #endif
 }
@@ -1855,10 +1792,12 @@ Java_one_nio_net_NativeSslContext_setKeylog(JNIEnv* env, jobject self, jboolean 
 JNIEXPORT jstring JNICALL
 Java_one_nio_net_NativeSslSocket_sslServerName(JNIEnv* env, jobject self) {
     SSL* ssl = (SSL*)(intptr_t)(*env)->GetLongField(env, self, f_ssl);
-    if (ssl == NULL) return NULL;
+    if (ssl == NULL)
+        return NULL;
 
     const char* name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-    if (name == NULL) return NULL;
+    if (name == NULL)
+        return NULL;
 
     return (*env)->NewStringUTF(env, name);
 }
