@@ -22,7 +22,7 @@ import java.util.Arrays;
 import one.nio.net.Socket;
 import one.nio.server.AcceptorConfig;
 
-public class MultiAcceptorGroup {
+class MultiAcceptorGroup {
     private final MultiAcceptorThread thread;
     private final String address;
     private final int port;
@@ -39,6 +39,10 @@ public class MultiAcceptorGroup {
             sessions[sessionIdx] = createMultiAcceptSession(config, sessionIdx);
         }
         this.sessions = sessions;
+    }
+
+    MultiAcceptSession[] sessions() {
+        return sessions;
     }
 
     boolean isSameAddressPort(AcceptorConfig config) {

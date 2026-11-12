@@ -19,6 +19,7 @@ package one.nio.server.acceptor;
 import java.io.IOException;
 import java.util.Arrays;
 
+import one.nio.net.Socket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +117,15 @@ class MultiAcceptor implements Acceptor {
     @Override
     public int getSinglePort() {
         return acceptorGroups[0].getPort();
+    }
+
+    @Override
+    public Iterable<Socket> sockets() {
+        return () -> Arrays.stream(this.acceptorGroups)
+                .map(MultiAcceptorGroup::sessions)
+                .flatMap(Arrays::stream)
+                .map(MultiAcceptSession::serverSocket)
+                .iterator();
     }
 
     private void validateConfig(AcceptorConfig newConfig) {

@@ -32,6 +32,7 @@ public class SslConfig {
     static final long DEFAULT_REFRESH_INTERVAL = 300_000;
 
     public boolean debug;
+    public boolean statsEnabled;
     public boolean rdrand;
     public String protocols;
     public String ciphers;

@@ -45,6 +45,10 @@ class MultiAcceptSession extends Session {
         AcceptorSupport.reconfigureSocket(socket, newConfig);
     }
 
+    Socket serverSocket() {
+        return socket;
+    }
+
     static int acceptOp() {
         return Socket.USE_NATIVE_SOCKET ? READABLE : SelectionKey.OP_ACCEPT;
     }

@@ -124,6 +124,15 @@ class NativeSslContext extends SslContext {
     public native boolean getDebug();
 
     @Override
+    protected native void setSslStatsEnabled(boolean statsEnabled);
+
+    @Override
+    public native void resetSslStats();
+
+    @Override
+    public native SslStats getSslStats();
+
+    @Override
     public void setProtocols(String protocols) {
         int enabled = 0;
 

@@ -18,6 +18,7 @@ package one.nio.server.acceptor;
 
 import java.io.IOException;
 
+import one.nio.net.Socket;
 import one.nio.server.AcceptorConfig;
 
 public interface Acceptor {
@@ -36,4 +37,7 @@ public interface Acceptor {
     void resetCounters();
 
     int getSinglePort();
+
+    Iterable<Socket> sockets();
+
 }
