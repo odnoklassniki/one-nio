@@ -19,13 +19,14 @@ package one.nio.server.acceptor;
 import java.io.IOException;
 import java.util.Arrays;
 
+import one.nio.net.Socket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import one.nio.server.AcceptorConfig;
 import one.nio.server.Server;
 
-public class DefaultAcceptor implements Acceptor {
+class DefaultAcceptor implements Acceptor {
     private static final Logger log = LoggerFactory.getLogger(DefaultAcceptor.class);
 
     private final Server server;
@@ -120,5 +121,14 @@ public class DefaultAcceptor implements Acceptor {
     @Override
     public int getSinglePort() {
         return acceptorGroups[0].getPort();
+    }
+
+    @Override
+    public Iterable<Socket> sockets() {
+        return () -> Arrays.stream(this.acceptorGroups)
+                .map(DefaultAcceptorGroup::acceptors)
+                .flatMap(Arrays::stream)
+                .map(thread -> thread.serverSocket)
+                .iterator();
     }
 }

@@ -17,6 +17,7 @@
 package one.nio.http;
 
 import one.nio.net.Socket;
+import one.nio.net.SslContext;
 import one.nio.net.SslOption;
 import one.nio.util.Utf8;
 import org.slf4j.Logger;
@@ -102,7 +103,27 @@ public class HttpServerTest extends HttpServer {
         return Response.ok(result.toString());
     }
 
-    @Override
+    @Path("/ssl-stats")
+    @RequestMethod(Request.METHOD_GET)
+    public Response handleGetSslStats(HttpSession session) {
+        Socket socket = session.socket();
+        if (!session.isSsl()) {
+            return Response.ok("Not an SSL session");
+        }
+        return Response.json(socket.getSslContext().getSslStats());
+    }
+
+    @Path("/ssl-stats")
+    @RequestMethod(Request.METHOD_DELETE)
+    public Response handleResetSslStats(HttpSession session) {
+        Socket socket = session.socket();
+        if (!session.isSsl()) {
+            return Response.ok("Not an SSL session");
+        }
+        socket.getSslContext().resetSslStats();
+        return Response.ok("SslStats reset");
+    }
+
     public void handleDefault(Request request, HttpSession session) throws IOException {
         Response response = Response.ok(Utf8.toBytes("<html><body><pre>Default</pre></body></html>"));
         response.addHeader("Content-Type: text/html");

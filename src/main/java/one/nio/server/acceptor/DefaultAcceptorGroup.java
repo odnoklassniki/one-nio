@@ -44,6 +44,10 @@ class DefaultAcceptorGroup {
         this.acceptors = acceptors;
     }
 
+    AcceptorThread[] acceptors() {
+        return acceptors;
+    }
+
     public void reconfigure(AcceptorConfig ac) throws IOException {
         if (!isSameAddressPort(ac)) {
             throw new IllegalArgumentException("Acceptor config has different address:port");

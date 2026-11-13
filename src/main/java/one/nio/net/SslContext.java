@@ -73,6 +73,7 @@ public abstract class SslContext {
         }
 
         setDebug(config.debug);
+        setSslStatsEnabled(config.statsEnabled);
 
         if (config.rdrand != currentConfig.rdrand) {
             setRdrand(config.rdrand);
@@ -303,6 +304,11 @@ public abstract class SslContext {
 
     public abstract void setDebug(boolean debug);
     public abstract boolean getDebug();
+
+
+    protected abstract void setSslStatsEnabled(boolean statsEnabled);
+    public abstract void resetSslStats();
+    public abstract SslStats getSslStats();
 
     public abstract void setRdrand(boolean rdrand) throws SSLException;
     public abstract void setProtocols(String protocols) throws SSLException;

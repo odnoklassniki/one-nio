@@ -17,6 +17,8 @@
 package one.nio.http;
 
 import one.nio.http.gen.RequestHandlerGenerator;
+import one.nio.net.SslContext;
+import one.nio.net.SslStats;
 import one.nio.server.RejectedSessionException;
 import one.nio.server.Server;
 import one.nio.net.Socket;
@@ -26,6 +28,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.StreamSupport;
 
 public class HttpServer extends Server {
     private final PathMapper defaultMapper = new PathMapper();
@@ -54,6 +58,28 @@ public class HttpServer extends Server {
     @Override
     public HttpSession createSession(Socket socket) throws RejectedSessionException {
         return new HttpSession(socket, this);
+    }
+
+    public void resetSslStats() {
+        StreamSupport.stream(acceptor.sockets().spliterator(), false)
+                .map(Socket::getSslContext)
+                .filter(Objects::nonNull)
+                .forEach(SslContext::resetSslStats);
+    }
+
+    public SslStats getSslStats() {
+        return StreamSupport.stream(acceptor.sockets().spliterator(), false)
+                .map(Socket::getSslContext)
+                .filter(Objects::nonNull)
+                .map(SslContext::getSslStats)
+                .reduce(new SslStats(), (acc, stats) ->
+                        new SslStats(
+                            acc.handshakesTotal + stats.handshakesTotal,
+                            acc.handshakesFailed + stats.handshakesFailed,
+                            acc.handshakeTimeout + stats.handshakeTimeout,
+                            acc.sessionReuses + stats.sessionReuses
+                        )
+                );
     }
 
     public void handleRequest(Request request, HttpSession session) throws IOException {
