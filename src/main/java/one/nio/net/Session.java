@@ -127,7 +127,7 @@ public class Session implements Closeable {
     public int read(byte[] data, int offset, int count) throws IOException {
         int bytesRead = socket.read(data, offset, count, 0);
         if (bytesRead >= 0) {
-            listen(READABLE);
+            listen(eventsToListen | READABLE);
             return bytesRead;
         } else {
             listen(SSL | WRITEABLE);
