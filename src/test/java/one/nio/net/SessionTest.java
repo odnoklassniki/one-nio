@@ -21,6 +21,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
@@ -72,9 +73,42 @@ public class SessionTest {
 
         assertTrue(
                 "read() dropped WRITEABLE: eventsToListen=" + session.eventsToListen
-                        + " (ожидалось " + (Session.READABLE | Session.WRITEABLE) + ")",
+                        + " (was expected " + (Session.READABLE | Session.WRITEABLE) + ")",
                 (session.eventsToListen & Session.WRITEABLE) != 0
         );
+    }
+
+    @Test
+    public void testReadRawDoesNotDropWriteableEvent() throws IOException {
+        session.listen(Session.READABLE | Session.WRITEABLE);
+        assertEquals(Session.READABLE | Session.WRITEABLE, session.eventsToListen);
+
+        acceptedChannel.write(ByteBuffer.wrap("test data".getBytes()));
+
+        ByteBuffer direct = ByteBuffer.allocateDirect(1024);
+        long address = getDirectBufferAddress(direct);
+        int bytesRead = session.readRaw(address, direct.capacity());
+        assertTrue("Expected to read some bytes, got " + bytesRead, bytesRead > 0);
+
+        assertTrue(
+            "readRaw() dropped WRITEABLE: eventsToListen=" + session.eventsToListen,
+            (session.eventsToListen & Session.WRITEABLE) != 0
+        );
+    }
+
+    private static long getDirectBufferAddress(ByteBuffer buffer) {
+        try {
+            Field theUnsafe = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            sun.misc.Unsafe unsafe = (sun.misc.Unsafe) theUnsafe.get(null);
+
+            Field addressField = java.nio.Buffer.class.getDeclaredField("address");
+            long addressOffset = unsafe.objectFieldOffset(addressField);
+
+            return unsafe.getLong(buffer, addressOffset);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to get direct buffer address", e);
+        }
     }
 
     @After
